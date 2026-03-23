@@ -66,17 +66,26 @@ jobs:
         run: |
           tar -C target/release -czvf droidtui-${{ github.ref_name }}-linux-x86_64.tar.gz droidtui
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          body_path: RELEASE_CHANGELOG.md
-          files: |
-            droidtui-${{ github.ref_name }}-linux-x86_64.tar.gz
-            LICENSE
-            README.md
-            CHANGELOG.md
+      - name: Create Gitea Release
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
+          body_path: RELEASE_CHANGELOG.md
+          draft: false
+          prerelease: false
+
+      - name: Upload release binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: droidtui-${{ github.ref_name }}-linux-x86_64.tar.gz
+          asset_name: droidtui-${{ github.ref_name }}-linux-x86_64.tar.gz
+          asset_content_type: application/gzip
 
       - name: Publish to crates.io
         if: env.CRATES_IO_TOKEN != ''
@@ -92,4 +101,4 @@ jobs:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
           echo "CRATES_IO_TOKEN not set — skipping crates.io publication."
-          echo "Add CRATES_IO_TOKEN to your GitHub repository secrets to enable auto-publish."
+          echo "Add CRATES_IO_TOKEN to your Gitea repository secrets to enable auto-publish."

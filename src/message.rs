@@ -23,14 +23,6 @@ pub enum Message {
     ScrollToTop,
     ScrollToBottom,
 
-    // Screen streaming messages
-    StartStream,
-    StopStream,
-    UpdateFrame(Option<String>),
-    TogglePause,
-    IncreaseRefreshRate,
-    DecreaseRefreshRate,
-
     // Application lifecycle
     Tick,
     Quit,
@@ -60,8 +52,6 @@ impl Message {
                 | Message::EnterChild
                 | Message::ExitChild
                 | Message::SkipStartup
-                | Message::StartStream
-                | Message::StopStream
         )
     }
 }
