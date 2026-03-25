@@ -137,7 +137,7 @@ impl Model {
     /// Create a new model with initial state
     pub fn new() -> Self {
         Self {
-            state: AppState::Startup,
+            state: AppState::Menu,
             menu: Menu::new(),
             effects: EffectsManager::new(),
             last_tick: Instant::now(),
@@ -154,6 +154,7 @@ impl Model {
             last_command_label: None,
             device_status: DeviceStatus::default(),
             needs_device_refresh: true,
+            // Skip startup animation — go straight to menu
             logcat: LogcatState::new(),
             logcat_save_active: false,
             logcat_save_path: String::new(),
