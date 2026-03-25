@@ -59,6 +59,21 @@ pub enum Message {
     LogcatFileExplorerKey(KeyEvent),
     LogcatCancelSave,
     LogcatSaveAs,
+    // Logcat feature messages
+    LogcatToggleRegex,
+    LogcatToggleExclude,
+    LogcatToggleCompact,
+    LogcatToggleDetail,
+    LogcatBookmarkToggle,
+    LogcatBookmarkNext,
+    LogcatBookmarkPrev,
+    LogcatHScrollLeft,
+    LogcatHScrollRight,
+    LogcatHScrollReset,
+    LogcatCopyLine,
+    LogcatToggleFold,
+    LogcatSelectUp,
+    LogcatSelectDown,
     CloseLogcat,
 
     // Application lifecycle

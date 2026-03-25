@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-03-25
+
+### 🚀 Features
+
+- **Live Logcat Viewer** — Full-screen, real-time logcat streaming via the `adb_client` crate's native `ADBServerDevice::get_logs()` API
+- **Regex search** — Toggle regex mode (`r`) for powerful pattern matching (e.g. `Error|Exception`, `OkHttp.*failed`)
+- **Exclude filter** — Negative match filter (`e`) to hide noisy tags/messages (supports regex when enabled)
+- **Line detail popup** — Press `Enter` to inspect any log line with full unwrapped message, tag, PID, TID, and timestamp
+- **Per-tag color hashing** — Each tag gets a stable, visually distinct color via djb2 hash over a 16-color palette
+- **Stack trace folding** — Detect Java/Kotlin stack traces and fold/unfold them with `f`
+- **Live stats bar** — Real-time lines/sec rate and per-level counters in the status area
+- **Horizontal scroll** — `←`/`→` arrow keys to scroll long messages when word-wrap is off, `0` to reset
+- **Compact mode** — Toggle with `x` to hide timestamp and PID columns for more message space
+- **Copy to clipboard** — Press `y` to copy the selected line to the system clipboard (macOS `pbcopy`, Linux `xclip`/`xsel`)
+- **Bookmarks** — `m` to toggle bookmarks on log lines, `[`/`]` to jump between them (wraps around)
+- **Search highlighting** — Search matches are highlighted with yellow background in the log output
+- **Log level filter** — Cycle minimum level with `l` (V→D→I→W→E→F)
+- **Tag / PID filters** — Dedicated filter fields for tag substring and PID matching
+- **Auto-scroll** — Sticks to the bottom by default; manual scroll disables it; `G`/`End` re-enables
+- **Pause / Resume** — `Space` to pause ingestion without losing the stream
+- **Clear logs** — `c` to clear all entries and counters
+- **Save logs** — `s` to save all entries, `S` to save filtered only, with path input dialog
+- **Save As… file browser** — `F2` in save dialog opens `tui-file-explorer` for directory browsing
+- **Save Here** — `S` in the file browser to save directly into the current directory with a timestamped filename
+- **Word wrap toggle** — `w` to toggle line wrapping
+- **Menu integration** — 📺 Live Logcat entry in the SYSTEM menu section, `Shift+L` shortcut from menu
+
+### 🐛 Bug Fixes
+
+- **Bounded channel** — Replaced unbounded `mpsc::channel` with `sync_channel(10_000)` to prevent OOM crashes during logcat bursts
+- **Backpressure** — ADB streaming thread now blocks when the channel is full instead of flooding memory
+- **Optimized trim** — Ring buffer trim now adjusts filtered indices in-place O(filtered_len) instead of full O(50k) rebuild
+- **Scroll position crash** — Fixed `scroll_position` semantics so transitioning from auto-scroll doesn't jump to line 0
+- **Drain rate** — Increased from 200 to 500 lines/tick for better throughput (15k lines/sec at 30fps)
+
+### ⚙️ Miscellaneous Tasks
+
+- Added `regex` crate dependency for regex search support
+- Added `tui-file-explorer` crate (no-default-features) for file browser in save dialog
+- Added 49 new unit tests covering all logcat features (177 total project tests)
+- Bumped version to 0.4.0
+
 ## [0.3.2] - 2025-10-19
 
 ### ⚙️ Miscellaneous Tasks

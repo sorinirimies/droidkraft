@@ -6,6 +6,8 @@
 
 use adb_client::ADBServerDevice;
 use ratatui::style::Color;
+use regex::Regex;
+use std::collections::{BTreeSet, HashSet, VecDeque};
 use std::fmt;
 use std::io::{self, Write};
 use std::net::{Ipv4Addr, SocketAddrV4};
@@ -129,6 +131,19 @@ impl fmt::Display for LogLevel {
 // LogEntry
 // ---------------------------------------------------------------------------
 
+/// Detect whether a message line looks like a stack trace continuation.
+fn is_continuation_line(msg: &str) -> bool {
+    let trimmed = msg.trim_start();
+    trimmed.starts_with("at ")
+        || trimmed.starts_with("Caused by:")
+        || trimmed.starts_with("... ")
+        || (trimmed.starts_with("java.")
+            || trimmed.starts_with("kotlin.")
+            || trimmed.starts_with("android.")
+            || trimmed.starts_with("javax."))
+            && (trimmed.contains("Exception") || trimmed.contains("Error"))
+}
+
 /// A single parsed logcat entry.
 #[derive(Debug, Clone)]
 pub struct LogEntry {
@@ -146,6 +161,8 @@ pub struct LogEntry {
     pub tag: Option<String>,
     /// The log message body.
     pub message: String,
+    /// Whether this line is a stack trace continuation (e.g. "at ...", "Caused by:", etc.).
+    pub is_stack_continuation: bool,
 }
 
 impl LogEntry {
@@ -181,6 +198,7 @@ impl LogEntry {
             level: LogLevel::Unknown,
             tag: None,
             message: line.to_string(),
+            is_stack_continuation: is_continuation_line(line),
         }
     }
 
@@ -256,7 +274,8 @@ impl LogEntry {
             tid: Some(tid),
             level,
             tag: if tag.is_empty() { None } else { Some(tag) },
-            message,
+            message: message.clone(),
+            is_stack_continuation: is_continuation_line(&message),
         })
     }
 
@@ -300,7 +319,8 @@ impl LogEntry {
             tid: None,
             level,
             tag: if tag.is_empty() { None } else { Some(tag) },
-            message,
+            message: message.clone(),
+            is_stack_continuation: is_continuation_line(&message),
         })
     }
 }
@@ -315,6 +335,7 @@ pub enum FilterField {
     Search,
     Tag,
     Package,
+    Exclude,
     None,
 }
 
@@ -323,7 +344,6 @@ pub enum FilterField {
 // ---------------------------------------------------------------------------
 
 /// Filter state for the logcat viewer.
-#[derive(Debug, Clone)]
 pub struct LogcatFilter {
     /// Free-text search (case-insensitive substring match).
     pub search_query: String,
@@ -341,6 +361,56 @@ pub struct LogcatFilter {
     pub package_cursor: usize,
     /// Which input field is currently receiving keyboard input.
     pub active_field: FilterField,
+    /// Negative match / exclude filter query.
+    pub exclude_query: String,
+    /// Cursor position within the exclude filter field.
+    pub exclude_cursor: usize,
+    /// Whether regex mode is enabled for search/exclude.
+    pub use_regex: bool,
+    /// Cached compiled regex for search query — not cloned/debug'd.
+    compiled_regex: Option<Regex>,
+    /// Cached compiled regex for exclude query — not cloned/debug'd.
+    compiled_exclude: Option<Regex>,
+}
+
+impl fmt::Debug for LogcatFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LogcatFilter")
+            .field("search_query", &self.search_query)
+            .field("search_cursor", &self.search_cursor)
+            .field("min_level", &self.min_level)
+            .field("tag_filter", &self.tag_filter)
+            .field("tag_cursor", &self.tag_cursor)
+            .field("package_filter", &self.package_filter)
+            .field("package_cursor", &self.package_cursor)
+            .field("active_field", &self.active_field)
+            .field("exclude_query", &self.exclude_query)
+            .field("exclude_cursor", &self.exclude_cursor)
+            .field("use_regex", &self.use_regex)
+            .finish()
+    }
+}
+
+impl Clone for LogcatFilter {
+    fn clone(&self) -> Self {
+        let mut cloned = Self {
+            search_query: self.search_query.clone(),
+            search_cursor: self.search_cursor,
+            min_level: self.min_level,
+            tag_filter: self.tag_filter.clone(),
+            tag_cursor: self.tag_cursor,
+            package_filter: self.package_filter.clone(),
+            package_cursor: self.package_cursor,
+            active_field: self.active_field,
+            exclude_query: self.exclude_query.clone(),
+            exclude_cursor: self.exclude_cursor,
+            use_regex: self.use_regex,
+            compiled_regex: None,
+            compiled_exclude: None,
+        };
+        cloned.recompile_regex();
+        cloned
+    }
 }
 
 impl Default for LogcatFilter {
@@ -354,6 +424,11 @@ impl Default for LogcatFilter {
             package_filter: String::new(),
             package_cursor: 0,
             active_field: FilterField::None,
+            exclude_query: String::new(),
+            exclude_cursor: 0,
+            use_regex: false,
+            compiled_regex: None,
+            compiled_exclude: None,
         }
     }
 }
@@ -366,12 +441,36 @@ impl LogcatFilter {
             return false;
         }
 
-        // Search query (case-insensitive substring on raw line)
+        // Search query
         if !self.search_query.is_empty() {
-            let query_lower = self.search_query.to_lowercase();
-            let raw_lower = entry.raw.to_lowercase();
-            if !raw_lower.contains(&query_lower) {
-                return false;
+            if self.use_regex {
+                if let Some(ref re) = self.compiled_regex {
+                    if !re.is_match(&entry.raw) {
+                        return false;
+                    }
+                }
+            } else {
+                let query_lower = self.search_query.to_lowercase();
+                let raw_lower = entry.raw.to_lowercase();
+                if !raw_lower.contains(&query_lower) {
+                    return false;
+                }
+            }
+        }
+
+        // Exclude query (negative match)
+        if !self.exclude_query.is_empty() {
+            if self.use_regex {
+                if let Some(ref re) = self.compiled_exclude {
+                    if re.is_match(&entry.raw) {
+                        return false;
+                    }
+                }
+            } else {
+                let q = self.exclude_query.to_lowercase();
+                if entry.raw.to_lowercase().contains(&q) {
+                    return false;
+                }
             }
         }
 
@@ -422,31 +521,72 @@ impl LogcatFilter {
         self.package_cursor = 0;
     }
 
+    /// Clear the exclude filter and reset its cursor.
+    pub fn clear_exclude(&mut self) {
+        self.exclude_query.clear();
+        self.exclude_cursor = 0;
+    }
+
+    /// Recompile cached regexes from the current query strings.
+    pub fn recompile_regex(&mut self) {
+        self.compiled_regex = if self.use_regex && !self.search_query.is_empty() {
+            Regex::new(&self.search_query).ok()
+        } else {
+            None
+        };
+        self.compiled_exclude = if self.use_regex && !self.exclude_query.is_empty() {
+            Regex::new(&self.exclude_query).ok()
+        } else {
+            None
+        };
+    }
+
+    /// Toggle regex mode on/off and recompile.
+    pub fn toggle_regex(&mut self) {
+        self.use_regex = !self.use_regex;
+        self.recompile_regex();
+    }
+
     /// Insert a character at the cursor position of the currently active field.
     pub fn insert_char(&mut self, c: char) {
-        let (field, cursor) = self.active_field_mut();
-        let byte_idx = char_to_byte_index(field, *cursor);
-        field.insert(byte_idx, c);
-        *cursor += 1;
+        {
+            let (field, cursor) = self.active_field_mut();
+            let byte_idx = char_to_byte_index(field, *cursor);
+            field.insert(byte_idx, c);
+            *cursor += 1;
+        }
+        if self.use_regex {
+            self.recompile_regex();
+        }
     }
 
     /// Delete the character before the cursor (backspace) in the active field.
     pub fn delete_char(&mut self) {
-        let (field, cursor) = self.active_field_mut();
-        if *cursor > 0 {
-            *cursor -= 1;
-            let byte_idx = char_to_byte_index(field, *cursor);
-            field.remove(byte_idx);
+        {
+            let (field, cursor) = self.active_field_mut();
+            if *cursor > 0 {
+                *cursor -= 1;
+                let byte_idx = char_to_byte_index(field, *cursor);
+                field.remove(byte_idx);
+            }
+        }
+        if self.use_regex {
+            self.recompile_regex();
         }
     }
 
     /// Delete the character at the cursor (forward delete) in the active field.
     pub fn delete_char_forward(&mut self) {
-        let (field, cursor) = self.active_field_mut();
-        let char_count = field.chars().count();
-        if *cursor < char_count {
-            let byte_idx = char_to_byte_index(field, *cursor);
-            field.remove(byte_idx);
+        {
+            let (field, cursor) = self.active_field_mut();
+            let char_count = field.chars().count();
+            if *cursor < char_count {
+                let byte_idx = char_to_byte_index(field, *cursor);
+                field.remove(byte_idx);
+            }
+        }
+        if self.use_regex {
+            self.recompile_regex();
         }
     }
 
@@ -485,6 +625,7 @@ impl LogcatFilter {
             FilterField::Search => (&mut self.search_query, &mut self.search_cursor),
             FilterField::Tag => (&mut self.tag_filter, &mut self.tag_cursor),
             FilterField::Package => (&mut self.package_filter, &mut self.package_cursor),
+            FilterField::Exclude => (&mut self.exclude_query, &mut self.exclude_cursor),
             FilterField::None => (&mut self.search_query, &mut self.search_cursor),
         }
     }
@@ -496,6 +637,95 @@ fn char_to_byte_index(s: &str, char_idx: usize) -> usize {
         .nth(char_idx)
         .map(|(i, _)| i)
         .unwrap_or(s.len())
+}
+
+// ---------------------------------------------------------------------------
+// Per-tag color hashing
+// ---------------------------------------------------------------------------
+
+/// Hash a tag string to a stable, visually distinct color.
+pub fn tag_color(tag: &str) -> Color {
+    let mut hash: u32 = 5381;
+    for b in tag.bytes() {
+        hash = hash.wrapping_mul(33).wrapping_add(b as u32);
+    }
+    // Pick from a palette of distinct colors
+    const PALETTE: &[Color] = &[
+        Color::Rgb(86, 156, 214),  // blue
+        Color::Rgb(78, 201, 176),  // teal
+        Color::Rgb(220, 220, 170), // light yellow
+        Color::Rgb(206, 145, 120), // salmon
+        Color::Rgb(181, 206, 168), // light green
+        Color::Rgb(200, 130, 200), // purple
+        Color::Rgb(100, 200, 220), // cyan
+        Color::Rgb(220, 180, 100), // gold
+        Color::Rgb(130, 180, 220), // periwinkle
+        Color::Rgb(180, 140, 180), // mauve
+        Color::Rgb(150, 220, 150), // mint
+        Color::Rgb(220, 150, 150), // rose
+        Color::Rgb(170, 200, 130), // olive
+        Color::Rgb(140, 180, 200), // steel blue
+        Color::Rgb(200, 170, 140), // tan
+        Color::Rgb(160, 200, 200), // powder blue
+    ];
+    PALETTE[(hash as usize) % PALETTE.len()]
+}
+
+// ---------------------------------------------------------------------------
+// LogStats — live stats bar
+// ---------------------------------------------------------------------------
+
+/// Tracks per-level counts and lines-per-second rate for the stats bar.
+#[derive(Debug, Clone)]
+pub struct LogStats {
+    /// Counts indexed by `LogLevel::order()` (0–6).
+    pub counts: [u64; 7],
+    /// Estimated lines received per second.
+    pub lines_per_sec: f64,
+    /// Rolling sample window of total-received values.
+    samples: VecDeque<u64>,
+    _last_total: u64,
+}
+
+impl LogStats {
+    pub fn new() -> Self {
+        Self {
+            counts: [0; 7],
+            lines_per_sec: 0.0,
+            samples: VecDeque::with_capacity(32),
+            _last_total: 0,
+        }
+    }
+
+    /// Record one entry at the given level.
+    pub fn record(&mut self, level: &LogLevel) {
+        self.counts[level.order() as usize] += 1;
+    }
+
+    /// Call once per second (or per N ticks) to update rate.
+    pub fn update_rate(&mut self, total_received: u64) {
+        self.samples.push_back(total_received);
+        if self.samples.len() > 30 {
+            self.samples.pop_front();
+        }
+        if self.samples.len() >= 2 {
+            let newest = *self.samples.back().unwrap();
+            let oldest = *self.samples.front().unwrap();
+            let window = self.samples.len() as f64;
+            self.lines_per_sec = (newest - oldest) as f64 / (window / 30.0); // assuming 30fps ticks
+        }
+    }
+
+    /// Reset all stats.
+    pub fn reset(&mut self) {
+        *self = Self::new();
+    }
+}
+
+impl Default for LogStats {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -567,6 +797,59 @@ impl fmt::Debug for ChannelWriter {
 }
 
 // ---------------------------------------------------------------------------
+// Clipboard copy
+// ---------------------------------------------------------------------------
+
+/// Copy text to the system clipboard using platform-native commands.
+pub fn copy_to_clipboard(text: &str) -> std::result::Result<(), String> {
+    use std::io::Write as _;
+    use std::process::{Command, Stdio};
+
+    #[cfg(target_os = "macos")]
+    let mut child = Command::new("pbcopy")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn pbcopy: {}", e))?;
+
+    #[cfg(target_os = "linux")]
+    let mut child = {
+        // Try xclip, fall back to xsel
+        Command::new("xclip")
+            .args(["-selection", "clipboard"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .or_else(|_| {
+                Command::new("xsel")
+                    .args(["--clipboard", "--input"])
+                    .stdin(Stdio::piped())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+            })
+            .map_err(|e| format!("No clipboard tool found (xclip/xsel): {}", e))?
+    };
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    return Err("Clipboard not supported on this platform".into());
+
+    if let Some(ref mut stdin) = child.stdin {
+        stdin
+            .write_all(text.as_bytes())
+            .map_err(|e| format!("Write to clipboard failed: {}", e))?;
+    }
+    // Drop stdin to close the pipe before waiting
+    drop(child.stdin.take());
+    child
+        .wait()
+        .map_err(|e| format!("Clipboard command failed: {}", e))?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // LogcatState
 // ---------------------------------------------------------------------------
 
@@ -614,6 +897,32 @@ pub struct LogcatState {
     /// Used to compute the correct `scroll_position` when transitioning
     /// out of `auto_scroll` mode.
     pub viewport_height: usize,
+
+    // -- Feature 3: Line detail popup --
+    /// Whether the detail popup is open.
+    pub detail_open: bool,
+    /// Index into `filtered_indices` for the currently selected line.
+    pub selected_line: usize,
+
+    // -- Feature 5: Stack trace folding --
+    /// Entry indices of fold-start heads (the non-continuation entry before a stack trace).
+    pub folded_groups: HashSet<usize>,
+
+    // -- Feature 6: Live stats bar --
+    /// Aggregate statistics for the log stream.
+    pub stats: LogStats,
+
+    // -- Feature 7: Horizontal scroll --
+    /// Horizontal scroll offset (in characters).
+    pub h_scroll: usize,
+
+    // -- Feature 8: Compact mode --
+    /// Whether compact display mode is enabled.
+    pub compact: bool,
+
+    // -- Feature 10: Bookmarks --
+    /// Bookmarked entry indices (stable across filter changes).
+    pub bookmarks: BTreeSet<usize>,
 }
 
 impl LogcatState {
@@ -633,6 +942,13 @@ impl LogcatState {
             word_wrap: false,
             viewport_height: 30,
             trimmed_total: 0,
+            detail_open: false,
+            selected_line: 0,
+            folded_groups: HashSet::new(),
+            stats: LogStats::new(),
+            h_scroll: 0,
+            compact: false,
+            bookmarks: BTreeSet::new(),
         }
     }
 
@@ -695,6 +1011,7 @@ impl LogcatState {
 
                     let entry = LogEntry::parse(&line);
                     let idx = self.entries.len();
+                    self.stats.record(&entry.level);
                     self.entries.push(entry);
                     new_count += 1;
 
@@ -746,24 +1063,41 @@ impl LogcatState {
             // `height` entries regardless of scroll_position.  Keep it
             // near the end so transitioning out of auto_scroll doesn't jump.
             self.scroll_position = self.filtered_indices.len();
+            self.selected_line = self.filtered_indices.len().saturating_sub(1);
         }
+
+        self.stats.update_rate(self.total_received);
     }
 
-    /// Recompute `filtered_indices` from scratch based on the current filter.
+    /// Recompute `filtered_indices` from scratch based on the current filter,
+    /// respecting stack trace fold state.
     pub fn rebuild_filtered(&mut self) {
         self.filtered_indices.clear();
+        let mut skip_continuations = false;
         for (i, entry) in self.entries.iter().enumerate() {
+            if !entry.is_stack_continuation {
+                skip_continuations = self.folded_groups.contains(&i);
+            }
+            if skip_continuations && entry.is_stack_continuation {
+                continue; // hidden by fold
+            }
             if self.filter.matches(entry) {
                 self.filtered_indices.push(i);
             }
         }
 
-        // Only clamp if out of bounds, don't force auto scroll position
+        // clamp scroll/selected
         let len = self.filtered_indices.len();
         if len == 0 {
             self.scroll_position = 0;
-        } else if self.scroll_position >= len {
-            self.scroll_position = len.saturating_sub(1);
+            self.selected_line = 0;
+        } else {
+            if self.scroll_position >= len {
+                self.scroll_position = len.saturating_sub(self.viewport_height);
+            }
+            if self.selected_line >= len {
+                self.selected_line = len.saturating_sub(1);
+            }
         }
     }
 
@@ -809,6 +1143,7 @@ impl LogcatState {
         }
         self.auto_scroll = false;
         self.scroll_position = self.scroll_position.saturating_sub(n);
+        self.selected_line = self.scroll_position;
     }
 
     /// Scroll down by `n` lines. Disables auto-scroll.
@@ -822,6 +1157,9 @@ impl LogcatState {
             .len()
             .saturating_sub(self.viewport_height);
         self.scroll_position = (self.scroll_position + n).min(max_scroll);
+        let max_line = self.filtered_indices.len().saturating_sub(1);
+        self.selected_line =
+            (self.scroll_position + self.viewport_height.saturating_sub(1)).min(max_line);
     }
 
     /// Jump to the bottom and re-enable auto-scroll.
@@ -829,12 +1167,14 @@ impl LogcatState {
         self.auto_scroll = true;
         let total = self.filtered_indices.len();
         self.scroll_position = total.saturating_sub(self.viewport_height);
+        self.selected_line = self.filtered_indices.len().saturating_sub(1);
     }
 
     /// Jump to the top of the log. Disables auto-scroll.
     pub fn scroll_to_top(&mut self) {
         self.auto_scroll = false;
         self.scroll_position = 0;
+        self.selected_line = 0;
     }
 
     /// Clear all entries and filtered indices.
@@ -845,6 +1185,10 @@ impl LogcatState {
         self.total_received = 0;
         self.trimmed_total = 0;
         self.auto_scroll = true;
+        self.stats.reset();
+        self.bookmarks.clear();
+        self.folded_groups.clear();
+        self.detail_open = false;
     }
 
     /// Return the directory path that would be used for "Save Here".
@@ -918,6 +1262,198 @@ impl LogcatState {
     pub fn toggle_word_wrap(&mut self) {
         self.word_wrap = !self.word_wrap;
     }
+
+    // -- Feature 3: Line detail popup --------------------------------------
+
+    /// Toggle the detail popup open/closed.
+    pub fn toggle_detail(&mut self) {
+        self.detail_open = !self.detail_open;
+    }
+
+    /// Return a reference to the currently selected log entry (if any).
+    pub fn selected_entry(&self) -> Option<&LogEntry> {
+        self.filtered_indices
+            .get(self.selected_line)
+            .and_then(|&idx| self.entries.get(idx))
+    }
+
+    /// Move the selection up by one line, adjusting scroll if needed.
+    pub fn select_up(&mut self) {
+        if self.selected_line > 0 {
+            self.selected_line -= 1;
+        }
+        // Ensure visible
+        if self.selected_line < self.scroll_position {
+            self.scroll_position = self.selected_line;
+        }
+        self.auto_scroll = false;
+    }
+
+    /// Move the selection down by one line, adjusting scroll if needed.
+    pub fn select_down(&mut self) {
+        let max = self.filtered_indices.len().saturating_sub(1);
+        if self.selected_line < max {
+            self.selected_line += 1;
+        }
+        // Ensure visible
+        if self.selected_line >= self.scroll_position + self.viewport_height {
+            self.scroll_position = self.selected_line.saturating_sub(self.viewport_height - 1);
+        }
+    }
+
+    // -- Feature 5: Stack trace folding ------------------------------------
+
+    /// Toggle fold state at the currently selected line.
+    pub fn toggle_fold_at_selected(&mut self) {
+        if let Some(&entry_idx) = self.filtered_indices.get(self.selected_line) {
+            // Find the "head" of this stack trace group (the non-continuation entry before)
+            let head = if self.entries[entry_idx].is_stack_continuation {
+                // Walk backwards to find the head
+                (0..entry_idx)
+                    .rev()
+                    .find(|&i| !self.entries[i].is_stack_continuation)
+                    .unwrap_or(entry_idx)
+            } else {
+                entry_idx
+            };
+            if self.folded_groups.contains(&head) {
+                self.folded_groups.remove(&head);
+            } else {
+                self.folded_groups.insert(head);
+            }
+            self.rebuild_filtered();
+        }
+    }
+
+    // -- Feature 7: Horizontal scroll --------------------------------------
+
+    /// Scroll left by `n` characters.
+    pub fn h_scroll_left(&mut self, n: usize) {
+        self.h_scroll = self.h_scroll.saturating_sub(n);
+    }
+
+    /// Scroll right by `n` characters.
+    pub fn h_scroll_right(&mut self, n: usize) {
+        self.h_scroll += n;
+    }
+
+    /// Reset horizontal scroll to the beginning.
+    pub fn h_scroll_reset(&mut self) {
+        self.h_scroll = 0;
+    }
+
+    // -- Feature 8: Compact mode -------------------------------------------
+
+    /// Toggle compact display mode.
+    pub fn toggle_compact(&mut self) {
+        self.compact = !self.compact;
+    }
+
+    // -- Feature 9: Copy to clipboard --------------------------------------
+
+    /// Copy the currently selected log line to the system clipboard.
+    pub fn copy_selected_to_clipboard(&self) -> std::result::Result<(), String> {
+        if let Some(entry) = self.selected_entry() {
+            copy_to_clipboard(&entry.raw)
+        } else {
+            Err("No line selected".into())
+        }
+    }
+
+    // -- Feature 10: Bookmarks ---------------------------------------------
+
+    /// Toggle a bookmark on the currently selected line.
+    pub fn toggle_bookmark(&mut self) {
+        if let Some(&entry_idx) = self.filtered_indices.get(self.selected_line) {
+            if !self.bookmarks.remove(&entry_idx) {
+                self.bookmarks.insert(entry_idx);
+            }
+        }
+    }
+
+    /// Check whether the given entry index is bookmarked.
+    pub fn is_bookmarked(&self, entry_idx: usize) -> bool {
+        self.bookmarks.contains(&entry_idx)
+    }
+
+    /// Jump to the next bookmark (wrapping around).
+    pub fn next_bookmark(&mut self) {
+        if self.bookmarks.is_empty() {
+            return;
+        }
+        let current_entry = self
+            .filtered_indices
+            .get(self.selected_line)
+            .copied()
+            .unwrap_or(0);
+        // Find next bookmark after current entry
+        if let Some(&next) = self.bookmarks.range((current_entry + 1)..).next() {
+            // Find this entry in filtered_indices
+            if let Some(pos) = self.filtered_indices.iter().position(|&i| i == next) {
+                self.selected_line = pos;
+                self.auto_scroll = false;
+                // Ensure visible
+                if self.selected_line < self.scroll_position
+                    || self.selected_line >= self.scroll_position + self.viewport_height
+                {
+                    self.scroll_position =
+                        self.selected_line.saturating_sub(self.viewport_height / 2);
+                }
+            }
+        } else {
+            // Wrap around to first bookmark
+            if let Some(&first) = self.bookmarks.iter().next() {
+                if let Some(pos) = self.filtered_indices.iter().position(|&i| i == first) {
+                    self.selected_line = pos;
+                    self.auto_scroll = false;
+                    if self.selected_line < self.scroll_position
+                        || self.selected_line >= self.scroll_position + self.viewport_height
+                    {
+                        self.scroll_position =
+                            self.selected_line.saturating_sub(self.viewport_height / 2);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Jump to the previous bookmark (wrapping around).
+    pub fn prev_bookmark(&mut self) {
+        if self.bookmarks.is_empty() {
+            return;
+        }
+        let current_entry = self
+            .filtered_indices
+            .get(self.selected_line)
+            .copied()
+            .unwrap_or(0);
+        if let Some(&prev) = self.bookmarks.range(..current_entry).next_back() {
+            if let Some(pos) = self.filtered_indices.iter().position(|&i| i == prev) {
+                self.selected_line = pos;
+                self.auto_scroll = false;
+                if self.selected_line < self.scroll_position
+                    || self.selected_line >= self.scroll_position + self.viewport_height
+                {
+                    self.scroll_position =
+                        self.selected_line.saturating_sub(self.viewport_height / 2);
+                }
+            }
+        } else {
+            // Wrap to last bookmark
+            if let Some(&last) = self.bookmarks.iter().next_back() {
+                if let Some(pos) = self.filtered_indices.iter().position(|&i| i == last) {
+                    self.selected_line = pos;
+                    self.auto_scroll = false;
+                    if self.selected_line < self.scroll_position
+                        || self.selected_line >= self.scroll_position + self.viewport_height
+                    {
+                        self.scroll_position =
+                            self.selected_line.saturating_sub(self.viewport_height / 2);
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Default for LogcatState {
@@ -949,6 +1485,13 @@ impl fmt::Debug for LogcatState {
             .field("status_message", &self.status_message)
             .field("word_wrap", &self.word_wrap)
             .field("viewport_height", &self.viewport_height)
+            .field("detail_open", &self.detail_open)
+            .field("selected_line", &self.selected_line)
+            .field("folded_groups_len", &self.folded_groups.len())
+            .field("stats", &self.stats)
+            .field("h_scroll", &self.h_scroll)
+            .field("compact", &self.compact)
+            .field("bookmarks_len", &self.bookmarks.len())
             .finish()
     }
 }
@@ -1050,6 +1593,7 @@ mod tests {
             level: LogLevel::Info,
             tag: None,
             message: "hello".to_string(),
+            is_stack_continuation: false,
         };
         let warn_entry = LogEntry {
             raw: String::new(),
@@ -1059,6 +1603,7 @@ mod tests {
             level: LogLevel::Warn,
             tag: None,
             message: "warning".to_string(),
+            is_stack_continuation: false,
         };
 
         assert!(!filter.matches(&info_entry));
@@ -1078,6 +1623,7 @@ mod tests {
             level: LogLevel::Info,
             tag: None,
             message: "Hello World".to_string(),
+            is_stack_continuation: false,
         };
         let not_matching = LogEntry {
             raw: "01-01 00:00:00.000 I Goodbye".to_string(),
@@ -1087,6 +1633,7 @@ mod tests {
             level: LogLevel::Info,
             tag: None,
             message: "Goodbye".to_string(),
+            is_stack_continuation: false,
         };
 
         assert!(filter.matches(&matching));
@@ -1106,6 +1653,7 @@ mod tests {
             level: LogLevel::Info,
             tag: Some("ActivityManager".to_string()),
             message: "test".to_string(),
+            is_stack_continuation: false,
         };
         let not_matching = LogEntry {
             raw: String::new(),
@@ -1115,6 +1663,7 @@ mod tests {
             level: LogLevel::Info,
             tag: Some("WindowManager".to_string()),
             message: "test".to_string(),
+            is_stack_continuation: false,
         };
 
         assert!(filter.matches(&matching));
@@ -1298,6 +1847,7 @@ mod tests {
             level: LogLevel::Info,
             tag: None,
             message: "info line".to_string(),
+            is_stack_continuation: false,
         });
         state.entries.push(LogEntry {
             raw: "debug line".to_string(),
@@ -1307,6 +1857,7 @@ mod tests {
             level: LogLevel::Debug,
             tag: None,
             message: "debug line".to_string(),
+            is_stack_continuation: false,
         });
         state.entries.push(LogEntry {
             raw: "warn line".to_string(),
@@ -1316,6 +1867,7 @@ mod tests {
             level: LogLevel::Warn,
             tag: None,
             message: "warn line".to_string(),
+            is_stack_continuation: false,
         });
 
         // Filter to Warn and above
@@ -1410,5 +1962,405 @@ mod tests {
         state.stop_streaming();
         assert!(!state.is_streaming);
         assert!(state.receiver.is_none());
+    }
+
+    // ── Feature: Regex search ─────────────────────────────────────────────
+
+    #[test]
+    fn test_regex_search_matches() {
+        let mut filter = LogcatFilter::default();
+        filter.use_regex = true;
+        filter.search_query = "Error|Warning".to_string();
+        filter.recompile_regex();
+
+        let entry_match = LogEntry {
+            raw: "Some Error occurred".to_string(),
+            timestamp: None,
+            pid: None,
+            tid: None,
+            level: LogLevel::Error,
+            tag: None,
+            message: "Some Error occurred".to_string(),
+            is_stack_continuation: false,
+        };
+        let entry_no = LogEntry {
+            raw: "All fine here".to_string(),
+            timestamp: None,
+            pid: None,
+            tid: None,
+            level: LogLevel::Info,
+            tag: None,
+            message: "All fine here".to_string(),
+            is_stack_continuation: false,
+        };
+        assert!(filter.matches(&entry_match));
+        assert!(!filter.matches(&entry_no));
+    }
+
+    #[test]
+    fn test_regex_toggle() {
+        let mut filter = LogcatFilter::default();
+        assert!(!filter.use_regex);
+        filter.toggle_regex();
+        assert!(filter.use_regex);
+        filter.toggle_regex();
+        assert!(!filter.use_regex);
+    }
+
+    #[test]
+    fn test_regex_invalid_pattern_no_panic() {
+        let mut filter = LogcatFilter::default();
+        filter.use_regex = true;
+        filter.search_query = "[invalid".to_string();
+        filter.recompile_regex();
+        // Should not panic, compiled_regex should be None
+        let entry = LogEntry::parse("test line");
+        // With invalid regex, match should pass (no compiled regex)
+        assert!(filter.matches(&entry));
+    }
+
+    // ── Feature: Exclude filter ───────────────────────────────────────────
+
+    #[test]
+    fn test_exclude_filter() {
+        let mut filter = LogcatFilter::default();
+        filter.exclude_query = "noisy".to_string();
+
+        let entry_excluded = LogEntry {
+            raw: "this is noisy spam".to_string(),
+            timestamp: None,
+            pid: None,
+            tid: None,
+            level: LogLevel::Debug,
+            tag: None,
+            message: "this is noisy spam".to_string(),
+            is_stack_continuation: false,
+        };
+        let entry_kept = LogEntry {
+            raw: "this is useful".to_string(),
+            timestamp: None,
+            pid: None,
+            tid: None,
+            level: LogLevel::Debug,
+            tag: None,
+            message: "this is useful".to_string(),
+            is_stack_continuation: false,
+        };
+        assert!(!filter.matches(&entry_excluded));
+        assert!(filter.matches(&entry_kept));
+    }
+
+    #[test]
+    fn test_exclude_with_regex() {
+        let mut filter = LogcatFilter::default();
+        filter.use_regex = true;
+        filter.exclude_query = "spam|noise".to_string();
+        filter.recompile_regex();
+
+        let excluded = LogEntry {
+            raw: "lots of noise here".to_string(),
+            timestamp: None,
+            pid: None,
+            tid: None,
+            level: LogLevel::Debug,
+            tag: None,
+            message: "lots of noise here".to_string(),
+            is_stack_continuation: false,
+        };
+        assert!(!filter.matches(&excluded));
+    }
+
+    #[test]
+    fn test_exclude_filter_field() {
+        let mut filter = LogcatFilter::default();
+        filter.active_field = FilterField::Exclude;
+        filter.insert_char('t');
+        filter.insert_char('e');
+        assert_eq!(filter.exclude_query, "te");
+        filter.delete_char();
+        assert_eq!(filter.exclude_query, "t");
+        filter.clear_exclude();
+        assert!(filter.exclude_query.is_empty());
+    }
+
+    // ── Feature: Line detail / selection ───────────────────────────────────
+
+    #[test]
+    fn test_selected_entry() {
+        let mut state = LogcatState::new();
+        for i in 0..5 {
+            state.entries.push(LogEntry::parse(&format!("line {}", i)));
+            state.filtered_indices.push(i);
+        }
+        state.selected_line = 2;
+        let entry = state.selected_entry().unwrap();
+        assert!(entry.raw.contains("line 2"));
+    }
+
+    #[test]
+    fn test_toggle_detail() {
+        let mut state = LogcatState::new();
+        assert!(!state.detail_open);
+        state.toggle_detail();
+        assert!(state.detail_open);
+        state.toggle_detail();
+        assert!(!state.detail_open);
+    }
+
+    #[test]
+    fn test_select_up_down() {
+        let mut state = LogcatState::new();
+        state.viewport_height = 10;
+        for i in 0..20 {
+            state.entries.push(LogEntry::parse(&format!("line {}", i)));
+            state.filtered_indices.push(i);
+        }
+        state.selected_line = 5;
+        state.auto_scroll = false;
+        state.scroll_position = 0;
+
+        state.select_up();
+        assert_eq!(state.selected_line, 4);
+
+        state.select_down();
+        state.select_down();
+        assert_eq!(state.selected_line, 6);
+
+        // Can't go below 0
+        state.selected_line = 0;
+        state.select_up();
+        assert_eq!(state.selected_line, 0);
+    }
+
+    // ── Feature: Tag color ────────────────────────────────────────────────
+
+    #[test]
+    fn test_tag_color_deterministic() {
+        let c1 = tag_color("MyTag");
+        let c2 = tag_color("MyTag");
+        assert_eq!(c1, c2);
+    }
+
+    #[test]
+    fn test_tag_color_different_tags() {
+        // Different tags should (usually) get different colors
+        let c1 = tag_color("ActivityManager");
+        let c2 = tag_color("WindowManager");
+        // Not guaranteed to be different with 16 colors, but these two should differ
+        // Just test that the function doesn't panic
+        let _ = c1;
+        let _ = c2;
+    }
+
+    // ── Feature: Stack trace folding ──────────────────────────────────────
+
+    #[test]
+    fn test_stack_continuation_detection() {
+        let e1 = LogEntry::parse("03-25 12:00:00.000  1234  5678 E MyApp   : NullPointerException");
+        assert!(!e1.is_stack_continuation);
+
+        let e2 = LogEntry::parse("    at com.example.MyClass.method(MyClass.java:42)");
+        assert!(e2.is_stack_continuation);
+
+        let e3 = LogEntry::parse("Caused by: java.io.IOException: file not found");
+        assert!(e3.is_stack_continuation);
+
+        let e4 = LogEntry::parse("    ... 15 more");
+        assert!(e4.is_stack_continuation);
+    }
+
+    #[test]
+    fn test_fold_toggle() {
+        let mut state = LogcatState::new();
+        // Entry 0: error head
+        state.entries.push(LogEntry {
+            raw: "Error happened".to_string(),
+            timestamp: None,
+            pid: None,
+            tid: None,
+            level: LogLevel::Error,
+            tag: None,
+            message: "Error happened".to_string(),
+            is_stack_continuation: false,
+        });
+        // Entry 1: stack continuation
+        state.entries.push(LogEntry {
+            raw: "    at com.example.Foo.bar(Foo.java:10)".to_string(),
+            timestamp: None,
+            pid: None,
+            tid: None,
+            level: LogLevel::Error,
+            tag: None,
+            message: "at com.example.Foo.bar(Foo.java:10)".to_string(),
+            is_stack_continuation: true,
+        });
+        // Entry 2: stack continuation
+        state.entries.push(LogEntry {
+            raw: "    at com.example.Baz.qux(Baz.java:20)".to_string(),
+            timestamp: None,
+            pid: None,
+            tid: None,
+            level: LogLevel::Error,
+            tag: None,
+            message: "at com.example.Baz.qux(Baz.java:20)".to_string(),
+            is_stack_continuation: true,
+        });
+        // Entry 3: normal line after
+        state.entries.push(LogEntry {
+            raw: "Normal line".to_string(),
+            timestamp: None,
+            pid: None,
+            tid: None,
+            level: LogLevel::Info,
+            tag: None,
+            message: "Normal line".to_string(),
+            is_stack_continuation: false,
+        });
+
+        state.filtered_indices = vec![0, 1, 2, 3];
+        state.selected_line = 0;
+
+        // Fold
+        state.toggle_fold_at_selected();
+        assert!(state.folded_groups.contains(&0));
+        // rebuild_filtered should hide entries 1 and 2
+        assert_eq!(state.filtered_indices.len(), 2); // entry 0 and 3
+        assert_eq!(state.filtered_indices[0], 0);
+        assert_eq!(state.filtered_indices[1], 3);
+
+        // Unfold
+        state.selected_line = 0;
+        state.toggle_fold_at_selected();
+        assert!(!state.folded_groups.contains(&0));
+        assert_eq!(state.filtered_indices.len(), 4);
+    }
+
+    // ── Feature: Live stats ───────────────────────────────────────────────
+
+    #[test]
+    fn test_stats_record() {
+        let mut stats = LogStats::new();
+        stats.record(&LogLevel::Info);
+        stats.record(&LogLevel::Info);
+        stats.record(&LogLevel::Error);
+        assert_eq!(stats.counts[LogLevel::Info.order() as usize], 2);
+        assert_eq!(stats.counts[LogLevel::Error.order() as usize], 1);
+    }
+
+    #[test]
+    fn test_stats_reset() {
+        let mut stats = LogStats::new();
+        stats.record(&LogLevel::Debug);
+        stats.reset();
+        assert_eq!(stats.counts[LogLevel::Debug.order() as usize], 0);
+        assert_eq!(stats.lines_per_sec, 0.0);
+    }
+
+    // ── Feature: Horizontal scroll ────────────────────────────────────────
+
+    #[test]
+    fn test_h_scroll() {
+        let mut state = LogcatState::new();
+        assert_eq!(state.h_scroll, 0);
+        state.h_scroll_right(5);
+        assert_eq!(state.h_scroll, 5);
+        state.h_scroll_left(2);
+        assert_eq!(state.h_scroll, 3);
+        state.h_scroll_left(100); // should clamp to 0
+        assert_eq!(state.h_scroll, 0);
+        state.h_scroll_right(10);
+        state.h_scroll_reset();
+        assert_eq!(state.h_scroll, 0);
+    }
+
+    // ── Feature: Compact mode ─────────────────────────────────────────────
+
+    #[test]
+    fn test_compact_toggle() {
+        let mut state = LogcatState::new();
+        assert!(!state.compact);
+        state.toggle_compact();
+        assert!(state.compact);
+        state.toggle_compact();
+        assert!(!state.compact);
+    }
+
+    // ── Feature: Copy to clipboard ────────────────────────────────────────
+
+    #[test]
+    fn test_copy_selected_no_entries() {
+        let state = LogcatState::new();
+        assert!(state.copy_selected_to_clipboard().is_err());
+    }
+
+    // ── Feature: Bookmarks ────────────────────────────────────────────────
+
+    #[test]
+    fn test_bookmark_toggle() {
+        let mut state = LogcatState::new();
+        for i in 0..10 {
+            state.entries.push(LogEntry::parse(&format!("line {}", i)));
+            state.filtered_indices.push(i);
+        }
+        state.selected_line = 3;
+        state.toggle_bookmark();
+        assert!(state.is_bookmarked(3));
+
+        // Toggle off
+        state.toggle_bookmark();
+        assert!(!state.is_bookmarked(3));
+    }
+
+    #[test]
+    fn test_bookmark_navigation() {
+        let mut state = LogcatState::new();
+        state.viewport_height = 20;
+        for i in 0..20 {
+            state.entries.push(LogEntry::parse(&format!("line {}", i)));
+            state.filtered_indices.push(i);
+        }
+
+        // Bookmark entries 5 and 15
+        state.bookmarks.insert(5);
+        state.bookmarks.insert(15);
+        state.selected_line = 0;
+
+        // Next bookmark from 0 should go to 5
+        state.next_bookmark();
+        assert_eq!(state.selected_line, 5);
+
+        // Next should go to 15
+        state.next_bookmark();
+        assert_eq!(state.selected_line, 15);
+
+        // Next should wrap to 5
+        state.next_bookmark();
+        assert_eq!(state.selected_line, 5);
+
+        // Prev should go to 15 (wrap)
+        state.prev_bookmark();
+
+        // Previous from 15 should go to 5
+        state.prev_bookmark();
+        assert_eq!(state.selected_line, 5);
+    }
+
+    #[test]
+    fn test_bookmark_empty_no_panic() {
+        let mut state = LogcatState::new();
+        state.next_bookmark(); // should not panic
+        state.prev_bookmark(); // should not panic
+    }
+
+    #[test]
+    fn test_clear_resets_bookmarks_and_folds() {
+        let mut state = LogcatState::new();
+        state.bookmarks.insert(5);
+        state.folded_groups.insert(0);
+        state.detail_open = true;
+        state.clear();
+        assert!(state.bookmarks.is_empty());
+        assert!(state.folded_groups.is_empty());
+        assert!(!state.detail_open);
     }
 }

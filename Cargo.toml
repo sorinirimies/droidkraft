@@ -1,6 +1,6 @@
 [package]
 name = "droidtui"
-version = "0.3.2"
+version = "0.4.0"
 description = "A beautiful Terminal User Interface (TUI) for Android development and ADB commands"
 authors = ["Sorin Albu-Irimies <mihaiirimies@gmail.com>"]
 license = "MIT"
@@ -31,3 +31,4 @@ ratatui-widgets = "0.2.2"
 
 adb_client = "2.1.17"
 tui-file-explorer = { version = "0.8.8", default-features = false }
+regex = "1"

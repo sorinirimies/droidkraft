@@ -153,6 +153,20 @@ impl App {
                     };
                 }
 
+                // ── Detail popup active ─────────────────────────────────
+                if self.model.logcat.detail_open {
+                    return match key {
+                        KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
+                            Some(Message::LogcatToggleDetail)
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => Some(Message::LogcatSelectUp),
+                        KeyCode::Down | KeyCode::Char('j') => Some(Message::LogcatSelectDown),
+                        KeyCode::Char('y') => Some(Message::LogcatCopyLine),
+                        KeyCode::Char('m') => Some(Message::LogcatBookmarkToggle),
+                        _ => None,
+                    };
+                }
+
                 // ── Filter text input active ────────────────────────────────
                 let editing = self.model.logcat.filter.active_field != FilterField::None;
 
@@ -188,6 +202,19 @@ impl App {
                         KeyCode::Char('p') => Some(Message::LogcatTogglePackageFilter),
                         KeyCode::Char('s') => Some(Message::LogcatSave),
                         KeyCode::Char('S') => Some(Message::LogcatSaveFilteredOnly),
+                        // New feature keys
+                        KeyCode::Char('r') => Some(Message::LogcatToggleRegex),
+                        KeyCode::Char('e') => Some(Message::LogcatToggleExclude),
+                        KeyCode::Char('x') => Some(Message::LogcatToggleCompact),
+                        KeyCode::Enter => Some(Message::LogcatToggleDetail),
+                        KeyCode::Char('m') => Some(Message::LogcatBookmarkToggle),
+                        KeyCode::Char('[') => Some(Message::LogcatBookmarkPrev),
+                        KeyCode::Char(']') => Some(Message::LogcatBookmarkNext),
+                        KeyCode::Left => Some(Message::LogcatHScrollLeft),
+                        KeyCode::Right => Some(Message::LogcatHScrollRight),
+                        KeyCode::Char('0') => Some(Message::LogcatHScrollReset),
+                        KeyCode::Char('y') => Some(Message::LogcatCopyLine),
+                        KeyCode::Char('f') => Some(Message::LogcatToggleFold),
                         _ => None,
                     }
                 }

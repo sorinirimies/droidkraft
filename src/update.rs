@@ -385,6 +385,61 @@ pub async fn update(model: &mut Model, message: Message) {
             }
         }
 
+        // -- New logcat feature messages ------------------------------------
+        Message::LogcatToggleRegex => {
+            model.logcat.filter.toggle_regex();
+            model.logcat.rebuild_filtered();
+        }
+        Message::LogcatToggleExclude => {
+            use crate::logcat::FilterField;
+            if model.logcat.filter.active_field == FilterField::Exclude {
+                model.logcat.filter.active_field = FilterField::None;
+            } else {
+                model.logcat.filter.active_field = FilterField::Exclude;
+            }
+        }
+        Message::LogcatToggleCompact => {
+            model.logcat.toggle_compact();
+        }
+        Message::LogcatToggleDetail => {
+            model.logcat.toggle_detail();
+        }
+        Message::LogcatBookmarkToggle => {
+            model.logcat.toggle_bookmark();
+        }
+        Message::LogcatBookmarkNext => {
+            model.logcat.next_bookmark();
+        }
+        Message::LogcatBookmarkPrev => {
+            model.logcat.prev_bookmark();
+        }
+        Message::LogcatHScrollLeft => {
+            model.logcat.h_scroll_left(4);
+        }
+        Message::LogcatHScrollRight => {
+            model.logcat.h_scroll_right(4);
+        }
+        Message::LogcatHScrollReset => {
+            model.logcat.h_scroll_reset();
+        }
+        Message::LogcatCopyLine => match model.logcat.copy_selected_to_clipboard() {
+            Ok(()) => {
+                model.logcat.status_message = Some("Line copied to clipboard.".to_string());
+            }
+            Err(e) => {
+                model.logcat.status_message = Some(format!("Copy failed: {}", e));
+            }
+        },
+        Message::LogcatToggleFold => {
+            model.logcat.toggle_fold_at_selected();
+        }
+        Message::LogcatSelectUp => {
+            model.logcat.select_up();
+        }
+        Message::LogcatSelectDown => {
+            model.logcat.select_down();
+        }
+
         Message::LogcatFileExplorerKey(key_event) => {
             use crate::model::LogcatSaveMode;
             use ratatui::crossterm::event::KeyCode;

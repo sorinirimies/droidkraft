@@ -360,6 +360,7 @@ fn draw_border_bottom(x: u16, y: u16, width: u16, buf: &mut Buffer, color: Color
     set_cell(buf, x + width - 1, y, '\u{256f}', style); // ╯
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_item(
     x: u16,
     y: u16,

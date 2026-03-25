@@ -20,7 +20,7 @@
 
 use crate::adb::DeviceStatus;
 use crate::effects::{get_loading_spinner, RevealWidget};
-use crate::logcat::{FilterField, LogcatState};
+use crate::logcat::{tag_color, FilterField, LogcatState};
 use crate::model::{AppState, Model};
 use ratatui::{
     buffer::Buffer,
@@ -629,6 +629,11 @@ fn render_logcat(model: &mut Model, area: Rect, buf: &mut Buffer) {
     if model.logcat_save_active {
         render_logcat_save_dialog(model, area, buf);
     }
+
+    // ── Line detail popup ─────────────────────────────────────────────────
+    if model.logcat.detail_open {
+        render_logcat_detail(&model.logcat, area, buf);
+    }
 }
 
 // ── Logcat filter bar ─────────────────────────────────────────────────────────
@@ -640,11 +645,12 @@ fn render_logcat_filter_bar(state: &LogcatState, area: Rect, buf: &mut Buffer) {
     let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(28), // search
-            Constraint::Percentage(20), // tag
-            Constraint::Percentage(20), // package
+            Constraint::Percentage(22), // search
+            Constraint::Percentage(16), // tag
+            Constraint::Percentage(14), // package
+            Constraint::Percentage(16), // exclude
             Constraint::Length(12),     // level
-            Constraint::Min(10),        // status + counts
+            Constraint::Min(10),        // status + stats
         ])
         .split(area);
 
@@ -677,10 +683,15 @@ fn render_logcat_filter_bar(state: &LogcatState, area: Rect, buf: &mut Buffer) {
         };
         cursor
     };
+    let search_title = if state.filter.use_regex {
+        "  \u{1f50d}  Regex  "
+    } else {
+        "  \u{1f50d}  Search  "
+    };
     Paragraph::new(search_text)
         .block(
             Block::bordered()
-                .title("  \u{1f50d}  Search  ")
+                .title(search_title)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(search_border)),
         )
@@ -777,6 +788,46 @@ fn render_logcat_filter_bar(state: &LogcatState, area: Rect, buf: &mut Buffer) {
         }))
         .render(cols[2], buf);
 
+    // ── Exclude filter ────────────────────────────────────────────────
+    let excl_active = state.filter.active_field == FilterField::Exclude;
+    let excl_border = if excl_active {
+        Color::Rgb(255, 100, 80)
+    } else if !state.filter.exclude_query.is_empty() {
+        Color::Rgb(160, 60, 60)
+    } else {
+        Color::Rgb(50, 50, 70)
+    };
+    let excl_text = if state.filter.exclude_query.is_empty() && !excl_active {
+        "  e exclude…".to_string()
+    } else if excl_active {
+        let pos = state.filter.exclude_cursor;
+        let (before, after) = state.filter.exclude_query.split_at(
+            state
+                .filter
+                .exclude_query
+                .char_indices()
+                .nth(pos)
+                .map(|(i, _)| i)
+                .unwrap_or(state.filter.exclude_query.len()),
+        );
+        format!("  {}▏{}", before, after)
+    } else {
+        format!("  {}", state.filter.exclude_query)
+    };
+    Paragraph::new(excl_text)
+        .block(
+            Block::bordered()
+                .title("  ✕  Exclude  ")
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(excl_border)),
+        )
+        .style(Style::default().fg(if excl_active {
+            Color::White
+        } else {
+            Color::Rgb(180, 130, 130)
+        }))
+        .render(cols[3], buf);
+
     // ── Level badge ───────────────────────────────────────────────────────
     let lvl = &state.filter.min_level;
     let lvl_char = lvl.as_char();
@@ -790,7 +841,7 @@ fn render_logcat_filter_bar(state: &LogcatState, area: Rect, buf: &mut Buffer) {
                 .border_style(Style::default().fg(Color::Rgb(50, 50, 70))),
         )
         .style(Style::default().fg(lvl_color).add_modifier(Modifier::BOLD))
-        .render(cols[3], buf);
+        .render(cols[4], buf);
 
     // ── Status / counts ───────────────────────────────────────────────────
     let pause_icon = if state.paused { "⏸ " } else { "▶ " };
@@ -802,11 +853,18 @@ fn render_logcat_filter_bar(state: &LogcatState, area: Rect, buf: &mut Buffer) {
         Color::Rgb(120, 120, 120)
     };
 
+    let rate = state.stats.lines_per_sec;
+    let rate_str = if rate > 0.0 {
+        format!("{:.0}/s", rate)
+    } else {
+        String::new()
+    };
     let status_text = format!(
-        " {} {}/{}",
+        " {} {}/{} {}",
         pause_icon,
         state.entry_count(),
-        state.total_count()
+        state.total_count(),
+        rate_str,
     );
 
     Paragraph::new(status_text)
@@ -821,7 +879,7 @@ fn render_logcat_filter_bar(state: &LogcatState, area: Rect, buf: &mut Buffer) {
                 .border_style(Style::default().fg(Color::Rgb(50, 50, 70))),
         )
         .style(Style::default().fg(stream_color))
-        .render(cols[4], buf);
+        .render(cols[5], buf);
 }
 
 // ── Logcat log lines ──────────────────────────────────────────────────────────
@@ -881,29 +939,83 @@ fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
         let level_color = entry.level.color();
         let level_label_color = entry.level.label_color();
 
+        // Selected line highlight
+        let is_selected = {
+            let filtered_pos = if state.auto_scroll {
+                let total = state.filtered_indices.len();
+                let start = total.saturating_sub(visible_height);
+                start + row
+            } else {
+                state.scroll_position.min(
+                    state
+                        .filtered_indices
+                        .len()
+                        .saturating_sub(visible_height)
+                        .max(0),
+                ) + row
+            };
+            filtered_pos == state.selected_line
+        };
+        if is_selected {
+            for x in inner.x..inner.x + inner.width {
+                if let Some(cell) = buf.cell_mut((x, y)) {
+                    cell.set_bg(Color::Rgb(30, 40, 50));
+                }
+            }
+        }
+
         // Build spans for this line
         let mut spans: Vec<Span<'static>> = Vec::with_capacity(8);
         let mut used_width: usize = 0;
 
-        // Timestamp (dimmed)
-        if let Some(ref ts) = entry.timestamp {
-            let ts_display: &str = if ts.len() > 18 { &ts[..18] } else { ts };
-            let ts_str = format!(" {} ", ts_display);
-            used_width += ts_str.len();
-            spans.push(Span::styled(
-                ts_str,
-                Style::default().fg(Color::Rgb(100, 100, 100)),
-            ));
+        // Bookmark indicator
+        let is_bm = state.is_bookmarked(idx);
+        if is_bm {
+            if let Some(cell) = buf.cell_mut((inner.x, y)) {
+                cell.set_char('●');
+                cell.set_fg(Color::Rgb(255, 200, 50));
+            }
         }
 
-        // PID/TID (dimmed)
-        if let Some(ref pid) = entry.pid {
-            let pid_str = format!("{:>5}", pid);
-            used_width += pid_str.len() + 1;
-            spans.push(Span::styled(
-                format!("{} ", pid_str),
-                Style::default().fg(Color::Rgb(90, 90, 90)),
-            ));
+        if !state.compact {
+            // Timestamp (dimmed)
+            if let Some(ref ts) = entry.timestamp {
+                let ts_display: &str = if ts.len() > 18 { &ts[..18] } else { ts };
+                let ts_str = format!(" {} ", ts_display);
+                used_width += ts_str.len();
+                spans.push(Span::styled(
+                    ts_str,
+                    Style::default().fg(Color::Rgb(100, 100, 100)),
+                ));
+            }
+
+            // PID/TID (dimmed)
+            if let Some(ref pid) = entry.pid {
+                let pid_str = format!("{:>5}", pid);
+                used_width += pid_str.len() + 1;
+                spans.push(Span::styled(
+                    format!("{} ", pid_str),
+                    Style::default().fg(Color::Rgb(90, 90, 90)),
+                ));
+            }
+        }
+
+        // Fold indicator
+        let is_fold_head = !entry.is_stack_continuation && {
+            let next_idx = idx + 1;
+            next_idx < state.entries.len() && state.entries[next_idx].is_stack_continuation
+        };
+        if is_fold_head {
+            let is_folded = state.folded_groups.contains(&idx);
+            let fold_char = if is_folded { "▶ " } else { "▼ " };
+            spans.insert(
+                0,
+                Span::styled(
+                    fold_char.to_string(),
+                    Style::default().fg(Color::Rgb(120, 120, 140)),
+                ),
+            );
+            used_width += 2;
         }
 
         // Level badge (colored, bold)
@@ -918,7 +1030,7 @@ fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
         ));
         spans.push(Span::raw(" "));
 
-        // Tag (colored by level)
+        // Tag (colored by tag hash)
         if let Some(ref tag) = entry.tag {
             let tag_display: &str = if tag.len() > 20 { &tag[..20] } else { tag };
             let tag_str = format!("{:<20} ", tag_display);
@@ -926,17 +1038,33 @@ fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
             spans.push(Span::styled(
                 tag_str,
                 Style::default()
-                    .fg(level_label_color)
+                    .fg(tag_color(tag))
                     .add_modifier(Modifier::BOLD),
             ));
         }
 
-        // Message (truncated to fit, with search highlight)
-        let remaining = max_width.saturating_sub(used_width);
-        let msg = if entry.message.len() > remaining {
-            format!("{}…", &entry.message[..remaining.saturating_sub(1)])
+        // Horizontal scroll
+        let msg_to_display = if state.h_scroll > 0 && !state.word_wrap {
+            let char_count = entry.message.chars().count();
+            if state.h_scroll < char_count {
+                entry
+                    .message
+                    .chars()
+                    .skip(state.h_scroll)
+                    .collect::<String>()
+            } else {
+                String::new()
+            }
         } else {
             entry.message.clone()
+        };
+
+        // Message (truncated to fit, with search highlight)
+        let remaining = max_width.saturating_sub(used_width);
+        let msg = if msg_to_display.len() > remaining {
+            format!("{}…", &msg_to_display[..remaining.saturating_sub(1)])
+        } else {
+            msg_to_display
         };
 
         if has_search {
@@ -944,30 +1072,26 @@ fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
             let msg_lower = msg.to_lowercase();
             let mut last_end = 0;
             let mut search_start = 0;
-            loop {
-                if let Some(pos) = msg_lower[search_start..].find(&search_lower) {
-                    let abs_pos = search_start + pos;
-                    // Text before match
-                    if abs_pos > last_end {
-                        spans.push(Span::styled(
-                            msg[last_end..abs_pos].to_string(),
-                            Style::default().fg(level_color),
-                        ));
-                    }
-                    // Highlighted match
-                    let match_end = abs_pos + search_lower.len();
+            while let Some(pos) = msg_lower[search_start..].find(&search_lower) {
+                let abs_pos = search_start + pos;
+                // Text before match
+                if abs_pos > last_end {
                     spans.push(Span::styled(
-                        msg[abs_pos..match_end].to_string(),
-                        Style::default()
-                            .fg(Color::Black)
-                            .bg(Color::Rgb(255, 200, 50))
-                            .add_modifier(Modifier::BOLD),
+                        msg[last_end..abs_pos].to_string(),
+                        Style::default().fg(level_color),
                     ));
-                    last_end = match_end;
-                    search_start = match_end;
-                } else {
-                    break;
                 }
+                // Highlighted match
+                let match_end = abs_pos + search_lower.len();
+                spans.push(Span::styled(
+                    msg[abs_pos..match_end].to_string(),
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Rgb(255, 200, 50))
+                        .add_modifier(Modifier::BOLD),
+                ));
+                last_end = match_end;
+                search_start = match_end;
             }
             // Remaining text after last match
             if last_end < msg.len() {
@@ -1041,9 +1165,10 @@ fn render_logcat_footer(state: &LogcatState, area: Rect, buf: &mut Buffer) {
         "  Type to filter  \u{00b7}  Esc/Enter confirm  ".to_string()
     } else {
         let wrap_icon = if state.word_wrap { "W\u{0332}" } else { "w" };
+        let compact_icon = if state.compact { "X\u{0332}" } else { "x" };
         format!(
-            "  /Search  tTag  pPID  lLevel  {}Wrap  Space Pause  cClear  sSave  g/G Top/Bot  q Close  ",
-            wrap_icon
+            "  /Srch  eExcl  tTag  pPID  lLvl  {}Wrap  {}Cmpct  rRegex  Enter Detail  sSave  q Close  ",
+            wrap_icon, compact_icon
         )
     };
 
@@ -1081,6 +1206,126 @@ fn render_logcat_footer(state: &LogcatState, area: Rect, buf: &mut Buffer) {
         )
         .alignment(Alignment::Center)
         .render(area, buf);
+}
+
+// ── Logcat line detail popup ──────────────────────────────────────────────────
+
+fn render_logcat_detail(state: &LogcatState, area: Rect, buf: &mut Buffer) {
+    let popup = centered_rect(80, 60, area);
+
+    // Solid background
+    let bg = Color::Rgb(20, 22, 28);
+    for y in popup.top()..popup.bottom() {
+        for x in popup.left()..popup.right() {
+            if let Some(cell) = buf.cell_mut((x, y)) {
+                cell.set_char(' ');
+                cell.set_bg(bg);
+            }
+        }
+    }
+
+    let entry = match state.selected_entry() {
+        Some(e) => e,
+        None => {
+            Paragraph::new("  No line selected")
+                .style(Style::default().fg(Color::Rgb(120, 120, 120)).bg(bg))
+                .render(popup, buf);
+            return;
+        }
+    };
+
+    let level_color = entry.level.label_color();
+    let mut lines: Vec<Line<'static>> = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Level: ", Style::default().fg(Color::Rgb(100, 100, 120))),
+            Span::styled(
+                format!("{}", entry.level.as_char()),
+                Style::default()
+                    .fg(level_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+    ];
+
+    if let Some(ref ts) = entry.timestamp {
+        lines.push(Line::from(vec![
+            Span::styled("  Time:  ", Style::default().fg(Color::Rgb(100, 100, 120))),
+            Span::styled(ts.clone(), Style::default().fg(Color::Rgb(200, 200, 200))),
+        ]));
+    }
+    if let Some(ref tag) = entry.tag {
+        lines.push(Line::from(vec![
+            Span::styled("  Tag:   ", Style::default().fg(Color::Rgb(100, 100, 120))),
+            Span::styled(tag.clone(), Style::default().fg(tag_color(tag))),
+        ]));
+    }
+    if let Some(ref pid) = entry.pid {
+        lines.push(Line::from(vec![
+            Span::styled("  PID:   ", Style::default().fg(Color::Rgb(100, 100, 120))),
+            Span::styled(pid.clone(), Style::default().fg(Color::Rgb(200, 200, 200))),
+        ]));
+    }
+    if let Some(ref tid) = entry.tid {
+        lines.push(Line::from(vec![
+            Span::styled("  TID:   ", Style::default().fg(Color::Rgb(100, 100, 120))),
+            Span::styled(tid.clone(), Style::default().fg(Color::Rgb(200, 200, 200))),
+        ]));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  Message:",
+        Style::default().fg(Color::Rgb(100, 100, 120)),
+    )));
+
+    // Word-wrap the message to fit popup width
+    let max_w = popup.width.saturating_sub(4) as usize;
+    let msg = &entry.message;
+    for chunk_start in (0..msg.len()).step_by(max_w.max(1)) {
+        let chunk_end = (chunk_start + max_w).min(msg.len());
+        let chunk = &msg[chunk_start..chunk_end];
+        lines.push(Line::from(Span::styled(
+            format!("  {}", chunk),
+            Style::default().fg(entry.level.color()),
+        )));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(
+            "  y ",
+            Style::default()
+                .fg(Color::Rgb(80, 200, 80))
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("copy  ", Style::default().fg(Color::Rgb(90, 90, 100))),
+        Span::styled(
+            "m ",
+            Style::default()
+                .fg(Color::Rgb(255, 200, 50))
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("bookmark  ", Style::default().fg(Color::Rgb(90, 90, 100))),
+        Span::styled(
+            "Esc/Enter ",
+            Style::default()
+                .fg(Color::Rgb(200, 100, 80))
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("close", Style::default().fg(Color::Rgb(90, 90, 100))),
+    ]));
+
+    let title = "  \u{1f4cb}  Line Detail  ".to_string();
+    Paragraph::new(lines)
+        .block(
+            Block::bordered()
+                .title(title)
+                .title_alignment(Alignment::Left)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(level_color)),
+        )
+        .style(Style::default().bg(bg))
+        .render(popup, buf);
 }
 
 // ── Logcat save dialog ────────────────────────────────────────────────────────
@@ -1284,7 +1529,7 @@ fn render_save_file_browser(model: &Model, area: Rect, buf: &mut Buffer, bg: Col
             let size_str = if entry.is_dir {
                 String::new()
             } else {
-                entry.size.map(|s| format_file_size(s)).unwrap_or_default()
+                entry.size.map(format_file_size).unwrap_or_default()
             };
 
             let y = list_area.y + row as u16;
