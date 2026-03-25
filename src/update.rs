@@ -797,10 +797,14 @@ pub async fn update(model: &mut Model, message: Message) {
 
         Message::ThemeNext => {
             model.theme_selector.next();
+            let theme = model.theme_selector.apply();
+            model.theme = theme;
         }
 
         Message::ThemePrev => {
             model.theme_selector.prev();
+            let theme = model.theme_selector.apply();
+            model.theme = theme;
         }
 
         Message::ThemeApply => {
