@@ -1,55 +1,88 @@
 # DroidTUI 🤖
 
 [![Crates.io](https://img.shields.io/crates/v/droidtui.svg)](https://crates.io/crates/droidtui)
-![Version](https://img.shields.io/badge/version-0.5.1-blue.svg)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Release](https://github.com/sorinirimies/droidtui/actions/workflows/release.yml/badge.svg)](https://github.com/sorinirimies/droidtui/actions/workflows/release.yml)
 [![CI](https://github.com/sorinirimies/droidtui/actions/workflows/ci.yml/badge.svg)](https://github.com/sorinirimies/droidtui/actions/workflows/ci.yml)
 
-A beautiful Terminal User Interface (TUI) for Android development, providing an intuitive interface for ADB (Android Debug Bridge) commands with stunning visual effects and animations powered by TachyonFX.
-
-![DroidTUI Demo](examples/vhs/output/main_menu.gif)
-
-## What's New in v0.3.0 🎉
-
-- **🔧 Type-Safe ADB Commands**: Complete refactoring using `adb_cli` (adb_client) for robust, typed ADB operations
-- **⚡ Performance Boost**: 5-10% improvement from direct ADB server communication
-- **📚 Rich Examples**: New examples for streaming, device info, package manager, and more
-- **🎬 VHS Demos**: 7+ animated terminal demos showcasing all features
-- **✅ Comprehensive Testing**: 31 tests with 82% coverage
-- **📖 Enhanced Documentation**: New refactoring guide, implementation summary, and quick reference
-- **🏗️ Better Architecture**: New `AdbManager` abstraction layer for maintainable, future-proof code
-
-See [CHANGELOG.md](CHANGELOG.md) for full release notes.
+A beautiful Terminal User Interface (TUI) for Android development — ADB commands, live logcat viewer, device dashboard, and more. Built with Rust, Ratatui, and the pure-Rust `adb_client` crate (no Android SDK required).
 
 ## Features ✨
 
-- **📱 Type-Safe ADB Commands**: using the `adb_cli` (adb_client) crate the ADB command categories are now typed, error-safe execution and there is no need for the Google Android Debug Bridge (ADB) to be installed
-- **📺 Screen Streaming**: Stream your Android device screen in a separate window with real video (like scrcpy!)
-- **📜 Scrollable Results**: Navigate through long command output with visual scroll indicators
-- **🎭 Clean Design**: Static Android green selections and professional layout borders
-- **⌨️ Keyboard Navigation**: Intuitive vim-like navigation (j/k) and arrow keys
-- **🚀 Fast & Responsive**: Built with Rust and Ratatui for optimal performance
-- **🔧 Real Command Execution**: Direct ADB server communication with comprehensive error handling
-- **📚 Extensive Examples**: 5+ runnable examples demonstrating all features
-- **🎬 VHS Demos**: Animated terminal recordings showcasing the TUI in action
-- **🎨 Beautiful UI**: Clean, modern terminal interface with consistent Android green theming
-- **🌟 TachyonFX Animations**: Dramatic reveal animations and gradient effects
+### 📺 Live Logcat Viewer
+Full-screen, real-time logcat streaming with professional-grade tooling:
+
+- **Live streaming** via `adb_client`'s native API — no `adb` binary needed
+- **Regex search** (`r` toggle) — powerful pattern matching (`Error|Exception`, `OkHttp.*failed`)
+- **Find filter** (`f`) — case-insensitive substring search with match highlighting
+- **Exclude filter** (`e`) — negative matching to hide noisy tags/messages
+- **Tag & PID filters** (`t`, `p`) — dedicated filter fields
+- **Log level filter** (`l`) — cycle minimum level V → D → I → W → E → F
+- **Per-tag color hashing** — each tag gets a stable, visually distinct color
+- **Stack trace folding** (`F`) — detect and fold/unfold Java/Kotlin stack traces
+- **Line detail popup** (`Enter`) — inspect any line with full message, JSON formatting
+- **Bookmarks** (`m`, `[`, `]`) — mark lines and jump between them
+- **Copy to clipboard** (`y`) — copy selected line via `pbcopy`/`xclip`
+- **Soft wrap** (`w`) — wrap long messages across multiple rows with aligned indentation
+- **Compact mode** (`x`) — hide timestamp/PID columns for more message space
+- **Horizontal scroll** (`←`/`→`) — scroll long messages when wrap is off
+- **Auto-scroll** — sticks to bottom; manual scroll disables; `G`/`End` re-enables
+- **Pause / Resume** (`Space`) — freeze the view without losing the stream
+- **Live stats** — lines/sec rate and per-level counters in the status bar
+- **Save logs** (`s`) — save to file with path input dialog
+- **Save As…** (`S`) — browse with integrated file explorer, `Shift+S` to save in current folder
+- **JSON export** — Tab in save dialog cycles TXT/JSON format (JSONL for Nushell/jq)
+- **Bounded channel** — `sync_channel(10k)` with backpressure prevents OOM during bursts
+- **JSON detection** — auto-detects and pretty-prints JSON in log messages with syntax coloring
+
+### 📱 ADB Command Dashboard
+- **Device panel** — live device selector with model, Android version, battery, RAM, CPU stats
+- **40+ typed commands** — packages, system, network, root toolkit, bootloader & flash
+- **Fastboot support** — OEM unlock/lock, wipe data, device info
+- **Type-safe execution** — compile-time guarantees via `adb_client` crate
+
+### 🎨 Theme System
+- **12 named presets** — Default, Dracula, Nord, Gruvbox Dark, Catppuccin Mocha, Tokyo Night, Solarized Dark, Moonfly, Oxocarbon, Forest, Neon, Mono
+- **Global selector** (`Shift+T`) — works from any screen
+- **11 colour fields** — brand, accent, success, dim, fg, sel_bg, warn, error, surface, border, key_hint
+
+### 🖥️ CLI Query Mode
+Stream logcat as JSON lines to stdout — designed for piping into Nushell, jq, or grep:
+
+```bash
+droidtui --query                          # Stream live logcat as JSONL
+droidtui --query --last 500               # Dump last 500 lines
+droidtui --query --level E                # Only errors
+droidtui --query --tag MyApp              # Filter by tag
+droidtui --query --grep "timeout"         # Filter by message
+droidtui --query | nu -c 'lines | each { from json } | where level == "Error"'
+```
+
+### 📂 Nushell Recipe Scripts
+Pre-built analysis scripts in `scripts/logcat/`:
+
+| Script | What it does |
+|--------|-------------|
+| `top_tags.nu` | Rank tags by frequency (top 20) |
+| `error_summary.nu` | Group Error/Fatal by tag with sample messages |
+| `timeline.nu` | Log volume + error count per second |
+| `find_crashes.nu` | Detect Fatal entries, ANRs, exceptions |
+| `filter_json.nu` | Extract and pretty-print JSON payloads from messages |
+
+```bash
+droidtui --query --last 5000 > logcat.jsonl
+nu scripts/logcat/top_tags.nu logcat.jsonl
+```
 
 ## Installation 🔧
 
-### Prerequisites
-
-- Android SDK with ADB in your PATH
-- FFmpeg (for video decoding during screen streaming)
-
-### Install from crates.io
+### From crates.io
 
 ```bash
 cargo install droidtui
 ```
 
-### Install from Source
+### From source
 
 ```bash
 git clone https://github.com/sorinirimies/droidtui.git
@@ -57,479 +90,187 @@ cd droidtui
 cargo install --path .
 ```
 
-### Run
+### Prerequisites
 
-```bash
-droidtui
-```
-
-Or with cargo:
-
-```bash
-cargo run
-```
+- **ADB server** running (`adb start-server`) — the `adb` binary is only needed to start the server; all commands use the pure-Rust `adb_client` crate
+- A connected Android device with USB debugging enabled
 
 ## Usage 🎮
 
-### Startup Screen
+```bash
+droidtui          # Launch the TUI
+droidtui --query   # CLI mode — stream logcat as JSON
+droidtui --help    # Show all options
+```
 
-When you launch DroidTUI, you'll see a stunning startup screen with:
-- TachyonFX-powered reveal animation with gradient sweep effects
-- Dynamic wave animations and center-out reveal patterns
-- Progressive content loading with smooth fade-in transitions
-- Press any key to continue to the main menu
-
-### Main Menu
-
-The main interface provides access to functional ADB commands with expandable sub-options:
-
-- **📱 List Devices** ▶ - Show all connected Android devices with detailed info
-  - Basic device list, detailed info, serial numbers only
-- **📋 List Packages** ▶ - List all installed packages with file paths
-  - All packages, with paths, user packages only, system packages only
-- **🔋 Battery Info** ▶ - Display detailed battery information and status
-  - Full battery status, battery level only, charging status
-- **💾 Memory Usage** ▶ - Show comprehensive memory usage statistics
-  - System memory, available memory, top memory apps
-- **📊 CPU Info** ▶ - Display CPU information and specifications
-  - CPU details, current usage, load average
-- **🔗 Network Info** ▶ - Show network connectivity and configuration
-  - Connectivity status, WiFi info, IP configuration
-- **📱 Device Properties** ▶ - Get all device system properties
-  - All properties, device model, Android version
-- **🎯 Running Processes** ▶ - List all currently running processes
-  - All processes, top processes, user processes only
-- **📊 System Services** ▶ - List all system services and their status
-  - All services, running services, app services
-- **📷 Screenshot** ▶ - Take and save device screenshots
-  - Take & save locally, save to device, view screenshot paths
-- **🔄 Reboot Device** ▶ - Reboot the connected device
-  - Normal reboot, fast reboot (bootloader), recovery mode
-- **📜 System Log** ▶ - View recent system logs (last 100 lines)
-  - Recent logs, errors only, warnings & errors, clear logs
-- **📺 Screen Stream** ▶ - Stream device screen in separate window (like scrcpy)
-  - Start screen stream, high quality stream, fast stream
-- **🔍 ADB Version** ▶ - Display ADB version information
-  - ADB version, ADB help, ADB installation path
-
-### Navigation
+### Key Bindings — Main Menu
 
 | Key | Action |
 |-----|--------|
-| `↑` / `k` | Move up in menu / Scroll up in results |
-| `↓` / `j` | Move down in menu / Scroll down in results |
-| `Enter` / `→` | Enter sub-options (main menu) |
-| `Enter` | Execute selected command (child menu) |
-| `←` / `Backspace` | Return to main menu (from child menu) |
-| `Page Up` | Fast scroll up in results (10 lines) |
-| `Page Down` | Fast scroll down in results (10 lines) |
-| `Home` | Jump to beginning of results |
-| `End` | Jump to end of results |
-| `q` / `Esc` | Quit application / Return from results |
-| `Ctrl+C` | Force quit |
+| `↑`/`↓` or `j`/`k` | Navigate menu |
+| `Tab` / `Shift+Tab` | Jump between sections |
+| `Enter` | Execute selected command |
+| `L` | Open Live Logcat |
+| `T` | Open Theme Selector |
+| `d` | Cycle connected device |
+| `r` | Refresh device info |
+| `q` / `Esc` | Quit |
 
-**Note**: Screen streaming opens in a separate window. Close the window or press Q/Esc in it to stop streaming.
+### Key Bindings — Logcat Viewer
 
-### Interface Layout
+#### Navigation
+| Key | Action |
+|-----|--------|
+| `↑`/`↓` or `j`/`k` | Scroll up/down |
+| `PgUp` / `PgDn` | Scroll 20 lines |
+| `g` / `G` or `Home`/`End` | Jump to top / bottom |
+| `←` / `→` | Horizontal scroll (when wrap off) |
+| `0` | Reset horizontal scroll |
 
-The interface adapts based on navigation mode:
+#### Filters
+| Key | Action |
+|-----|--------|
+| `f` | Find (search filter) |
+| `e` | Exclude filter (negative match) |
+| `t` | Tag filter |
+| `p` | PID filter |
+| `l` | Cycle log level (V→D→I→W→E→F) |
+| `r` | Toggle regex mode |
 
-**Main Menu Mode:**
-1. **Left Panel (60%)**: Main ADB commands with ▶ indicators for expandable items (Android green border)
-2. **Right Panel (40%)**: Description of selected command with usage hints (dark gray border)
-3. **Footer**: Navigation help and keyboard shortcuts
+#### Actions
+| Key | Action |
+|-----|--------|
+| `Enter` | Line detail popup (with JSON formatting) |
+| `y` | Copy line to clipboard |
+| `m` | Toggle bookmark |
+| `[` / `]` | Jump to prev/next bookmark |
+| `F` | Fold/unfold stack trace |
+| `w` | Toggle soft wrap |
+| `x` | Toggle compact mode |
+| `Space` | Pause / resume |
+| `c` | Clear all entries |
+| `s` | Save logs |
+| `S` | Save As… (file browser) |
+| `q` / `Esc` | Close logcat |
 
-**Child Menu Mode:**
-1. **Left Panel (40%)**: Category overview with current selection highlighted (dark gray border)
-2. **Right Panel (60%)**: Expanded sub-options for the selected category (Android green border)
-3. **Footer**: Updated navigation help for child menu mode
+#### Save Dialog
+| Key | Action |
+|-----|--------|
+| `Enter` | Save to typed path |
+| `S` | Save As… (open file browser) |
+| `Tab` | Cycle format: TXT all → TXT filtered → JSON all → JSON filtered |
+| `Esc` | Cancel |
 
-## Examples & Demos 📚
+#### File Browser (Save As…)
+| Key | Action |
+|-----|--------|
+| `↑`/`↓` | Navigate |
+| `Enter` / `l` | Open directory / select file |
+| `h` / `←` / `Backspace` | Go to parent |
+| `Shift+S` | Save Here (into current directory) |
+| `/` | Incremental search |
+| `n` | Create new folder |
+| `.` | Toggle hidden files |
+| `s` | Cycle sort mode |
+| `Esc` | Back to path input |
 
-### Runnable Examples
+## Architecture 🏗️
 
-DroidTUI includes several standalone examples demonstrating different features:
+DroidTUI follows an **Elm-like architecture** with clear separation of concerns:
 
-```bash
-# Main menu with all features
-cargo run --example main_menu
-
-# Screen streaming
-cargo run --example streaming
-
-# Device information
-cargo run --example device_info
-
-# Package manager
-cargo run --example package_manager
-
-# All examples (run sequentially)
-cargo run --example all_examples
 ```
-
-See [examples/README.md](examples/README.md) for detailed information.
-
-### VHS Terminal Demos
-
-Animated terminal recordings showcasing DroidTUI in action:
-
-- `main_menu.tape` - Complete main menu navigation
-- `streaming.tape` - Screen streaming feature
-- `device_info.tape` - Device information commands
-- `package_manager.tape` - Package management
-- `navigation.tape` - Keyboard navigation and scrolling
-- `features_highlight.tape` - All major features
-- `all_examples.tape` - Running all examples
-
-Generate demos with [VHS](https://github.com/charmbracelet/vhs):
-
-```bash
-# Install VHS
-go install github.com/charmbracelet/vhs@latest
-
-# Generate a demo
-vhs examples/vhs/main_menu.tape
-
-# Generate all demos
-./examples/vhs/generate_all.sh
+┌── Model ──────────────────────┐
+│ app state, menu, logcat,      │
+│ device status, theme          │
+├── Message ────────────────────┤
+│ all possible state changes    │
+├── Update ─────────────────────┤
+│ message → state transitions   │
+├── View ───────────────────────┤
+│ model → terminal rendering    │
+├── Event ──────────────────────┤
+│ keyboard, tick → messages     │
+└───────────────────────────────┘
 ```
-
-See [examples/vhs/README.md](examples/vhs/README.md) for more information.
-
-## Dependencies 📦
-
-### Core Dependencies
-
-- **ratatui**: Terminal user interface library
-- **crossterm**: Cross-platform terminal manipulation
-- **tokio**: Async runtime
-- **tachyonfx**: Visual effects and animations
-- **color-eyre**: Beautiful error handling
-- **adb_client** (adb_cli): Type-safe ADB command execution
-- **futures**: Async utilities
-- **minifb**: Window creation for screen streaming
-
-### Why adb_client?
-
-The v0.3.0 refactoring replaced string-based ADB commands with the typed `adb_client` crate, providing:
-
-- **Type Safety**: Compile-time guarantees for ADB operations
-- **Error Handling**: Rich error types with detailed information
-- **Performance**: Direct ADB server communication (5-10% faster)
-- **Maintainability**: Clear API, easier to extend and debug
-- **Future-Proof**: Support for new ADB features as they're added
-
-See [REFACTORING.md](REFACTORING.md) for the complete migration story.
-
-## Technical Details 🔧
-
-### Architecture
-
-DroidTUI follows an Elm-like architecture with clear separation of concerns:
-
-- **Model**: Application state (`src/model.rs`)
-- **View**: UI rendering (`src/view.rs`)
-- **Update**: State transitions (`src/update.rs`)
-- **Message**: State change events (`src/message.rs`)
-- **Event System**: Async event handling (`src/event.rs`)
-- **ADB Layer**: Type-safe command execution (`src/adb.rs`)
-- **Effects**: Visual animations (`src/effects.rs`)
-- **Streaming**: Screen streaming (`src/stream.rs`)
-
-### ADB Command Abstraction
-
-The new `AdbManager` provides a clean abstraction over `adb_client`:
-
-```rust
-pub enum AdbCommand {
-    ListDevices,
-    Shell(String),
-    GetProp(String),
-    GetState,
-    // ... 20+ typed commands
-}
-
-pub struct AdbManager {
-    // Manages ADB server connection
-}
-
-impl AdbManager {
-    pub async fn execute(&mut self, command: AdbCommand) -> Result<String, AdbError>
-}
-```
-
-This design:
-- Encapsulates ADB complexity
-- Provides type-safe commands
-- Enables comprehensive error handling
-- Facilitates testing and mocking
-- Makes adding new commands easy
-
-See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for usage examples.
 
 ### Project Structure
 
 ```
 droidtui/
 ├── src/
-│   ├── main.rs          # Application entry point
-│   ├── app.rs           # Main application logic
-│   ├── model.rs         # Application state
-│   ├── view.rs          # UI rendering
-│   ├── update.rs        # State update logic
-│   ├── message.rs       # Message types
-│   ├── event.rs         # Event handling
-│   ├── menu.rs          # Menu system
-│   ├── adb.rs           # ADB command abstraction (NEW in v0.3.0)
-│   ├── effects.rs       # Visual effects
-│   └── stream.rs        # Screen streaming
-├── examples/
-│   ├── main_menu.rs     # Full menu example
-│   ├── streaming.rs     # Streaming example
-│   ├── device_info.rs   # Device info example
-│   ├── package_manager.rs  # Package manager example
-│   ├── all_examples.rs  # Run all examples
-│   ├── vhs/             # VHS demo tapes
-│   └── README.md        # Examples documentation
+│   ├── main.rs       # Entry point + CLI query mode
+│   ├── app.rs        # Event loop, key → message mapping
+│   ├── model.rs      # All application state
+│   ├── view.rs       # UI rendering (ratatui)
+│   ├── update.rs     # State transitions
+│   ├── message.rs    # Message enum
+│   ├── event.rs      # Async event handling
+│   ├── menu.rs       # Command menu widget
+│   ├── adb.rs        # ADB client abstraction
+│   ├── fastboot.rs   # Fastboot command support
+│   ├── logcat.rs     # Logcat viewer (streaming, parsing, filters, stats)
+│   ├── theme.rs      # Theme system (12 presets, selector)
+│   ├── effects.rs    # Visual effects (TachyonFX)
+│   └── lib.rs        # Library exports
+├── scripts/
+│   ├── logcat/       # Nushell recipe scripts
+│   ├── bump_version.nu
+│   └── release_prepare.nu
 ├── tests/
-│   ├── integration_tests.rs  # Integration tests
-│   └── adb_tests.rs     # ADB layer tests
-├── docs/
-│   ├── REFACTORING.md           # Refactoring story
-│   ├── IMPLEMENTATION_SUMMARY.md # Implementation details
-│   ├── QUICK_REFERENCE.md       # Quick API reference
-│   └── CHANGELOG.md             # Version history
-└── scripts/
-    └── bump_version.sh  # Version management
+│   └── adb_integration_tests.rs
+├── examples/
+└── Cargo.toml
 ```
+
+## Dependencies 📦
+
+| Crate | Purpose |
+|-------|---------|
+| `ratatui` | Terminal UI framework |
+| `crossterm` | Cross-platform terminal I/O |
+| `adb_client` | Pure-Rust ADB protocol client |
+| `tokio` | Async runtime |
+| `tachyonfx` | Visual effects & animations |
+| `regex` | Regex search in logcat |
+| `serde` + `serde_json` | JSON serialization for logcat export |
+| `tui-file-explorer` | File browser widget (save dialog) |
+| `color-eyre` | Error handling |
 
 ## Development 🛠️
 
-### Adding New Commands
-
-To add a new ADB command:
-
-1. **Define the command variant** in `src/adb.rs`:
-
-```rust
-pub enum AdbCommand {
-    // ... existing commands
-    YourNewCommand { param: String },
-}
-```
-
-2. **Implement execution** in `AdbManager::execute`:
-
-```rust
-AdbCommand::YourNewCommand { param } => {
-    // Use adb_client API
-    let result = self.client.shell_command(device_serial, &format!("your command {}", param))?;
-    Ok(result)
-}
-```
-
-3. **Add to menu** in `src/menu.rs`:
-
-```rust
-MenuItem {
-    label: "🔧 Your Command".to_string(),
-    description: "What it does".to_string(),
-    command: AdbCommand::YourNewCommand { param: "value".to_string() },
-    children: vec![],
-}
-```
-
-4. **Add tests** in `tests/adb_tests.rs`
-
-See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for detailed examples.
-
-### Customizing Effects
-
-Visual effects can be modified in `src/effects.rs`:
-- Adjust startup reveal animation timing and intensity
-- Modify gradient wave effects and background colors
-- Change static Android green selection color
-- Change startup progress phases and content timing
-- Modify layout border colors (green for active, dark gray for inactive)
-
-### Testing
-
-Run the comprehensive test suite:
-
 ```bash
-# Run all tests
-cargo test
-
-# Run with output
-cargo test -- --nocapture
-
-# Run specific test
-cargo test test_adb_manager
-
-# Run integration tests
-cargo test --test integration_tests
-
-# Check code coverage (requires tarpaulin)
-cargo tarpaulin --out Html
+cargo test                    # Run all 209 tests
+cargo clippy --all-targets --all-features -- -D warnings  # Lint
+cargo fmt --check             # Format check
+just release patch            # Bump, test, tag, push
 ```
 
-Current test coverage: **82%** with 31 passing tests.
+### Adding New ADB Commands
 
-## Release Automation 🚀
-
-**📚 See [QUICK_RELEASE.md](QUICK_RELEASE.md) for a quick start guide!**
-
-DroidTUI includes automated tools for version management and releases.
-
-### Quick Release
-
-Install `just` command runner:
-```bash
-cargo install just
-```
-
-Bump version and release in one command:
-```bash
-just release 0.3.0
-```
-
-### Available Commands
-
-```bash
-just              # Show all available commands
-just version      # Show current version
-just bump 0.3.0   # Bump version to 0.3.0
-just release 0.3.0  # Full release workflow
-just check-all    # Run all checks (fmt, clippy, test)
-```
-
-### Manual Version Bump
-
-Use the provided script:
-```bash
-./scripts/bump_version.sh 0.3.0
-```
-
-### Automated Workflows
-
-- **CI Workflow**: Runs tests on every push and PR
-- **Release Workflow**: Builds and publishes on tag push
-- **Update README**: Automatically updates version badge on release
-
-📚 **Documentation:**
-- **Quick Start**: [QUICK_RELEASE.md](QUICK_RELEASE.md) - TL;DR one-command release
-- **Full Guide**: [RELEASE.md](RELEASE.md) - Detailed release process documentation
-
-## Documentation 📖
-
-DroidTUI includes comprehensive documentation:
-
-- **[README.md](README.md)** - This file, main overview
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
-- **[REFACTORING.md](REFACTORING.md)** - Complete refactoring story and rationale
-- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Implementation details and outcomes
-- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick API reference and examples
-- **[examples/README.md](examples/README.md)** - Examples documentation
-- **[examples/vhs/README.md](examples/vhs/README.md)** - VHS demos documentation
-- **[QUICK_RELEASE.md](QUICK_RELEASE.md)** - Quick release guide
-- **[RELEASE.md](RELEASE.md)** - Detailed release process
+1. Add a variant to `AdbCommand` in `src/adb.rs`
+2. Implement the handler in `AdbManager::execute`
+3. Add a menu entry in `src/menu.rs` via `build_entries()`
+4. Tests in `tests/adb_integration_tests.rs`
 
 ## Contributing 🤝
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
+2. Create your feature branch (`git checkout -b feature/amazing`)
+3. Run `cargo fmt && cargo clippy --all-targets --all-features -- -D warnings && cargo test`
+4. Commit and push
 5. Open a Pull Request
-
-### Contribution Guidelines
-
-- Follow the existing code style (run `cargo fmt`)
-- Add tests for new features
-- Update documentation as needed
-- Use the `AdbCommand` enum for ADB operations
-- Ensure all tests pass (`cargo test`)
-- Check for clippy warnings (`cargo clippy`)
-
-See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for API usage examples.
-
-## Roadmap 🗺️
-
-Future enhancements planned:
-
-- [ ] APK installation via file transfer
-- [ ] Multiple device selection
-- [ ] Wireless ADB support
-- [ ] Command batching and async execution
-- [ ] Custom command presets
-- [ ] Configuration file support
-- [ ] Plugin system for custom commands
-- [ ] Log filtering and search
-- [ ] File browser for device storage
-- [ ] App manager with install/uninstall
-
-## Performance 📈
-
-DroidTUI v0.3.0 performance improvements:
-
-- **Startup Time**: < 100ms to main menu
-- **Command Execution**: 5-10% faster than string-based commands
-- **Memory Usage**: < 20MB typical
-- **Screen Streaming**: 30-60 FPS depending on device
-- **Responsiveness**: < 16ms UI update latency
-
-Benchmarks run on: Ubuntu 22.04, Ryzen 7 5800X, 32GB RAM
-
-## Troubleshooting 🔍
-
-### Common Issues
-
-**"No devices found"**
-- Ensure ADB is in your PATH: `which adb`
-- Check device connection: `adb devices`
-- Enable USB debugging on device
-
-**"FFmpeg not found" (for streaming)**
-- Install FFmpeg: `sudo apt install ffmpeg` (Linux) or `brew install ffmpeg` (macOS)
-- Ensure it's in your PATH: `which ffmpeg`
-
-**Screen streaming doesn't work**
-- Check FFmpeg installation
-- Ensure device screen is unlocked
-- Try different quality settings in menu
-
-**Commands fail with "Connection refused"**
-- Restart ADB server: `adb kill-server && adb start-server`
-- Check device authorization
-- Verify ADB version compatibility
-
-For more issues, check [GitHub Issues](https://github.com/sorinirimies/droidtui/issues).
 
 ## License 📄
 
-Copyright (c) Sorin Albu-Irimies <mihaiirimies@gmail.com>
-
-This project is licensed under the MIT license ([LICENSE](./LICENSE) or <http://opensource.org/licenses/MIT>)
+MIT — Copyright (c) Sorin Albu-Irimies
 
 ## Acknowledgments 🙏
 
-- [Ratatui](https://ratatui.rs) - Amazing TUI library for Rust
-- [TachyonFX](https://github.com/junkdog/tachyonfx) - Visual effects library
-- [adb_client](https://github.com/adb-client/adb_client) - Type-safe ADB Rust client
-- Android team for the awesome platform and tooling
-- All contributors and users of DroidTUI
-
-## Links 🔗
-
-- **Crates.io**: [droidtui](https://crates.io/crates/droidtui)
-- **GitHub**: [sorinirimies/droidtui](https://github.com/sorinirimies/droidtui)
-- **Issues**: [Report a bug](https://github.com/sorinirimies/droidtui/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/sorinirimies/droidtui/discussions)
+- [Ratatui](https://ratatui.rs) — TUI framework
+- [adb_client](https://github.com/nicoulaj/adb_client) — Pure-Rust ADB client
+- [TachyonFX](https://github.com/junkdog/tachyonfx) — Visual effects
+- [tui-file-explorer](https://github.com/sorinirimies/tui-file-explorer) — File browser widget
 
 ---
 
-**Made with ❤️ and ☕ for Android developers**
-
-*Powered by Rust 🦀 | Built with Ratatui 🐭 | Enhanced by TachyonFX ⚡*
+**Made with ❤️ and ☕ for Android developers** · *Powered by Rust 🦀*
