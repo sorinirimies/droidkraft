@@ -1,6 +1,6 @@
 [package]
 name = "droidtui"
-version      = "0.5.0"
+version      = "0.5.1"
 description = "A beautiful Terminal User Interface (TUI) for Android development and ADB commands"
 authors = ["Sorin Albu-Irimies <mihaiirimies@gmail.com>"]
 license = "MIT"

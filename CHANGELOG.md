@@ -2,47 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.4.0] - 2026-03-25
-
-### 🚀 Features
-
-- **Live Logcat Viewer** — Full-screen, real-time logcat streaming via the `adb_client` crate's native `ADBServerDevice::get_logs()` API
-- **Regex search** — Toggle regex mode (`r`) for powerful pattern matching (e.g. `Error|Exception`, `OkHttp.*failed`)
-- **Exclude filter** — Negative match filter (`e`) to hide noisy tags/messages (supports regex when enabled)
-- **Line detail popup** — Press `Enter` to inspect any log line with full unwrapped message, tag, PID, TID, and timestamp
-- **Per-tag color hashing** — Each tag gets a stable, visually distinct color via djb2 hash over a 16-color palette
-- **Stack trace folding** — Detect Java/Kotlin stack traces and fold/unfold them with `f`
-- **Live stats bar** — Real-time lines/sec rate and per-level counters in the status area
-- **Horizontal scroll** — `←`/`→` arrow keys to scroll long messages when word-wrap is off, `0` to reset
-- **Compact mode** — Toggle with `x` to hide timestamp and PID columns for more message space
-- **Copy to clipboard** — Press `y` to copy the selected line to the system clipboard (macOS `pbcopy`, Linux `xclip`/`xsel`)
-- **Bookmarks** — `m` to toggle bookmarks on log lines, `[`/`]` to jump between them (wraps around)
-- **Search highlighting** — Search matches are highlighted with yellow background in the log output
-- **Log level filter** — Cycle minimum level with `l` (V→D→I→W→E→F)
-- **Tag / PID filters** — Dedicated filter fields for tag substring and PID matching
-- **Auto-scroll** — Sticks to the bottom by default; manual scroll disables it; `G`/`End` re-enables
-- **Pause / Resume** — `Space` to pause ingestion without losing the stream
-- **Clear logs** — `c` to clear all entries and counters
-- **Save logs** — `s` to save all entries, `S` to save filtered only, with path input dialog
-- **Save As… file browser** — `F2` in save dialog opens `tui-file-explorer` for directory browsing
-- **Save Here** — `S` in the file browser to save directly into the current directory with a timestamped filename
-- **Word wrap toggle** — `w` to toggle line wrapping
-- **Menu integration** — 📺 Live Logcat entry in the SYSTEM menu section, `Shift+L` shortcut from menu
+## [0.5.1] - 2026-03-25
 
 ### 🐛 Bug Fixes
 
-- **Bounded channel** — Replaced unbounded `mpsc::channel` with `sync_channel(10_000)` to prevent OOM crashes during logcat bursts
-- **Backpressure** — ADB streaming thread now blocks when the channel is full instead of flooding memory
-- **Optimized trim** — Ring buffer trim now adjusts filtered indices in-place O(filtered_len) instead of full O(50k) rebuild
-- **Scroll position crash** — Fixed `scroll_position` semantics so transitioning from auto-scroll doesn't jump to line 0
-- **Drain rate** — Increased from 200 to 500 lines/tick for better throughput (15k lines/sec at 30fps)
+- Remap find to f, fold to F, update filter bar labels - ([62dc409](https://github.com/sorinirimies/droidtui/commit/62dc40995720d83e1f4cc73e838f21ce482d060b))
 
-### ⚙️ Miscellaneous Tasks
+- Remap S to Save As (file browser), update all hints - ([cf21586](https://github.com/sorinirimies/droidtui/commit/cf21586a920cc1ba617845669fa3a95dda7276a8))
 
-- Added `regex` crate dependency for regex search support
-- Added `tui-file-explorer` crate (no-default-features) for file browser in save dialog
-- Added 49 new unit tests covering all logcat features (177 total project tests)
-- Bumped version to 0.4.0
+- Resolve clippy field_reassign_with_default in test modules - ([d0388bf](https://github.com/sorinirimies/droidtui/commit/d0388bff79923810ed7f79265121707cb7ee9b5e))
+
+
+## [0.4.1] - 2026-03-25
+
+### 🚀 Features
+
+- Theme system + redesigned logcat shortcuts & footer - ([df0f8f8](https://github.com/sorinirimies/droidtui/commit/df0f8f82c0c966e449f98954fd0137d00f49d490))
+
+
+## [0.4.0] - 2026-03-25
+
+### 📚 Documentation
+
+- Update README and CHANGELOG for v0.3.2 - ([1447d5d](https://github.com/sorinirimies/droidtui/commit/1447d5d5860fe15eb79b2038ea9076b44e91a8b3))
+
+
+### 🚀 Features
+
+- Live Logcat Viewer with 10 pro features - ([1131f48](https://github.com/sorinirimies/droidtui/commit/1131f48fb13ec2f47285b1cdeb6eb2196148fcb7))
+
 
 ## [0.3.2] - 2025-10-19
 
