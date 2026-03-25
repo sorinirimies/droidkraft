@@ -1,4 +1,5 @@
 use crate::menu::MenuCommand;
+use ratatui::crossterm::event::KeyEvent;
 
 /// Messages represent all possible actions/events in the application
 /// This follows the Elm architecture pattern for clear state transitions
@@ -31,6 +32,35 @@ pub enum Message {
     ScrollToTop,
     ScrollToBottom,
 
+    // Logcat messages
+    OpenLogcat,
+    LogcatScrollUp,
+    LogcatScrollDown,
+    LogcatScrollPageUp,
+    LogcatScrollPageDown,
+    LogcatScrollToTop,
+    LogcatScrollToBottom,
+    LogcatTogglePause,
+    LogcatClear,
+    LogcatCycleLevel,
+    LogcatToggleSearch,
+    LogcatToggleTagFilter,
+    LogcatTogglePackageFilter,
+    LogcatSearchInput(char),
+    LogcatSearchBackspace,
+    LogcatSearchDelete,
+    LogcatCursorLeft,
+    LogcatCursorRight,
+    LogcatExitFilter,
+    LogcatSave,
+    LogcatSaveFilteredOnly,
+    LogcatToggleWordWrap,
+    LogcatFileSaved(String),
+    LogcatFileExplorerKey(KeyEvent),
+    LogcatCancelSave,
+    LogcatSaveAs,
+    CloseLogcat,
+
     // Application lifecycle
     Tick,
     Quit,
@@ -60,6 +90,10 @@ impl Message {
                 | Message::EnterChild
                 | Message::ExitChild
                 | Message::SkipStartup
+                | Message::OpenLogcat
+                | Message::CloseLogcat
+                | Message::LogcatSave
+                | Message::LogcatCancelSave
         )
     }
 }

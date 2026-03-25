@@ -20,6 +20,7 @@
 
 use crate::adb::DeviceStatus;
 use crate::effects::{get_loading_spinner, RevealWidget};
+use crate::logcat::{FilterField, LogcatState};
 use crate::model::{AppState, Model};
 use ratatui::{
     buffer::Buffer,
@@ -33,10 +34,11 @@ use ratatui::{
 
 pub fn render(model: &mut Model, area: Rect, buf: &mut Buffer) {
     match model.state {
-        AppState::Startup    => render_startup(model, area, buf),
-        AppState::Menu       => render_menu(model, area, buf),
-        AppState::Loading    => render_loading(model, area, buf),
+        AppState::Startup => render_startup(model, area, buf),
+        AppState::Menu => render_menu(model, area, buf),
+        AppState::Loading => render_loading(model, area, buf),
         AppState::ShowResult => render_result(model, area, buf),
+        AppState::Logcat => render_logcat(model, area, buf),
     }
 }
 
@@ -51,7 +53,7 @@ fn render_startup(model: &mut Model, area: Rect, buf: &mut Buffer) {
 
 fn render_loading(model: &Model, area: Rect, buf: &mut Buffer) {
     let spinner = get_loading_spinner(model.loading_counter);
-    let label   = model.menu.get_selected_label();
+    let label = model.menu.get_selected_label();
 
     Paragraph::new(format!(
         "\n   {}  Executing\u{2026}\n\n   {}\n\n   Esc  \u{00b7}  cancel",
@@ -83,8 +85,8 @@ fn render_menu(model: &mut Model, area: Rect, buf: &mut Buffer) {
         .split(area);
 
     let header_area = outer[0];
-    let body_area   = outer[1];
-    let desc_area   = outer[2];
+    let body_area = outer[1];
+    let desc_area = outer[2];
     let footer_area = outer[3];
 
     // ── Header ────────────────────────────────────────────────────────────────
@@ -130,7 +132,7 @@ fn render_menu(model: &mut Model, area: Rect, buf: &mut Buffer) {
 
     // ── Footer ────────────────────────────────────────────────────────────────
     Paragraph::new(
-        "  \u{2191}/\u{2193} j/k Navigate  Tab/S-Tab Section  Enter Execute  d Device  r Refresh  q Quit  ",
+        "  \u{2191}/\u{2193} j/k Navigate  Tab/S-Tab Section  Enter Execute  L Logcat  d Device  r Refresh  q Quit  ",
     )
     .block(
         Block::bordered()
@@ -163,9 +165,17 @@ fn render_device_panel(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
 // ── Device selector ───────────────────────────────────────────────────────────
 
 fn render_device_list(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
-    let connected   = status.is_connected();
-    let bdr_color   = if connected { Color::Rgb(40, 120, 40) } else { Color::Rgb(60, 50, 35) };
-    let multi_hint  = if status.devices.len() > 1 { "  d \u{2013} cycle" } else { "" };
+    let connected = status.is_connected();
+    let bdr_color = if connected {
+        Color::Rgb(40, 120, 40)
+    } else {
+        Color::Rgb(60, 50, 35)
+    };
+    let multi_hint = if status.devices.len() > 1 {
+        "  d \u{2013} cycle"
+    } else {
+        ""
+    };
 
     let block = Block::bordered()
         .title(format!("  \u{1f4f1}  Devices{}  ", multi_hint))
@@ -177,17 +187,15 @@ fn render_device_list(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
     block.render(area, buf);
 
     if !connected {
-        Paragraph::new(Line::from(vec![
-            Span::styled(
-                "  \u{25cb}  No device connected",
-                Style::default().fg(Color::Rgb(160, 130, 60)),
-            ),
-        ]))
+        Paragraph::new(Line::from(vec![Span::styled(
+            "  \u{25cb}  No device connected",
+            Style::default().fg(Color::Rgb(160, 130, 60)),
+        )]))
         .render(inner, buf);
         return;
     }
 
-    let dim    = Color::Rgb(100, 100, 100);
+    let dim = Color::Rgb(100, 100, 100);
     let sel_bg = Color::Rgb(40, 140, 40);
     let sel_fg = Color::Rgb(10, 10, 10);
 
@@ -198,15 +206,12 @@ fn render_device_list(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
         .take(inner.height as usize)
         .map(|(idx, dev)| {
             let selected = idx == status.selected_idx;
-            let serial   = format!("{:<20}", dev.serial);
-            let state    = dev.state.clone();
+            let serial = format!("{:<20}", dev.serial);
+            let state = dev.state.clone();
 
             if selected {
                 Line::from(vec![
-                    Span::styled(
-                        "  \u{25b6}  ",
-                        Style::default().fg(Color::Rgb(80, 220, 80)),
-                    ),
+                    Span::styled("  \u{25b6}  ", Style::default().fg(Color::Rgb(80, 220, 80))),
                     Span::styled(
                         serial,
                         Style::default()
@@ -235,8 +240,12 @@ fn render_device_list(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
 // ── Device stats ──────────────────────────────────────────────────────────────
 
 fn render_device_stats(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
-    let connected  = status.is_connected();
-    let bdr_color  = if connected { Color::Rgb(35, 70, 35) } else { Color::Rgb(55, 45, 35) };
+    let connected = status.is_connected();
+    let bdr_color = if connected {
+        Color::Rgb(35, 70, 35)
+    } else {
+        Color::Rgb(55, 45, 35)
+    };
 
     let title = status
         .active()
@@ -261,37 +270,41 @@ fn render_device_stats(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
 
     // Battery
     let batt_color = match status.battery_pct {
-        0..=20  => Color::Rgb(220, 60, 60),
+        0..=20 => Color::Rgb(220, 60, 60),
         21..=50 => Color::Rgb(220, 160, 50),
-        _       => Color::Rgb(80, 200, 80),
+        _ => Color::Rgb(80, 200, 80),
     };
 
     // RAM
     let ram_used = status.ram_total_mib.saturating_sub(status.ram_avail_mib);
-    let ram_pct  = if status.ram_total_mib > 0 {
+    let ram_pct = if status.ram_total_mib > 0 {
         ram_used as f32 / status.ram_total_mib as f32
     } else {
         0.0
     };
     let ram_color = match (ram_pct * 100.0) as u8 {
-        0..=60  => Color::Rgb(80, 200, 80),
+        0..=60 => Color::Rgb(80, 200, 80),
         61..=80 => Color::Rgb(220, 160, 50),
-        _       => Color::Rgb(220, 60, 60),
+        _ => Color::Rgb(220, 60, 60),
     };
 
     // CPU — clamp load to 4.0 (4-core ceiling for bar display)
-    let cpu_frac  = (status.cpu_load_1min / 4.0).clamp(0.0, 1.0);
+    let cpu_frac = (status.cpu_load_1min / 4.0).clamp(0.0, 1.0);
     let cpu_color = match (cpu_frac * 100.0) as u8 {
-        0..=60  => Color::Rgb(80, 200, 80),
+        0..=60 => Color::Rgb(80, 200, 80),
         61..=80 => Color::Rgb(220, 160, 50),
-        _       => Color::Rgb(220, 60, 60),
+        _ => Color::Rgb(220, 60, 60),
     };
 
-    let dim    = Color::Rgb(90, 90, 90);
+    let dim = Color::Rgb(90, 90, 90);
     let bright = Color::Rgb(205, 205, 205);
 
-    let model_text = if status.model.is_empty() { "Unknown".to_string() } else { status.model.clone() };
-    let ver_text   = if status.android_version.is_empty() {
+    let model_text = if status.model.is_empty() {
+        "Unknown".to_string()
+    } else {
+        status.model.clone()
+    };
+    let ver_text = if status.android_version.is_empty() {
         String::new()
     } else {
         format!("Android {}", status.android_version)
@@ -301,7 +314,10 @@ fn render_device_stats(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
         Line::from(""),
         Line::from(vec![
             Span::styled("  \u{1f4f1}  ", Style::default().fg(dim)),
-            Span::styled(model_text, Style::default().fg(bright).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                model_text,
+                Style::default().fg(bright).add_modifier(Modifier::BOLD),
+            ),
         ]),
     ];
 
@@ -354,8 +370,8 @@ fn render_device_stats(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
 // ── No-device content ─────────────────────────────────────────────────────────
 
 fn render_no_device_content(area: Rect, buf: &mut Buffer) {
-    let dim    = Color::Rgb(90, 90, 90);
-    let amber  = Color::Rgb(160, 130, 60);
+    let dim = Color::Rgb(90, 90, 90);
+    let amber = Color::Rgb(160, 130, 60);
     let subtle = Color::Rgb(80, 80, 80);
 
     let lines: Vec<Line<'static>> = vec![
@@ -391,22 +407,28 @@ fn render_no_device_content(area: Rect, buf: &mut Buffer) {
 
 /// Build a single progress-bar stat line.
 fn stat_bar(
-    label:  &str,
-    value:  f32,
-    max:    f32,
-    bar_w:  usize,
-    color:  Color,
+    label: &str,
+    value: f32,
+    max: f32,
+    bar_w: usize,
+    color: Color,
     suffix: String,
 ) -> Line<'static> {
-    let pct    = (value / max).clamp(0.0, 1.0);
+    let pct = (value / max).clamp(0.0, 1.0);
     let filled = (pct * bar_w as f32) as usize;
-    let empty  = bar_w.saturating_sub(filled);
+    let empty = bar_w.saturating_sub(filled);
 
     Line::from(vec![
-        Span::styled(label.to_string(),       Style::default().fg(Color::Rgb(90, 90, 90))),
+        Span::styled(
+            label.to_string(),
+            Style::default().fg(Color::Rgb(90, 90, 90)),
+        ),
         Span::styled("\u{2588}".repeat(filled), Style::default().fg(color)),
-        Span::styled("\u{2591}".repeat(empty),  Style::default().fg(Color::Rgb(40, 40, 40))),
-        Span::styled(format!("  {}", suffix),  Style::default().fg(color)),
+        Span::styled(
+            "\u{2591}".repeat(empty),
+            Style::default().fg(Color::Rgb(40, 40, 40)),
+        ),
+        Span::styled(format!("  {}", suffix), Style::default().fg(color)),
     ])
 }
 
@@ -434,14 +456,14 @@ fn render_result(model: &mut Model, area: Rect, buf: &mut Buffer) {
         .unwrap_or_else(|| "Result".to_string());
 
     let slide_progress = model.effects.get_slide_in_progress();
-    let base_area      = centered_rect(82, 76, area);
-    let slide_offset   = ((1.0 - slide_progress) * base_area.height as f32 * 0.4) as u16;
+    let base_area = centered_rect(82, 76, area);
+    let slide_offset = ((1.0 - slide_progress) * base_area.height as f32 * 0.4) as u16;
 
     let popup_area = if slide_offset > 0 {
         Rect {
-            x:      base_area.x,
-            y:      base_area.y + slide_offset,
-            width:  base_area.width,
+            x: base_area.x,
+            y: base_area.y + slide_offset,
+            width: base_area.width,
             height: base_area.height.saturating_sub(slide_offset),
         }
     } else {
@@ -457,18 +479,18 @@ fn render_result(model: &mut Model, area: Rect, buf: &mut Buffer) {
         ..popup_area
     };
     let scrollbar_area = Rect {
-        x:     popup_area.x + popup_area.width.saturating_sub(3),
+        x: popup_area.x + popup_area.width.saturating_sub(3),
         width: 3,
         ..popup_area
     };
 
     let content_height = content_area.height.saturating_sub(4) as usize;
-    let max_width      = content_area.width.saturating_sub(4) as usize;
+    let max_width = content_area.width.saturating_sub(4) as usize;
     model.update_wrapped_lines(max_width);
 
-    let total   = model.wrapped_lines.len();
-    let start   = model.scroll_position;
-    let end     = (start + content_height).min(total);
+    let total = model.wrapped_lines.len();
+    let start = model.scroll_position;
+    let end = (start + content_height).min(total);
     let visible = model.wrapped_lines[start..end].to_vec();
 
     let scroll_hint = if total > content_height {
@@ -528,12 +550,12 @@ fn render_result(model: &mut Model, area: Rect, buf: &mut Buffer) {
 // ── Scrollbar ─────────────────────────────────────────────────────────────────
 
 fn render_scrollbar(
-    area:        Rect,
-    buf:         &mut Buffer,
+    area: Rect,
+    buf: &mut Buffer,
     total_lines: usize,
-    visible:     usize,
-    pos:         usize,
-    color:       Color,
+    visible: usize,
+    pos: usize,
+    color: Color,
 ) {
     if area.height < 3 {
         return;
@@ -551,7 +573,7 @@ fn render_scrollbar(
     }
 
     let thumb_size = ((visible as f64 / total_lines as f64) * h as f64).max(1.0) as usize;
-    let thumb_pos  = if total_lines > visible {
+    let thumb_pos = if total_lines > visible {
         ((pos as f64 / (total_lines - visible) as f64) * (h - thumb_size) as f64) as usize
     } else {
         0
@@ -567,6 +589,845 @@ fn render_scrollbar(
                 cell.set_fg(Color::DarkGray);
             }
         }
+    }
+}
+
+// ── centered_rect ─────────────────────────────────────────────────────────────
+
+// ── Logcat view ───────────────────────────────────────────────────────────────
+
+fn render_logcat(model: &mut Model, area: Rect, buf: &mut Buffer) {
+    let state = &mut model.logcat;
+
+    // ── Layout ────────────────────────────────────────────────────────────
+    //  ┌─ Filter bar ──────────────────────────────────────────────────────┐
+    //  │ 🔍 search… │ 🏷 tag… │ 📦 pkg… │ Level: I+ │ ⏸ Paused │ 1234  │
+    //  ├─ Log lines ───────────────────────────────────────────────────────┤
+    //  │ 03-25 12:00:00.000  1234  5678 I MyTag   : Hello world          │
+    //  │ …                                                                │
+    //  ├─ Footer / help ───────────────────────────────────────────────────┤
+    //  │ /Search  tTag  pPkg  lLevel  Space Pause  cClear  q Close       │
+    //  └──────────────────────────────────────────────────────────────────┘
+    let outer = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // filter bar
+            Constraint::Min(1),    // log lines
+            Constraint::Length(3), // footer
+        ])
+        .split(area);
+
+    let filter_area = outer[0];
+    let log_area = outer[1];
+    let footer_area = outer[2];
+
+    render_logcat_filter_bar(state, filter_area, buf);
+    render_logcat_lines(state, log_area, buf);
+    render_logcat_footer(state, footer_area, buf);
+
+    // ── Save dialog overlay ───────────────────────────────────────────────
+    if model.logcat_save_active {
+        render_logcat_save_dialog(model, area, buf);
+    }
+}
+
+// ── Logcat filter bar ─────────────────────────────────────────────────────────
+
+fn render_logcat_filter_bar(state: &LogcatState, area: Rect, buf: &mut Buffer) {
+    let _editing = state.filter.active_field != FilterField::None;
+
+    // Split into segments: search | tag | package | level | status | counts
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(28), // search
+            Constraint::Percentage(20), // tag
+            Constraint::Percentage(20), // package
+            Constraint::Length(12),     // level
+            Constraint::Min(10),        // status + counts
+        ])
+        .split(area);
+
+    // ── Search field ──────────────────────────────────────────────────────
+    let search_active = state.filter.active_field == FilterField::Search;
+    let search_border = if search_active {
+        Color::Rgb(80, 200, 255)
+    } else if !state.filter.search_query.is_empty() {
+        Color::Rgb(60, 140, 60)
+    } else {
+        Color::Rgb(50, 50, 70)
+    };
+    let search_text = if state.filter.search_query.is_empty() && !search_active {
+        "  / search…".to_string()
+    } else {
+        let cursor = if search_active {
+            let pos = state.filter.search_cursor;
+            let (before, after) = state.filter.search_query.split_at(
+                state
+                    .filter
+                    .search_query
+                    .char_indices()
+                    .nth(pos)
+                    .map(|(i, _)| i)
+                    .unwrap_or(state.filter.search_query.len()),
+            );
+            format!("  {}▏{}", before, after)
+        } else {
+            format!("  {}", state.filter.search_query)
+        };
+        cursor
+    };
+    Paragraph::new(search_text)
+        .block(
+            Block::bordered()
+                .title("  \u{1f50d}  Search  ")
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(search_border)),
+        )
+        .style(Style::default().fg(if search_active {
+            Color::White
+        } else {
+            Color::Rgb(180, 180, 180)
+        }))
+        .render(cols[0], buf);
+
+    // ── Tag filter ────────────────────────────────────────────────────────
+    let tag_active = state.filter.active_field == FilterField::Tag;
+    let tag_border = if tag_active {
+        Color::Rgb(80, 200, 255)
+    } else if !state.filter.tag_filter.is_empty() {
+        Color::Rgb(60, 140, 60)
+    } else {
+        Color::Rgb(50, 50, 70)
+    };
+    let tag_text = if state.filter.tag_filter.is_empty() && !tag_active {
+        "  t tag…".to_string()
+    } else {
+        let cursor = if tag_active {
+            let pos = state.filter.tag_cursor;
+            let (before, after) = state.filter.tag_filter.split_at(
+                state
+                    .filter
+                    .tag_filter
+                    .char_indices()
+                    .nth(pos)
+                    .map(|(i, _)| i)
+                    .unwrap_or(state.filter.tag_filter.len()),
+            );
+            format!("  {}▏{}", before, after)
+        } else {
+            format!("  {}", state.filter.tag_filter)
+        };
+        cursor
+    };
+    Paragraph::new(tag_text)
+        .block(
+            Block::bordered()
+                .title("  \u{1f3f7}  Tag  ")
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(tag_border)),
+        )
+        .style(Style::default().fg(if tag_active {
+            Color::White
+        } else {
+            Color::Rgb(180, 180, 180)
+        }))
+        .render(cols[1], buf);
+
+    // ── Package filter ────────────────────────────────────────────────────
+    let pkg_active = state.filter.active_field == FilterField::Package;
+    let pkg_border = if pkg_active {
+        Color::Rgb(80, 200, 255)
+    } else if !state.filter.package_filter.is_empty() {
+        Color::Rgb(60, 140, 60)
+    } else {
+        Color::Rgb(50, 50, 70)
+    };
+    let pkg_text = if state.filter.package_filter.is_empty() && !pkg_active {
+        "  p pid…".to_string()
+    } else {
+        let cursor = if pkg_active {
+            let pos = state.filter.package_cursor;
+            let (before, after) = state.filter.package_filter.split_at(
+                state
+                    .filter
+                    .package_filter
+                    .char_indices()
+                    .nth(pos)
+                    .map(|(i, _)| i)
+                    .unwrap_or(state.filter.package_filter.len()),
+            );
+            format!("  {}▏{}", before, after)
+        } else {
+            format!("  {}", state.filter.package_filter)
+        };
+        cursor
+    };
+    Paragraph::new(pkg_text)
+        .block(
+            Block::bordered()
+                .title("  \u{1f4e6}  PID  ")
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(pkg_border)),
+        )
+        .style(Style::default().fg(if pkg_active {
+            Color::White
+        } else {
+            Color::Rgb(180, 180, 180)
+        }))
+        .render(cols[2], buf);
+
+    // ── Level badge ───────────────────────────────────────────────────────
+    let lvl = &state.filter.min_level;
+    let lvl_char = lvl.as_char();
+    let lvl_color = lvl.label_color();
+    let lvl_label = format!("  {}+", lvl_char);
+    Paragraph::new(lvl_label)
+        .block(
+            Block::bordered()
+                .title("  Lvl  ")
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Rgb(50, 50, 70))),
+        )
+        .style(Style::default().fg(lvl_color).add_modifier(Modifier::BOLD))
+        .render(cols[3], buf);
+
+    // ── Status / counts ───────────────────────────────────────────────────
+    let pause_icon = if state.paused { "⏸ " } else { "▶ " };
+    let stream_color = if state.paused {
+        Color::Rgb(200, 160, 50)
+    } else if state.is_streaming {
+        Color::Rgb(80, 200, 80)
+    } else {
+        Color::Rgb(120, 120, 120)
+    };
+
+    let status_text = format!(
+        " {} {}/{}",
+        pause_icon,
+        state.entry_count(),
+        state.total_count()
+    );
+
+    Paragraph::new(status_text)
+        .block(
+            Block::bordered()
+                .title(if state.is_streaming {
+                    "  \u{1f4e1}  Live  "
+                } else {
+                    "  \u{25cb}  Idle  "
+                })
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Rgb(50, 50, 70))),
+        )
+        .style(Style::default().fg(stream_color))
+        .render(cols[4], buf);
+}
+
+// ── Logcat log lines ──────────────────────────────────────────────────────────
+
+fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
+    let border_color = if state.is_streaming && !state.paused {
+        Color::Rgb(35, 70, 35)
+    } else if state.paused {
+        Color::Rgb(70, 60, 25)
+    } else {
+        Color::Rgb(50, 50, 50)
+    };
+
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(border_color));
+    let inner = block.inner(area);
+    block.render(area, buf);
+
+    let visible_height = inner.height as usize;
+    if visible_height == 0 {
+        return;
+    }
+
+    // If there are no entries, show a placeholder
+    if state.entries.is_empty() {
+        let msg = state
+            .status_message
+            .clone()
+            .unwrap_or_else(|| "Waiting for logcat output…".to_string());
+        Paragraph::new(format!("\n  {}", msg))
+            .style(Style::default().fg(Color::Rgb(120, 120, 120)))
+            .render(inner, buf);
+        return;
+    }
+
+    if state.filtered_indices.is_empty() {
+        Paragraph::new("\n  No entries match current filters.")
+            .style(Style::default().fg(Color::Rgb(160, 130, 60)))
+            .render(inner, buf);
+        return;
+    }
+
+    let indices = state.visible_entries(visible_height);
+    let max_width = inner.width as usize;
+
+    let search_lower = state.filter.search_query.to_lowercase();
+    let has_search = !search_lower.is_empty();
+
+    for (row, &idx) in indices.iter().enumerate() {
+        let y = inner.y + row as u16;
+        if y >= inner.y + inner.height {
+            break;
+        }
+
+        let entry = &state.entries[idx];
+        let level_color = entry.level.color();
+        let level_label_color = entry.level.label_color();
+
+        // Build spans for this line
+        let mut spans: Vec<Span<'static>> = Vec::with_capacity(8);
+        let mut used_width: usize = 0;
+
+        // Timestamp (dimmed)
+        if let Some(ref ts) = entry.timestamp {
+            let ts_display: &str = if ts.len() > 18 { &ts[..18] } else { ts };
+            let ts_str = format!(" {} ", ts_display);
+            used_width += ts_str.len();
+            spans.push(Span::styled(
+                ts_str,
+                Style::default().fg(Color::Rgb(100, 100, 100)),
+            ));
+        }
+
+        // PID/TID (dimmed)
+        if let Some(ref pid) = entry.pid {
+            let pid_str = format!("{:>5}", pid);
+            used_width += pid_str.len() + 1;
+            spans.push(Span::styled(
+                format!("{} ", pid_str),
+                Style::default().fg(Color::Rgb(90, 90, 90)),
+            ));
+        }
+
+        // Level badge (colored, bold)
+        let level_badge = format!(" {} ", entry.level.as_char());
+        used_width += level_badge.len() + 1;
+        spans.push(Span::styled(
+            level_badge,
+            Style::default()
+                .fg(Color::Rgb(15, 15, 15))
+                .bg(level_label_color)
+                .add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::raw(" "));
+
+        // Tag (colored by level)
+        if let Some(ref tag) = entry.tag {
+            let tag_display: &str = if tag.len() > 20 { &tag[..20] } else { tag };
+            let tag_str = format!("{:<20} ", tag_display);
+            used_width += tag_str.len();
+            spans.push(Span::styled(
+                tag_str,
+                Style::default()
+                    .fg(level_label_color)
+                    .add_modifier(Modifier::BOLD),
+            ));
+        }
+
+        // Message (truncated to fit, with search highlight)
+        let remaining = max_width.saturating_sub(used_width);
+        let msg = if entry.message.len() > remaining {
+            format!("{}…", &entry.message[..remaining.saturating_sub(1)])
+        } else {
+            entry.message.clone()
+        };
+
+        if has_search {
+            // Highlight search matches in the message
+            let msg_lower = msg.to_lowercase();
+            let mut last_end = 0;
+            let mut search_start = 0;
+            loop {
+                if let Some(pos) = msg_lower[search_start..].find(&search_lower) {
+                    let abs_pos = search_start + pos;
+                    // Text before match
+                    if abs_pos > last_end {
+                        spans.push(Span::styled(
+                            msg[last_end..abs_pos].to_string(),
+                            Style::default().fg(level_color),
+                        ));
+                    }
+                    // Highlighted match
+                    let match_end = abs_pos + search_lower.len();
+                    spans.push(Span::styled(
+                        msg[abs_pos..match_end].to_string(),
+                        Style::default()
+                            .fg(Color::Black)
+                            .bg(Color::Rgb(255, 200, 50))
+                            .add_modifier(Modifier::BOLD),
+                    ));
+                    last_end = match_end;
+                    search_start = match_end;
+                } else {
+                    break;
+                }
+            }
+            // Remaining text after last match
+            if last_end < msg.len() {
+                spans.push(Span::styled(
+                    msg[last_end..].to_string(),
+                    Style::default().fg(level_color),
+                ));
+            }
+        } else {
+            spans.push(Span::styled(msg, Style::default().fg(level_color)));
+        }
+
+        // Render the line
+        let line = Line::from(spans);
+        let line_area = Rect {
+            x: inner.x,
+            y,
+            width: inner.width,
+            height: 1,
+        };
+        Paragraph::new(line).render(line_area, buf);
+    }
+
+    // ── Scrollbar ─────────────────────────────────────────────────────────
+    let total = state.filtered_indices.len();
+    if total > visible_height {
+        let sb_x = inner.x + inner.width.saturating_sub(1);
+        let h = inner.height as usize;
+        let thumb_size = ((visible_height as f64 / total as f64) * h as f64).max(1.0) as usize;
+        let max_scroll = total.saturating_sub(visible_height);
+        let thumb_pos = if max_scroll > 0 {
+            ((state.scroll_position as f64 / max_scroll as f64) * (h - thumb_size) as f64) as usize
+        } else {
+            0
+        };
+
+        for row in 0..h {
+            if let Some(cell) = buf.cell_mut((sb_x, inner.y + row as u16)) {
+                if row >= thumb_pos && row < thumb_pos + thumb_size {
+                    cell.set_char('\u{2588}');
+                    cell.set_fg(Color::Rgb(80, 160, 80));
+                } else {
+                    cell.set_char('\u{2591}');
+                    cell.set_fg(Color::Rgb(35, 35, 35));
+                }
+            }
+        }
+    }
+
+    // Auto-scroll indicator
+    if state.auto_scroll && total > visible_height {
+        let indicator = " ↓ AUTO ";
+        let x = inner.x + inner.width.saturating_sub(indicator.len() as u16 + 2);
+        let y = inner.y + inner.height.saturating_sub(1);
+        for (i, ch) in indicator.chars().enumerate() {
+            if let Some(cell) = buf.cell_mut((x + i as u16, y)) {
+                cell.set_char(ch);
+                cell.set_fg(Color::Rgb(80, 200, 80));
+                cell.set_bg(Color::Rgb(20, 40, 20));
+            }
+        }
+    }
+}
+
+// ── Logcat footer ─────────────────────────────────────────────────────────────
+
+fn render_logcat_footer(state: &LogcatState, area: Rect, buf: &mut Buffer) {
+    let editing = state.filter.active_field != FilterField::None;
+
+    let help_text = if editing {
+        "  Type to filter  \u{00b7}  Esc/Enter confirm  ".to_string()
+    } else {
+        let wrap_icon = if state.word_wrap { "W\u{0332}" } else { "w" };
+        format!(
+            "  /Search  tTag  pPID  lLevel  {}Wrap  Space Pause  cClear  sSave  g/G Top/Bot  q Close  ",
+            wrap_icon
+        )
+    };
+
+    // Status message bar (if present)
+    let status = state.status_message.as_deref().unwrap_or("");
+    let status_color = if status.starts_with('\u{2705}') {
+        Color::Rgb(80, 200, 80)
+    } else if status.starts_with('\u{274c}') || status.contains("ERROR") {
+        Color::Rgb(220, 60, 60)
+    } else {
+        Color::Rgb(160, 160, 80)
+    };
+
+    let content = if status.is_empty() {
+        vec![Line::from(Span::styled(
+            help_text,
+            Style::default().fg(Color::Rgb(100, 100, 120)),
+        ))]
+    } else {
+        vec![Line::from(vec![
+            Span::styled(format!("  {}  ", status), Style::default().fg(status_color)),
+            Span::styled("\u{00b7}  ", Style::default().fg(Color::Rgb(60, 60, 60))),
+            Span::styled(
+                help_text.trim().to_string(),
+                Style::default().fg(Color::Rgb(80, 80, 100)),
+            ),
+        ])]
+    };
+
+    Paragraph::new(content)
+        .block(
+            Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Rgb(50, 50, 70))),
+        )
+        .alignment(Alignment::Center)
+        .render(area, buf);
+}
+
+// ── Logcat save dialog ────────────────────────────────────────────────────────
+
+fn render_logcat_save_dialog(model: &Model, area: Rect, buf: &mut Buffer) {
+    use crate::model::LogcatSaveMode;
+
+    // ── Solid opaque background ───────────────────────────────────────────
+    let bg = Color::Rgb(18, 18, 24);
+    for y in area.top()..area.bottom() {
+        for x in area.left()..area.right() {
+            if let Some(cell) = buf.cell_mut((x, y)) {
+                cell.set_char(' ');
+                cell.set_bg(bg);
+                cell.set_fg(Color::Rgb(50, 50, 60));
+            }
+        }
+    }
+
+    match model.logcat_save_mode {
+        LogcatSaveMode::PathInput => render_save_path_input(model, area, buf, bg),
+        LogcatSaveMode::FileBrowser => render_save_file_browser(model, area, buf, bg),
+    }
+}
+
+/// Path-input sub-dialog for saving logs.
+fn render_save_path_input(model: &Model, area: Rect, buf: &mut Buffer, bg: Color) {
+    let popup = centered_rect(65, 40, area);
+    let popup = if popup.height < 9 {
+        centered_rect(90, 70, area)
+    } else {
+        popup
+    };
+
+    let kind = if model.logcat_save_filtered_only {
+        "filtered"
+    } else {
+        "all"
+    };
+    let count = if model.logcat_save_filtered_only {
+        model.logcat.entry_count()
+    } else {
+        model.logcat.total_count()
+    };
+
+    let title = format!("  \u{1f4be}  Save {} entries ({})  ", count, kind);
+
+    // Build the path input with cursor
+    let path = &model.logcat_save_path;
+    let cursor_pos = model.logcat_save_cursor;
+    let byte_idx = path
+        .char_indices()
+        .nth(cursor_pos)
+        .map(|(i, _)| i)
+        .unwrap_or(path.len());
+    let (before, after) = path.split_at(byte_idx);
+    let path_display = format!("{}▏{}", before, after);
+
+    let toggle_hint = if model.logcat_save_filtered_only {
+        "Tab \u{2192} save all"
+    } else {
+        "Tab \u{2192} save filtered only"
+    };
+
+    let lines: Vec<Line<'static>> = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Path: ", Style::default().fg(Color::Rgb(140, 140, 160))),
+            Span::styled(
+                path_display,
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            format!("  {}", toggle_hint),
+            Style::default().fg(Color::Rgb(120, 120, 140)),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(
+                "  Enter ",
+                Style::default()
+                    .fg(Color::Rgb(80, 200, 80))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "save  \u{00b7}  ",
+                Style::default().fg(Color::Rgb(90, 90, 100)),
+            ),
+            Span::styled(
+                "F2 ",
+                Style::default()
+                    .fg(Color::Rgb(80, 200, 255))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "Save As\u{2026}  \u{00b7}  ",
+                Style::default().fg(Color::Rgb(90, 90, 100)),
+            ),
+            Span::styled(
+                "Esc ",
+                Style::default()
+                    .fg(Color::Rgb(200, 100, 80))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("cancel", Style::default().fg(Color::Rgb(90, 90, 100))),
+        ]),
+    ];
+
+    Paragraph::new(lines)
+        .block(
+            Block::bordered()
+                .title(title)
+                .title_alignment(Alignment::Left)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Rgb(80, 200, 255))),
+        )
+        .style(Style::default().fg(Color::Rgb(220, 220, 220)).bg(bg))
+        .render(popup, buf);
+}
+
+/// File-explorer sub-dialog for "Save As…" browsing.
+fn render_save_file_browser(model: &Model, area: Rect, buf: &mut Buffer, bg: Color) {
+    let popup = centered_rect(80, 80, area);
+    let popup = if popup.height < 10 { area } else { popup };
+
+    let explorer = match &model.logcat_file_explorer {
+        Some(e) => e,
+        None => return,
+    };
+
+    // Outer block
+    let title = format!(
+        "  \u{1f4c2}  Save As\u{2026}  \u{2014}  {}  ",
+        explorer.current_dir.display()
+    );
+    let block = Block::bordered()
+        .title(title)
+        .title_alignment(Alignment::Left)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Rgb(80, 200, 255)));
+    let inner = block.inner(popup);
+    block.render(popup, buf);
+
+    // Fill inner bg
+    for y in inner.top()..inner.bottom() {
+        for x in inner.left()..inner.right() {
+            if let Some(cell) = buf.cell_mut((x, y)) {
+                cell.set_char(' ');
+                cell.set_bg(bg);
+            }
+        }
+    }
+
+    if inner.height < 3 {
+        return;
+    }
+
+    // Reserve last 2 rows for footer hints
+    let list_area = Rect {
+        height: inner.height.saturating_sub(2),
+        ..inner
+    };
+    let footer_area = Rect {
+        x: inner.x,
+        y: inner.y + list_area.height,
+        width: inner.width,
+        height: 2.min(inner.height),
+    };
+
+    // ── Render entries ────────────────────────────────────────────────────
+    let visible_height = list_area.height as usize;
+    let total = explorer.entries.len();
+
+    // Compute scroll so cursor is always visible.
+    // scroll_offset is private, so we derive it from cursor position.
+    let scroll = if explorer.cursor >= visible_height {
+        explorer.cursor.saturating_sub(visible_height - 1)
+    } else {
+        0
+    };
+
+    if total == 0 {
+        Paragraph::new("  (empty directory)")
+            .style(Style::default().fg(Color::Rgb(120, 120, 120)).bg(bg))
+            .render(list_area, buf);
+    } else {
+        for (row, idx) in (scroll..total).take(visible_height).enumerate() {
+            let entry = &explorer.entries[idx];
+            let is_selected = idx == explorer.cursor;
+
+            let icon = if entry.is_dir {
+                "\u{1f4c1} "
+            } else {
+                "\u{1f4c4} "
+            };
+            let name = &entry.name;
+            let size_str = if entry.is_dir {
+                String::new()
+            } else {
+                entry.size.map(|s| format_file_size(s)).unwrap_or_default()
+            };
+
+            let y = list_area.y + row as u16;
+            let line_area = Rect {
+                x: list_area.x,
+                y,
+                width: list_area.width,
+                height: 1,
+            };
+
+            let name_max = list_area.width as usize - 14;
+            let display_name: String = if name.len() > name_max {
+                format!("{}\u{2026}", &name[..name_max.saturating_sub(1)])
+            } else {
+                name.clone()
+            };
+
+            let (fg, entry_bg) = if is_selected {
+                (Color::Rgb(15, 15, 15), Color::Rgb(60, 160, 220))
+            } else if entry.is_dir {
+                (Color::Rgb(100, 200, 255), bg)
+            } else {
+                (Color::Rgb(200, 200, 210), bg)
+            };
+
+            let line = Line::from(vec![
+                Span::styled(format!(" {} ", icon), Style::default().fg(fg).bg(entry_bg)),
+                Span::styled(
+                    format!("{:<width$}", display_name, width = name_max),
+                    Style::default()
+                        .fg(fg)
+                        .bg(entry_bg)
+                        .add_modifier(if is_selected {
+                            Modifier::BOLD
+                        } else {
+                            Modifier::empty()
+                        }),
+                ),
+                Span::styled(
+                    format!("{:>8}", size_str),
+                    Style::default()
+                        .fg(if is_selected {
+                            Color::Rgb(30, 30, 30)
+                        } else {
+                            Color::Rgb(100, 100, 110)
+                        })
+                        .bg(entry_bg),
+                ),
+            ]);
+
+            Paragraph::new(line).render(line_area, buf);
+        }
+    }
+
+    // ── Search bar (if active) ────────────────────────────────────────────
+    let search_line = if explorer.search_active {
+        Line::from(vec![
+            Span::styled(
+                "  \u{1f50d} ",
+                Style::default().fg(Color::Rgb(80, 200, 255)),
+            ),
+            Span::styled(
+                format!("{}▏", explorer.search_query),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "  \u{00b7}  Esc clear",
+                Style::default().fg(Color::Rgb(80, 80, 100)),
+            ),
+        ])
+    } else if explorer.mkdir_active {
+        Line::from(vec![
+            Span::styled(
+                "  \u{1f4c1} New folder: ",
+                Style::default().fg(Color::Rgb(255, 200, 80)),
+            ),
+            Span::styled(
+                format!("{}▏", explorer.mkdir_input),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ])
+    } else {
+        Line::from(vec![
+            Span::styled(
+                "  \u{2191}\u{2193} navigate  Enter select  ",
+                Style::default().fg(Color::Rgb(80, 80, 100)),
+            ),
+            Span::styled(
+                "S Save Here  ",
+                Style::default()
+                    .fg(Color::Rgb(80, 200, 80))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "/search  n mkdir  Esc back  ",
+                Style::default().fg(Color::Rgb(80, 80, 100)),
+            ),
+        ])
+    };
+
+    // Scrollbar indicator
+    let scroll_hint = if total > visible_height {
+        format!(" {}/{} ", scroll + 1, total)
+    } else {
+        String::new()
+    };
+
+    let footer_lines = vec![
+        search_line,
+        Line::from(vec![
+            Span::styled(
+                "  h/\u{2190} parent  l/\u{2192}/Enter dir  .hidden  s sort",
+                Style::default().fg(Color::Rgb(65, 65, 80)),
+            ),
+            Span::styled(
+                format!("  {}", scroll_hint),
+                Style::default().fg(Color::Rgb(80, 80, 100)),
+            ),
+        ]),
+    ];
+
+    Paragraph::new(footer_lines)
+        .style(Style::default().bg(bg))
+        .render(footer_area, buf);
+}
+
+/// Format bytes into a human-readable size string.
+fn format_file_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * KB;
+    const GB: u64 = 1024 * MB;
+    if bytes >= GB {
+        format!("{:.1}G", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1}M", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1}K", bytes as f64 / KB as f64)
+    } else {
+        format!("{}B", bytes)
     }
 }
 

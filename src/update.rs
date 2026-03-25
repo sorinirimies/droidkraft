@@ -49,6 +49,18 @@ pub async fn update(model: &mut Model, message: Message) {
 
         // Command execution
         Message::ExecuteCommand(command) => {
+            // Special handling for logcat — bypass normal command execution
+            if matches!(command, MenuCommand::OpenLogcat) {
+                model.state = AppState::Logcat;
+                if let Some(dev) = model.device_status.active() {
+                    model.logcat.start_streaming(dev.serial.clone());
+                } else {
+                    model.logcat.status_message =
+                        Some("No device connected — connect a device first.".to_string());
+                }
+                return;
+            }
+
             model.last_command_label = Some(model.menu.get_selected_label().to_string());
             model.state = AppState::Loading;
             model.clear_results();
@@ -119,6 +131,440 @@ pub async fn update(model: &mut Model, message: Message) {
         }
 
         // Screen streaming messages
+
+        // ── Logcat ────────────────────────────────────────────────────────
+        Message::OpenLogcat => {
+            model.state = AppState::Logcat;
+            if let Some(dev) = model.device_status.active() {
+                model.logcat.start_streaming(dev.serial.clone());
+            } else {
+                model.logcat.status_message =
+                    Some("No device connected — connect a device first.".to_string());
+            }
+        }
+
+        Message::CloseLogcat => {
+            model.logcat.stop_streaming();
+            model.state = AppState::Menu;
+            model.needs_device_refresh = true;
+        }
+
+        Message::LogcatScrollUp => {
+            model.logcat.scroll_up(1);
+        }
+
+        Message::LogcatScrollDown => {
+            model.logcat.scroll_down(1);
+        }
+
+        Message::LogcatScrollPageUp => {
+            model.logcat.scroll_up(20);
+        }
+
+        Message::LogcatScrollPageDown => {
+            model.logcat.scroll_down(20);
+        }
+
+        Message::LogcatScrollToTop => {
+            model.logcat.scroll_to_top();
+        }
+
+        Message::LogcatScrollToBottom => {
+            model.logcat.scroll_to_bottom();
+        }
+
+        Message::LogcatTogglePause => {
+            model.logcat.toggle_pause();
+        }
+
+        Message::LogcatClear => {
+            model.logcat.clear();
+        }
+
+        Message::LogcatCycleLevel => {
+            model.logcat.filter.cycle_level();
+            model.logcat.rebuild_filtered();
+        }
+
+        Message::LogcatToggleSearch => {
+            use crate::logcat::FilterField;
+            if model.logcat.filter.active_field == FilterField::Search {
+                model.logcat.filter.active_field = FilterField::None;
+            } else {
+                model.logcat.filter.active_field = FilterField::Search;
+            }
+        }
+
+        Message::LogcatToggleTagFilter => {
+            use crate::logcat::FilterField;
+            if model.logcat.filter.active_field == FilterField::Tag {
+                model.logcat.filter.active_field = FilterField::None;
+            } else {
+                model.logcat.filter.active_field = FilterField::Tag;
+            }
+        }
+
+        Message::LogcatTogglePackageFilter => {
+            use crate::logcat::FilterField;
+            if model.logcat.filter.active_field == FilterField::Package {
+                model.logcat.filter.active_field = FilterField::None;
+            } else {
+                model.logcat.filter.active_field = FilterField::Package;
+            }
+        }
+
+        Message::LogcatSearchInput(c) => {
+            if model.logcat_save_active {
+                let pos = model.logcat_save_cursor;
+                let byte_idx = model
+                    .logcat_save_path
+                    .char_indices()
+                    .nth(pos)
+                    .map(|(i, _)| i)
+                    .unwrap_or(model.logcat_save_path.len());
+                model.logcat_save_path.insert(byte_idx, c);
+                model.logcat_save_cursor += 1;
+            } else {
+                model.logcat.filter.insert_char(c);
+                model.logcat.rebuild_filtered();
+            }
+        }
+
+        Message::LogcatSearchBackspace => {
+            if model.logcat_save_active {
+                if model.logcat_save_cursor > 0 {
+                    let pos = model.logcat_save_cursor;
+                    let byte_idx = model
+                        .logcat_save_path
+                        .char_indices()
+                        .nth(pos - 1)
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    let next_byte = model
+                        .logcat_save_path
+                        .char_indices()
+                        .nth(pos)
+                        .map(|(i, _)| i)
+                        .unwrap_or(model.logcat_save_path.len());
+                    model.logcat_save_path.drain(byte_idx..next_byte);
+                    model.logcat_save_cursor -= 1;
+                }
+            } else {
+                model.logcat.filter.delete_char();
+                model.logcat.rebuild_filtered();
+            }
+        }
+
+        Message::LogcatSearchDelete => {
+            if model.logcat_save_active {
+                let pos = model.logcat_save_cursor;
+                let max = model.logcat_save_path.chars().count();
+                if pos < max {
+                    let byte_idx = model
+                        .logcat_save_path
+                        .char_indices()
+                        .nth(pos)
+                        .map(|(i, _)| i)
+                        .unwrap_or(model.logcat_save_path.len());
+                    let next_byte = model
+                        .logcat_save_path
+                        .char_indices()
+                        .nth(pos + 1)
+                        .map(|(i, _)| i)
+                        .unwrap_or(model.logcat_save_path.len());
+                    model.logcat_save_path.drain(byte_idx..next_byte);
+                }
+            } else {
+                model.logcat.filter.delete_char_forward();
+                model.logcat.rebuild_filtered();
+            }
+        }
+
+        Message::LogcatCursorLeft => {
+            if model.logcat_save_active {
+                if model.logcat_save_cursor > 0 {
+                    model.logcat_save_cursor -= 1;
+                }
+            } else {
+                model.logcat.filter.move_cursor_left();
+            }
+        }
+
+        Message::LogcatCursorRight => {
+            if model.logcat_save_active {
+                let max = model.logcat_save_path.chars().count();
+                if model.logcat_save_cursor < max {
+                    model.logcat_save_cursor += 1;
+                }
+            } else {
+                model.logcat.filter.move_cursor_right();
+            }
+        }
+
+        Message::LogcatExitFilter => {
+            use crate::logcat::FilterField;
+            model.logcat.filter.active_field = FilterField::None;
+        }
+
+        Message::LogcatToggleWordWrap => {
+            model.logcat.toggle_word_wrap();
+        }
+
+        Message::LogcatSave => {
+            model.logcat_save_active = true;
+            model.logcat_save_filtered_only = false;
+            model.logcat_save_path = "logcat_output.txt".to_string();
+            model.logcat_save_cursor = model.logcat_save_path.len();
+        }
+
+        Message::LogcatSaveFilteredOnly => {
+            if model.logcat_save_active {
+                // Toggle filtered-only when already in save dialog
+                model.logcat_save_filtered_only = !model.logcat_save_filtered_only;
+            } else {
+                model.logcat_save_active = true;
+                model.logcat_save_filtered_only = true;
+                model.logcat_save_path = "logcat_filtered.txt".to_string();
+                model.logcat_save_cursor = model.logcat_save_path.len();
+            }
+        }
+
+        Message::LogcatCancelSave => {
+            use crate::model::LogcatSaveMode;
+            if model.logcat_save_mode == LogcatSaveMode::FileBrowser {
+                // Go back to path input mode instead of closing
+                model.logcat_save_mode = LogcatSaveMode::PathInput;
+            } else {
+                model.logcat_save_active = false;
+                model.logcat_save_path.clear();
+                model.logcat_save_cursor = 0;
+                model.logcat_save_mode = LogcatSaveMode::PathInput;
+                model.logcat_file_explorer = None;
+            }
+        }
+
+        Message::LogcatFileSaved(path_str) => {
+            model.logcat_save_active = false;
+            let path = std::path::PathBuf::from(&path_str);
+            let result = if model.logcat_save_filtered_only {
+                model.logcat.save_filtered_to_file(&path)
+            } else {
+                model.logcat.save_to_file(&path)
+            };
+            match result {
+                Ok(count) => {
+                    let kind = if model.logcat_save_filtered_only {
+                        "filtered"
+                    } else {
+                        "all"
+                    };
+                    model.logcat.status_message = Some(format!(
+                        "\u{2705} Saved {} {} entries to {}",
+                        count,
+                        kind,
+                        path.display()
+                    ));
+                }
+                Err(e) => {
+                    model.logcat.status_message = Some(format!("\u{274c} Save failed: {}", e));
+                }
+            }
+            model.logcat_save_path.clear();
+            model.logcat_save_cursor = 0;
+        }
+
+        Message::LogcatSaveAs => {
+            use crate::model::LogcatSaveMode;
+            model.logcat_save_mode = LogcatSaveMode::FileBrowser;
+            if model.logcat_file_explorer.is_none() {
+                let start_dir = std::env::current_dir().unwrap_or_else(|_| {
+                    std::path::PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/".into()))
+                });
+                let explorer = tui_file_explorer::FileExplorer::new(start_dir, vec![]);
+                model.logcat_file_explorer = Some(explorer);
+            }
+        }
+
+        Message::LogcatFileExplorerKey(key_event) => {
+            use crate::model::LogcatSaveMode;
+            use ratatui::crossterm::event::KeyCode;
+
+            if let Some(ref mut explorer) = model.logcat_file_explorer {
+                // tui-file-explorer uses crossterm 0.29 while we use 0.28.
+                // We can't pass our KeyEvent directly, so we map our
+                // KeyCode to the explorer's public API manually.
+                let outcome = match key_event.code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        explorer.cursor = explorer.cursor.saturating_sub(1);
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        if !explorer.entries.is_empty()
+                            && explorer.cursor < explorer.entries.len() - 1
+                        {
+                            explorer.cursor += 1;
+                        }
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::PageUp => {
+                        explorer.cursor = explorer.cursor.saturating_sub(10);
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::PageDown => {
+                        if !explorer.entries.is_empty() {
+                            explorer.cursor =
+                                (explorer.cursor + 10).min(explorer.entries.len() - 1);
+                        }
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::Home | KeyCode::Char('g') => {
+                        explorer.cursor = 0;
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::End | KeyCode::Char('G') => {
+                        if !explorer.entries.is_empty() {
+                            explorer.cursor = explorer.entries.len() - 1;
+                        }
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::Enter | KeyCode::Char('l') => {
+                        if explorer.mkdir_active {
+                            // Confirm mkdir
+                            let name = explorer.mkdir_input.trim().to_string();
+                            explorer.mkdir_active = false;
+                            explorer.mkdir_input.clear();
+                            if !name.is_empty() {
+                                let new_dir = explorer.current_dir.join(&name);
+                                if std::fs::create_dir_all(&new_dir).is_ok() {
+                                    explorer.reload();
+                                    if let Some(idx) =
+                                        explorer.entries.iter().position(|e| e.path == new_dir)
+                                    {
+                                        explorer.cursor = idx;
+                                    }
+                                }
+                            }
+                            tui_file_explorer::ExplorerOutcome::Pending
+                        } else if let Some(entry) = explorer.entries.get(explorer.cursor) {
+                            // Descend into dir or select file
+                            if entry.is_dir {
+                                let path = entry.path.clone();
+                                explorer.navigate_to(path);
+                                tui_file_explorer::ExplorerOutcome::Pending
+                            } else {
+                                tui_file_explorer::ExplorerOutcome::Selected(entry.path.clone())
+                            }
+                        } else {
+                            tui_file_explorer::ExplorerOutcome::Pending
+                        }
+                    }
+                    KeyCode::Right => {
+                        // Navigate into dir only
+                        if let Some(entry) = explorer.entries.get(explorer.cursor) {
+                            if entry.is_dir {
+                                let path = entry.path.clone();
+                                explorer.navigate_to(path);
+                            }
+                        }
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::Left | KeyCode::Backspace | KeyCode::Char('h') => {
+                        if explorer.mkdir_active {
+                            explorer.mkdir_input.pop();
+                        } else if explorer.search_active {
+                            if explorer.search_query.is_empty() {
+                                explorer.search_active = false;
+                            } else {
+                                explorer.search_query.pop();
+                                explorer.cursor = 0;
+                                explorer.reload();
+                            }
+                        } else {
+                            // Ascend to parent
+                            if let Some(parent) =
+                                explorer.current_dir.parent().map(|p| p.to_path_buf())
+                            {
+                                let prev = explorer.current_dir.clone();
+                                explorer.navigate_to(parent);
+                                // Try to land cursor on the directory we came from
+                                if let Some(idx) =
+                                    explorer.entries.iter().position(|e| e.path == prev)
+                                {
+                                    explorer.cursor = idx;
+                                }
+                            }
+                        }
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::Char('/') => {
+                        explorer.search_active = true;
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::Char('.') => {
+                        explorer.show_hidden = !explorer.show_hidden;
+                        explorer.reload();
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::Char('s') => {
+                        explorer.sort_mode = explorer.sort_mode.next();
+                        explorer.reload();
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::Char('n') => {
+                        explorer.mkdir_active = true;
+                        explorer.mkdir_input.clear();
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::Char('S') => {
+                        // "Save Here" — save into the current directory
+                        let filename = crate::logcat::LogcatState::default_save_filename();
+                        let save_path = explorer.current_dir.join(filename);
+                        tui_file_explorer::ExplorerOutcome::Selected(save_path)
+                    }
+                    KeyCode::Char(c) if explorer.search_active => {
+                        explorer.search_query.push(c);
+                        explorer.cursor = 0;
+                        explorer.reload();
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::Char(c) if explorer.mkdir_active => {
+                        explorer.mkdir_input.push(c);
+                        tui_file_explorer::ExplorerOutcome::Pending
+                    }
+                    KeyCode::Esc => {
+                        if explorer.search_active {
+                            explorer.search_active = false;
+                            explorer.search_query.clear();
+                            explorer.reload();
+                            tui_file_explorer::ExplorerOutcome::Pending
+                        } else if explorer.mkdir_active {
+                            explorer.mkdir_active = false;
+                            explorer.mkdir_input.clear();
+                            tui_file_explorer::ExplorerOutcome::Pending
+                        } else {
+                            tui_file_explorer::ExplorerOutcome::Dismissed
+                        }
+                    }
+                    KeyCode::Char('q') => tui_file_explorer::ExplorerOutcome::Dismissed,
+                    _ => tui_file_explorer::ExplorerOutcome::Pending,
+                };
+
+                match outcome {
+                    tui_file_explorer::ExplorerOutcome::Selected(path) => {
+                        // User selected a file — use its path as the save target
+                        let path_str = path.display().to_string();
+                        model.logcat_save_path = path_str;
+                        model.logcat_save_cursor = model.logcat_save_path.chars().count();
+                        model.logcat_save_mode = LogcatSaveMode::PathInput;
+                    }
+                    tui_file_explorer::ExplorerOutcome::Dismissed => {
+                        model.logcat_save_mode = LogcatSaveMode::PathInput;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         // Application lifecycle
         Message::Tick => {
             tick(model).await;
@@ -165,6 +611,11 @@ async fn tick(model: &mut Model) {
         model.reveal_counter += 1;
     }
 
+    // Poll for new logcat entries
+    if model.state == AppState::Logcat {
+        model.logcat.poll_new_entries();
+    }
+
     // Check if startup is complete
     if model.state == AppState::Startup && model.effects.is_startup_complete() {
         model.state = AppState::Menu;
@@ -190,6 +641,10 @@ async fn execute_adb_command(model: &mut Model, command: MenuCommand) -> Command
             };
         }
         MenuCommand::Adb(cmd) => cmd,
+        MenuCommand::OpenLogcat => {
+            // Should never reach here — intercepted earlier in ExecuteCommand handler
+            return CommandResult::Error("Logcat should be opened via OpenLogcat message".into());
+        }
     };
 
     // Execute the ADB command using the ADB manager

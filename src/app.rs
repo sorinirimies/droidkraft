@@ -90,6 +90,7 @@ impl App {
                 KeyCode::BackTab => Some(Message::SectionPrev),
                 KeyCode::Char('r') => Some(Message::RefreshDeviceInfo),
                 KeyCode::Char('d') => Some(Message::NextDevice),
+                KeyCode::Char('L') => Some(Message::OpenLogcat),
                 KeyCode::Enter => {
                     let command = self.model.get_selected_command();
                     Some(Message::ExecuteCommand(command))
@@ -114,6 +115,83 @@ impl App {
                 }
                 _ => Some(Message::ReturnToMenu),
             },
+
+            AppState::Logcat => {
+                use crate::logcat::FilterField;
+                use crate::model::LogcatSaveMode;
+
+                // ── Save dialog active ──────────────────────────────────────
+                if self.model.logcat_save_active {
+                    // ── File browser sub-mode ───────────────────────────────
+                    if self.model.logcat_save_mode == LogcatSaveMode::FileBrowser {
+                        // Forward the raw KeyEvent to the file explorer
+                        let key_event = crossterm::event::KeyEvent::new(
+                            key,
+                            crossterm::event::KeyModifiers::NONE,
+                        );
+                        return Some(Message::LogcatFileExplorerKey(key_event));
+                    }
+
+                    // ── Path-input sub-mode ─────────────────────────────────
+                    return match key {
+                        KeyCode::Esc => Some(Message::LogcatCancelSave),
+                        KeyCode::Enter => {
+                            let path = self.model.logcat_save_path.clone();
+                            if path.trim().is_empty() {
+                                Some(Message::LogcatCancelSave)
+                            } else {
+                                Some(Message::LogcatFileSaved(path))
+                            }
+                        }
+                        KeyCode::F(2) => Some(Message::LogcatSaveAs),
+                        KeyCode::Backspace => Some(Message::LogcatSearchBackspace),
+                        KeyCode::Left => Some(Message::LogcatCursorLeft),
+                        KeyCode::Right => Some(Message::LogcatCursorRight),
+                        KeyCode::Tab => Some(Message::LogcatSaveFilteredOnly),
+                        KeyCode::Char(c) => Some(Message::LogcatSearchInput(c)),
+                        _ => None,
+                    };
+                }
+
+                // ── Filter text input active ────────────────────────────────
+                let editing = self.model.logcat.filter.active_field != FilterField::None;
+
+                if editing {
+                    match key {
+                        KeyCode::Esc => Some(Message::LogcatExitFilter),
+                        KeyCode::Enter => Some(Message::LogcatExitFilter),
+                        KeyCode::Backspace => Some(Message::LogcatSearchBackspace),
+                        KeyCode::Delete => Some(Message::LogcatSearchDelete),
+                        KeyCode::Left => Some(Message::LogcatCursorLeft),
+                        KeyCode::Right => Some(Message::LogcatCursorRight),
+                        KeyCode::Char(c) => Some(Message::LogcatSearchInput(c)),
+                        _ => None,
+                    }
+                } else {
+                    // ── Normal logcat navigation mode ────────────────────────
+                    match key {
+                        KeyCode::Esc | KeyCode::Char('q') => Some(Message::CloseLogcat),
+                        KeyCode::Up | KeyCode::Char('k') => Some(Message::LogcatScrollUp),
+                        KeyCode::Down | KeyCode::Char('j') => Some(Message::LogcatScrollDown),
+                        KeyCode::PageUp => Some(Message::LogcatScrollPageUp),
+                        KeyCode::PageDown => Some(Message::LogcatScrollPageDown),
+                        KeyCode::Home => Some(Message::LogcatScrollToTop),
+                        KeyCode::End => Some(Message::LogcatScrollToBottom),
+                        KeyCode::Char('G') => Some(Message::LogcatScrollToBottom),
+                        KeyCode::Char('g') => Some(Message::LogcatScrollToTop),
+                        KeyCode::Char(' ') => Some(Message::LogcatTogglePause),
+                        KeyCode::Char('c') => Some(Message::LogcatClear),
+                        KeyCode::Char('l') => Some(Message::LogcatCycleLevel),
+                        KeyCode::Char('w') => Some(Message::LogcatToggleWordWrap),
+                        KeyCode::Char('/') => Some(Message::LogcatToggleSearch),
+                        KeyCode::Char('t') => Some(Message::LogcatToggleTagFilter),
+                        KeyCode::Char('p') => Some(Message::LogcatTogglePackageFilter),
+                        KeyCode::Char('s') => Some(Message::LogcatSave),
+                        KeyCode::Char('S') => Some(Message::LogcatSaveFilteredOnly),
+                        _ => None,
+                    }
+                }
+            }
         }
     }
 }

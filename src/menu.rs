@@ -26,6 +26,7 @@ use ratatui::{
 pub enum MenuCommand {
     Adb(AdbCommand),
     Fastboot(FastbootCommand),
+    OpenLogcat,
 }
 
 // ── Entry types ───────────────────────────────────────────────────────────────
@@ -494,6 +495,10 @@ fn build_entries() -> Vec<MenuEntry> {
 
         // ── System ──────────────────────────────────────────────────────────
         MenuEntry::Section("SYSTEM"),
+        item("📺  Live Logcat",
+             "Open the live logcat viewer with real-time streaming, search, and level filters",
+             MenuCommand::OpenLogcat,
+             false),
         item("🔋  Battery Status",
              "Show detailed battery info — level, health and temperature",
              adb(AdbCommand::GetBatteryInfo), false),

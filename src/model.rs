@@ -1,9 +1,19 @@
 use crate::adb::{AdbManager, DeviceStatus};
 use crate::effects::EffectsManager;
 use crate::fastboot::FastbootManager;
+use crate::logcat::LogcatState;
 use crate::menu::{Menu, MenuCommand};
 
 use std::time::Instant;
+
+/// Mode of the logcat save dialog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogcatSaveMode {
+    /// Text input for the save path.
+    PathInput,
+    /// File explorer overlay for "Save As…" browsing.
+    FileBrowser,
+}
 
 /// Application state following Elm architecture
 /// All mutable state is contained within this model
@@ -59,6 +69,27 @@ pub struct Model {
 
     /// When true the next tick will fetch fresh device info.
     pub needs_device_refresh: bool,
+
+    /// Logcat viewer state
+    pub logcat: LogcatState,
+
+    /// Whether the save dialog is active in logcat view.
+    pub logcat_save_active: bool,
+
+    /// The path input for the save dialog.
+    pub logcat_save_path: String,
+
+    /// Cursor position in the save path input.
+    pub logcat_save_cursor: usize,
+
+    /// Whether to save only filtered entries (true) or all entries (false).
+    pub logcat_save_filtered_only: bool,
+
+    /// Current mode of the save dialog.
+    pub logcat_save_mode: LogcatSaveMode,
+
+    /// File explorer for "Save As…" browsing.
+    pub logcat_file_explorer: Option<tui_file_explorer::FileExplorer>,
 }
 
 /// Application states
@@ -75,6 +106,9 @@ pub enum AppState {
 
     /// Showing command results
     ShowResult,
+
+    /// Logcat viewer
+    Logcat,
 }
 
 impl Default for Model {
@@ -104,6 +138,13 @@ impl Model {
             last_command_label: None,
             device_status: DeviceStatus::default(),
             needs_device_refresh: true,
+            logcat: LogcatState::new(),
+            logcat_save_active: false,
+            logcat_save_path: String::new(),
+            logcat_save_cursor: 0,
+            logcat_save_filtered_only: false,
+            logcat_save_mode: LogcatSaveMode::PathInput,
+            logcat_file_explorer: None,
         }
     }
 
@@ -120,6 +161,11 @@ impl Model {
     /// Check if we're in the menu
     pub fn is_in_menu(&self) -> bool {
         self.state == AppState::Menu
+    }
+
+    /// Check if we're in logcat view
+    pub fn is_in_logcat(&self) -> bool {
+        self.state == AppState::Logcat
     }
 
     /// Check if startup animation is complete

@@ -30,3 +30,4 @@ tachyonfx = "0.7.0"
 ratatui-widgets = "0.2.2"
 
 adb_client = "2.1.17"
+tui-file-explorer = { version = "0.8.8", default-features = false }
