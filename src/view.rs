@@ -1,497 +1,579 @@
-use crate::effects::{
-    get_dots_orbit, get_loading_dots, get_loading_spinner, get_orbital_spinner,
-    get_particle_effect, get_progress_bar, get_wave_animation, RevealWidget,
-};
+//! View layer — pure rendering from the current `Model`.
+//!
+//! Layout:
+//!   ┌── Header ───────────────────────────────────────────────┐
+//!   │ (3 rows) app title                                      │
+//!   ├── Body ─────────────────────────────────────────────────┤
+//!   │ Commands (58%)          │  Device panel (42%)           │
+//!   │  • Section cards        │  ┌─ Devices ──────────────┐   │
+//!   │  • Scrollable           │  │ device selector list   │   │
+//!   │                         │  └────────────────────────┘   │
+//!   │                         │  ┌─ Stats / No-Device ────┐   │
+//!   │                         │  │ model · version ·      │   │
+//!   │                         │  │ battery / RAM / CPU    │   │
+//!   │                         │  └────────────────────────┘   │
+//!   ├── Description ──────────────────────────────────────────┤
+//!   │ (3 rows) selected command description                   │
+//!   ├── Footer ───────────────────────────────────────────────┤
+//!   │ (3 rows) key hint bar                                   │
+//!   └─────────────────────────────────────────────────────────┘
+
+use crate::adb::DeviceStatus;
+use crate::effects::{get_loading_spinner, RevealWidget};
 use crate::model::{AppState, Model};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, BorderType, Paragraph, Widget},
 };
 
-/// Main view function - renders the entire UI based on the model
-/// This is pure function that takes model and produces UI
+// ── Public entry point ────────────────────────────────────────────────────────
+
 pub fn render(model: &mut Model, area: Rect, buf: &mut Buffer) {
     match model.state {
-        AppState::Startup => render_startup(model, area, buf),
-        AppState::Menu => render_menu(model, area, buf),
-        AppState::Loading => render_loading(model, area, buf),
-        AppState::Executing => render_executing(model, area, buf),
+        AppState::Startup    => render_startup(model, area, buf),
+        AppState::Menu       => render_menu(model, area, buf),
+        AppState::Loading    => render_loading(model, area, buf),
         AppState::ShowResult => render_result(model, area, buf),
     }
 }
 
-/// Render startup screen with animations
+// ── Startup ───────────────────────────────────────────────────────────────────
+
 fn render_startup(model: &mut Model, area: Rect, buf: &mut Buffer) {
-    let reveal_widget = RevealWidget::new(
-        &mut model.effects,
-        "🚀 DroidTUI - Android Development Toolkit",
-        "Your powerful ADB command center with visual effects",
-    );
-    reveal_widget.render(area, buf);
+    RevealWidget::new(&mut model.effects, "DroidTUI", "Android ADB & Root Toolkit")
+        .render(area, buf);
 }
 
-/// Render loading screen with animations
+// ── Loading ───────────────────────────────────────────────────────────────────
+
 fn render_loading(model: &Model, area: Rect, buf: &mut Buffer) {
     let spinner = get_loading_spinner(model.loading_counter);
-    let dots = get_loading_dots(model.loading_counter);
-    let progress = get_progress_bar(model.loading_counter, 30);
+    let label   = model.menu.get_selected_label();
 
-    // Create enhanced loading text with multiple spinners
-    let orbital_spinner = get_orbital_spinner(model.loading_counter);
-    let wave_animation = get_wave_animation(model.loading_counter);
-    let dots_orbit = get_dots_orbit(model.loading_counter);
-    let particle_effect = get_particle_effect(model.loading_counter);
-
-    // Multi-layered loading display
-    let loading_text = format!(
-        "{} Executing Command {}\n\n{}\n\n{}\n\n{}\n{}\n\nPress Esc to cancel",
-        spinner, dots, progress, wave_animation, dots_orbit, particle_effect
-    );
-
-    // Animate border color cycling between yellow and green
-    let color_phase = (model.loading_counter as f32 * 0.05).sin() * 0.5 + 0.5;
-    let border_color = if color_phase > 0.5 {
-        Color::Yellow
-    } else {
-        Color::LightYellow
-    };
-
-    // Animated title with orbital spinner
-    let animated_title = format!("⚡ Processing {} ", orbital_spinner);
-
-    let loading_block = Block::bordered()
-        .title(animated_title)
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .style(Style::default().fg(border_color));
-
-    // Cycle text color for shimmer effect
-    let text_brightness = 170 + (color_phase * 85.0) as u8;
-    let text_color = Color::Rgb(text_brightness, text_brightness, 0);
-
-    let loading_paragraph = Paragraph::new(loading_text)
-        .block(loading_block)
-        .style(Style::default().fg(text_color))
-        .alignment(Alignment::Center);
-
-    // Create pulsing animation effect
-    let pulse = (model.loading_counter as f32 * 0.1).sin() * 0.5 + 0.5;
-    let scale_factor = 1.0 + (pulse * 0.1); // Pulse between 1.0 and 1.1
-
-    let base_popup_area = centered_rect(55, 35, area);
-
-    // Apply scale effect to the popup
-    let scaled_width = (base_popup_area.width as f32 * scale_factor) as u16;
-    let scaled_height = (base_popup_area.height as f32 * scale_factor) as u16;
-
-    let width_offset = (scaled_width.saturating_sub(base_popup_area.width)) / 2;
-    let height_offset = (scaled_height.saturating_sub(base_popup_area.height)) / 2;
-
-    let popup_area = Rect {
-        x: base_popup_area.x.saturating_sub(width_offset),
-        y: base_popup_area.y.saturating_sub(height_offset),
-        width: scaled_width.min(area.width),
-        height: scaled_height.min(area.height),
-    };
-
-    loading_paragraph.render(popup_area, buf);
-
-    // Add animated corners/decorations around the popup
-    render_loading_corners(popup_area, buf, model.loading_counter);
+    Paragraph::new(format!(
+        "\n   {}  Executing\u{2026}\n\n   {}\n\n   Esc  \u{00b7}  cancel",
+        spinner, label
+    ))
+    .block(
+        Block::bordered()
+            .title("  \u{26a1} Running  ")
+            .title_alignment(Alignment::Center)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Rgb(190, 160, 30))),
+    )
+    .style(Style::default().fg(Color::Rgb(230, 205, 60)))
+    .alignment(Alignment::Center)
+    .render(centered_rect(44, 30, area), buf);
 }
 
-/// Render executing screen
-fn render_executing(model: &Model, area: Rect, buf: &mut Buffer) {
-    let command = model.get_selected_command();
-    let executing_text = format!(
-        "Executing command...\n\nCommand: {:?}\n\nPress Esc to return to menu",
-        command
-    );
+// ── Menu (full layout) ────────────────────────────────────────────────────────
 
-    let executing_block = Block::bordered()
-        .title("⚡ Executing Command")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .style(Style::default().fg(Color::Yellow));
-
-    let executing_paragraph = Paragraph::new(executing_text)
-        .block(executing_block)
-        .style(Style::default().fg(Color::White))
-        .alignment(Alignment::Center);
-
-    let popup_area = centered_rect(70, 50, area);
-    executing_paragraph.render(popup_area, buf);
-}
-
-/// Render main menu with header and footer
 fn render_menu(model: &mut Model, area: Rect, buf: &mut Buffer) {
-    // Create layout with proper constraints
-    let chunks = Layout::default()
+    let outer = Layout::default()
         .direction(Direction::Vertical)
-        .margin(0)
         .constraints([
-            Constraint::Length(3), // Header
-            Constraint::Min(0),    // Menu content
-            Constraint::Length(3), // Footer
+            Constraint::Length(3), // header
+            Constraint::Min(0),    // body
+            Constraint::Length(3), // description
+            Constraint::Length(3), // footer
         ])
         .split(area);
 
-    // Get slide animation progress
-    let slide_progress = model.effects.get_slide_in_progress();
+    let header_area = outer[0];
+    let body_area   = outer[1];
+    let desc_area   = outer[2];
+    let footer_area = outer[3];
 
-    // Calculate slide offset (slide in from right)
-    let slide_offset = ((1.0 - slide_progress) * area.width as f32 * 0.3) as u16;
+    // ── Header ────────────────────────────────────────────────────────────────
+    Paragraph::new("  Android ADB \u{26a1} Root Toolkit  ")
+        .block(
+            Block::bordered()
+                .title("  \u{1f916}  DroidTUI  ")
+                .title_alignment(Alignment::Center)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Rgb(40, 160, 40))),
+        )
+        .style(Style::default().fg(Color::Rgb(120, 200, 120)))
+        .alignment(Alignment::Center)
+        .render(header_area, buf);
 
-    // Render header with slide animation
-    let header_area = if slide_offset > 0 {
-        Rect {
-            x: chunks[0].x + slide_offset,
-            y: chunks[0].y,
-            width: chunks[0].width.saturating_sub(slide_offset),
-            height: chunks[0].height,
-        }
-    } else {
-        chunks[0]
-    };
+    // ── Body: commands left | device panel right ──────────────────────────────
+    let body = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(58), // command cards
+            Constraint::Percentage(42), // device dashboard
+        ])
+        .split(body_area);
 
-    let header_block = Block::bordered()
-        .title("🤖 DroidTUI - Android Development Toolkit")
-        .title_alignment(Alignment::Center)
+    let cmd_block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .style(Style::default().fg(Color::Green));
+        .border_style(Style::default().fg(Color::Rgb(35, 70, 35)));
+    let cmd_inner = cmd_block.inner(body[0]);
+    cmd_block.render(body[0], buf);
+    model.menu.render(cmd_inner, buf);
 
-    let header = Paragraph::new("ADB Command Interface")
-        .block(header_block)
-        .style(Style::default().fg(Color::LightGreen))
-        .alignment(Alignment::Center);
+    render_device_panel(&model.device_status, body[1], buf);
 
-    if header_area.width > 0 {
-        header.render(header_area, buf);
+    // ── Description ───────────────────────────────────────────────────────────
+    Paragraph::new(format!("  {}", model.menu.get_selected_description()))
+        .block(
+            Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Rgb(50, 50, 70))),
+        )
+        .style(Style::default().fg(Color::Rgb(150, 150, 175)))
+        .render(desc_area, buf);
+
+    // ── Footer ────────────────────────────────────────────────────────────────
+    Paragraph::new(
+        "  \u{2191}/\u{2193} j/k Navigate  Tab/S-Tab Section  Enter Execute  d Device  r Refresh  q Quit  ",
+    )
+    .block(
+        Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Rgb(50, 50, 70))),
+    )
+    .style(Style::default().fg(Color::Rgb(100, 100, 120)))
+    .alignment(Alignment::Center)
+    .render(footer_area, buf);
+}
+
+// ── Device panel (right column) ───────────────────────────────────────────────
+
+fn render_device_panel(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
+    // Device selector height: 2 borders + max(1, num_devices) content rows, capped at 6
+    let list_rows = (status.devices.len().max(1) as u16 + 2).min(6);
+
+    let panel = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(list_rows), // device selector
+            Constraint::Min(0),            // live stats
+        ])
+        .split(area);
+
+    render_device_list(status, panel[0], buf);
+    render_device_stats(status, panel[1], buf);
+}
+
+// ── Device selector ───────────────────────────────────────────────────────────
+
+fn render_device_list(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
+    let connected   = status.is_connected();
+    let bdr_color   = if connected { Color::Rgb(40, 120, 40) } else { Color::Rgb(60, 50, 35) };
+    let multi_hint  = if status.devices.len() > 1 { "  d \u{2013} cycle" } else { "" };
+
+    let block = Block::bordered()
+        .title(format!("  \u{1f4f1}  Devices{}  ", multi_hint))
+        .title_alignment(Alignment::Left)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(bdr_color));
+
+    let inner = block.inner(area);
+    block.render(area, buf);
+
+    if !connected {
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                "  \u{25cb}  No device connected",
+                Style::default().fg(Color::Rgb(160, 130, 60)),
+            ),
+        ]))
+        .render(inner, buf);
+        return;
     }
 
-    // Render menu with slide animation
-    let menu_area = if slide_offset > 0 {
-        Rect {
-            x: chunks[1].x + slide_offset,
-            y: chunks[1].y,
-            width: chunks[1].width.saturating_sub(slide_offset),
-            height: chunks[1].height,
-        }
-    } else {
-        chunks[1]
-    };
+    let dim    = Color::Rgb(100, 100, 100);
+    let sel_bg = Color::Rgb(40, 140, 40);
+    let sel_fg = Color::Rgb(10, 10, 10);
 
-    // Wrap menu in a bordered block to ensure alignment
-    let menu_block = Block::bordered()
-        .title("📱 ADB Command Interface")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .style(Style::default().fg(Color::Green));
+    let lines: Vec<Line<'static>> = status
+        .devices
+        .iter()
+        .enumerate()
+        .take(inner.height as usize)
+        .map(|(idx, dev)| {
+            let selected = idx == status.selected_idx;
+            let serial   = format!("{:<20}", dev.serial);
+            let state    = dev.state.clone();
 
-    let menu_inner = menu_block.inner(menu_area);
-
-    if menu_area.width > 0 {
-        menu_block.render(menu_area, buf);
-        // Render menu content inside the bordered block
-        (&model.menu).render(menu_inner, buf);
-    }
-
-    // Render footer with help
-    let footer_block = Block::bordered()
-        .title("Help")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .style(Style::default().fg(Color::Yellow));
-
-    let footer_text = if model.menu.is_in_child_mode() {
-        "↑/↓ or j/k: Navigate | Enter: Execute | ← Left/Backspace: Back | q/Esc: Quit"
-    } else {
-        "↑/↓ or j/k: Navigate | Enter/→: Options | q/Esc: Quit"
-    };
-
-    // Apply fade-in effect if entering child mode
-    if model.menu.is_in_child_mode() && !model.effects.is_fade_in_complete() {
-        let fade_progress = model.effects.get_fade_in_progress();
-
-        // Apply fade effect to the entire menu area
-        for y in area.top()..area.bottom() {
-            for x in area.left()..area.right() {
-                if let Some(cell) = buf.cell_mut((x, y)) {
-                    // Simple fade effect - adjust alpha by modifying colors
-                    match cell.fg {
-                        Color::Green => {
-                            let intensity = (255.0 * fade_progress) as u8;
-                            cell.set_fg(Color::Rgb(0, intensity, 0));
-                        }
-                        Color::White => {
-                            let intensity = (255.0 * fade_progress) as u8;
-                            cell.set_fg(Color::Rgb(intensity, intensity, intensity));
-                        }
-                        Color::Yellow => {
-                            let intensity = (255.0 * fade_progress) as u8;
-                            cell.set_fg(Color::Rgb(intensity, intensity, 0));
-                        }
-                        _ => {
-                            // For other colors, apply a general fade
-                            if fade_progress < 0.5 {
-                                cell.set_fg(Color::DarkGray);
-                            }
-                        }
-                    }
-                }
+            if selected {
+                Line::from(vec![
+                    Span::styled(
+                        "  \u{25b6}  ",
+                        Style::default().fg(Color::Rgb(80, 220, 80)),
+                    ),
+                    Span::styled(
+                        serial,
+                        Style::default()
+                            .fg(sel_fg)
+                            .bg(sel_bg)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!(" {}", state),
+                        Style::default().fg(sel_fg).bg(sel_bg),
+                    ),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled("     ", Style::default()),
+                    Span::styled(serial, Style::default().fg(Color::Rgb(180, 180, 180))),
+                    Span::styled(format!(" {}", state), Style::default().fg(dim)),
+                ])
             }
-        }
+        })
+        .collect();
+
+    Paragraph::new(lines).render(inner, buf);
+}
+
+// ── Device stats ──────────────────────────────────────────────────────────────
+
+fn render_device_stats(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
+    let connected  = status.is_connected();
+    let bdr_color  = if connected { Color::Rgb(35, 70, 35) } else { Color::Rgb(55, 45, 35) };
+
+    let title = status
+        .active()
+        .map(|d| format!("  {}  ", d.serial))
+        .unwrap_or_else(|| "  No Device  ".to_string());
+
+    let block = Block::bordered()
+        .title(title)
+        .title_alignment(Alignment::Left)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(bdr_color));
+
+    let inner = block.inner(area);
+    block.render(area, buf);
+
+    if !connected {
+        render_no_device_content(inner, buf);
+        return;
     }
 
-    // Render footer with slide animation
-    let footer_area = if slide_offset > 0 {
-        Rect {
-            x: chunks[2].x + slide_offset,
-            y: chunks[2].y,
-            width: chunks[2].width.saturating_sub(slide_offset),
-            height: chunks[2].height,
-        }
-    } else {
-        chunks[2]
+    let bar_w = (inner.width as usize).saturating_sub(22).clamp(4, 16);
+
+    // Battery
+    let batt_color = match status.battery_pct {
+        0..=20  => Color::Rgb(220, 60, 60),
+        21..=50 => Color::Rgb(220, 160, 50),
+        _       => Color::Rgb(80, 200, 80),
     };
 
-    let footer = Paragraph::new(footer_text)
-        .block(footer_block)
-        .style(Style::default().fg(Color::White))
-        .alignment(Alignment::Center);
+    // RAM
+    let ram_used = status.ram_total_mib.saturating_sub(status.ram_avail_mib);
+    let ram_pct  = if status.ram_total_mib > 0 {
+        ram_used as f32 / status.ram_total_mib as f32
+    } else {
+        0.0
+    };
+    let ram_color = match (ram_pct * 100.0) as u8 {
+        0..=60  => Color::Rgb(80, 200, 80),
+        61..=80 => Color::Rgb(220, 160, 50),
+        _       => Color::Rgb(220, 60, 60),
+    };
 
-    if footer_area.width > 0 {
-        footer.render(footer_area, buf);
+    // CPU — clamp load to 4.0 (4-core ceiling for bar display)
+    let cpu_frac  = (status.cpu_load_1min / 4.0).clamp(0.0, 1.0);
+    let cpu_color = match (cpu_frac * 100.0) as u8 {
+        0..=60  => Color::Rgb(80, 200, 80),
+        61..=80 => Color::Rgb(220, 160, 50),
+        _       => Color::Rgb(220, 60, 60),
+    };
+
+    let dim    = Color::Rgb(90, 90, 90);
+    let bright = Color::Rgb(205, 205, 205);
+
+    let model_text = if status.model.is_empty() { "Unknown".to_string() } else { status.model.clone() };
+    let ver_text   = if status.android_version.is_empty() {
+        String::new()
+    } else {
+        format!("Android {}", status.android_version)
+    };
+
+    let mut lines: Vec<Line<'static>> = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  \u{1f4f1}  ", Style::default().fg(dim)),
+            Span::styled(model_text, Style::default().fg(bright).add_modifier(Modifier::BOLD)),
+        ]),
+    ];
+
+    if !ver_text.is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled("  \u{1f916}  ", Style::default().fg(dim)),
+            Span::styled(ver_text, Style::default().fg(bright)),
+        ]));
+    }
+
+    lines.push(Line::from(""));
+
+    // Battery bar
+    lines.push(stat_bar(
+        "  \u{1f50b}  Batt ",
+        status.battery_pct as f32,
+        100.0,
+        bar_w,
+        batt_color,
+        format!("{}%", status.battery_pct),
+    ));
+
+    // RAM bar (only if data available)
+    if status.ram_total_mib > 0 {
+        lines.push(stat_bar(
+            "  \u{1f4be}  RAM  ",
+            ram_pct * 100.0,
+            100.0,
+            bar_w,
+            ram_color,
+            format!("{} / {}", fmt_mib(ram_used), fmt_mib(status.ram_total_mib)),
+        ));
+    }
+
+    // CPU load bar
+    if status.cpu_load_1min > 0.0 {
+        lines.push(stat_bar(
+            "  \u{1f4ca}  CPU  ",
+            cpu_frac * 100.0,
+            100.0,
+            bar_w,
+            cpu_color,
+            format!("{:.2}", status.cpu_load_1min),
+        ));
+    }
+
+    Paragraph::new(lines).render(inner, buf);
+}
+
+// ── No-device content ─────────────────────────────────────────────────────────
+
+fn render_no_device_content(area: Rect, buf: &mut Buffer) {
+    let dim    = Color::Rgb(90, 90, 90);
+    let amber  = Color::Rgb(160, 130, 60);
+    let subtle = Color::Rgb(80, 80, 80);
+
+    let lines: Vec<Line<'static>> = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "  \u{26aa}  No device connected",
+            Style::default().fg(amber),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  \u{2022}  Enable USB debugging on the device",
+            Style::default().fg(dim),
+        )),
+        Line::from(Span::styled(
+            "  \u{2022}  Run  adb start-server",
+            Style::default().fg(dim),
+        )),
+        Line::from(Span::styled(
+            "  \u{2022}  Connect via USB or WiFi",
+            Style::default().fg(dim),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  Press  r  to retry",
+            Style::default().fg(subtle),
+        )),
+    ];
+
+    Paragraph::new(lines).render(area, buf);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Build a single progress-bar stat line.
+fn stat_bar(
+    label:  &str,
+    value:  f32,
+    max:    f32,
+    bar_w:  usize,
+    color:  Color,
+    suffix: String,
+) -> Line<'static> {
+    let pct    = (value / max).clamp(0.0, 1.0);
+    let filled = (pct * bar_w as f32) as usize;
+    let empty  = bar_w.saturating_sub(filled);
+
+    Line::from(vec![
+        Span::styled(label.to_string(),       Style::default().fg(Color::Rgb(90, 90, 90))),
+        Span::styled("\u{2588}".repeat(filled), Style::default().fg(color)),
+        Span::styled("\u{2591}".repeat(empty),  Style::default().fg(Color::Rgb(40, 40, 40))),
+        Span::styled(format!("  {}", suffix),  Style::default().fg(color)),
+    ])
+}
+
+/// Format MiB as human-readable (GiB when >= 1 GiB, else MiB).
+fn fmt_mib(mib: u64) -> String {
+    if mib >= 1024 {
+        format!("{:.1}G", mib as f64 / 1024.0)
+    } else {
+        format!("{}M", mib)
     }
 }
 
-/// Render command result with scrolling support
+// ── Result view (unchanged) ───────────────────────────────────────────────────
+
 fn render_result(model: &mut Model, area: Rect, buf: &mut Buffer) {
-    let (title, color) = if model.command_result.is_some() {
-        ("✅ Command Result", Color::Green)
-    } else if model.command_error.is_some() {
-        ("❌ Command Error", Color::Red)
+    let (icon, border_color) = if model.command_result.is_some() {
+        ("\u{2705}", Color::Rgb(40, 160, 40))
     } else {
-        ("📋 No Output", Color::Yellow)
+        ("\u{274c}", Color::Rgb(160, 40, 40))
     };
 
-    // Get slide animation progress for result popup
+    let label = model
+        .last_command_label
+        .clone()
+        .unwrap_or_else(|| "Result".to_string());
+
     let slide_progress = model.effects.get_slide_in_progress();
-
-    // Use larger area for results to accommodate more text
-    let base_popup_area = centered_rect(80, 70, area);
-
-    // Calculate slide offset (slide up from bottom)
-    let slide_offset = ((1.0 - slide_progress) * base_popup_area.height as f32 * 0.5) as u16;
+    let base_area      = centered_rect(82, 76, area);
+    let slide_offset   = ((1.0 - slide_progress) * base_area.height as f32 * 0.4) as u16;
 
     let popup_area = if slide_offset > 0 {
         Rect {
-            x: base_popup_area.x,
-            y: base_popup_area.y + slide_offset,
-            width: base_popup_area.width,
-            height: base_popup_area.height.saturating_sub(slide_offset),
+            x:      base_area.x,
+            y:      base_area.y + slide_offset,
+            width:  base_area.width,
+            height: base_area.height.saturating_sub(slide_offset),
         }
     } else {
-        base_popup_area
+        base_area
     };
 
-    // Don't render if area is too small
     if popup_area.height < 5 {
         return;
     }
 
-    // Split area for content and scroll bar
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Min(0),    // Content area
-            Constraint::Length(3), // Scroll bar area
-        ])
-        .split(popup_area);
-
-    let content_area = chunks[0];
-    let scrollbar_area = chunks[1];
-
-    // Calculate available height for content (subtract borders and help text)
-    let content_height = content_area.height.saturating_sub(4); // 2 for borders, 2 for help text
-    let visible_lines = content_height as usize;
-
-    // Update wrapped lines with current terminal width
-    let max_width = content_area.width.saturating_sub(4) as usize;
-    model.update_wrapped_lines(max_width);
-
-    // Determine visible content based on scroll position
-    let total_lines = model.wrapped_lines.len();
-    let start_line = model.scroll_position;
-    let end_line = (start_line + visible_lines).min(total_lines);
-
-    let visible_content: Vec<String> = model.wrapped_lines[start_line..end_line].to_vec();
-
-    // Create scroll indicator
-    let scroll_info = if total_lines > visible_lines {
-        format!(
-            " [{}/{}] ↑/↓:Scroll PgUp/PgDn:Fast Home/End:Jump",
-            start_line + 1,
-            total_lines
-        )
-    } else {
-        " Press Esc/q/Enter to return".to_string()
+    let content_area = Rect {
+        width: popup_area.width.saturating_sub(3),
+        ..popup_area
+    };
+    let scrollbar_area = Rect {
+        x:     popup_area.x + popup_area.width.saturating_sub(3),
+        width: 3,
+        ..popup_area
     };
 
-    // Create title with scroll info
-    let full_title = format!("{}{}", title, scroll_info);
+    let content_height = content_area.height.saturating_sub(4) as usize;
+    let max_width      = content_area.width.saturating_sub(4) as usize;
+    model.update_wrapped_lines(max_width);
 
-    let result_block = Block::bordered()
-        .title(full_title)
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .style(Style::default().fg(color));
+    let total   = model.wrapped_lines.len();
+    let start   = model.scroll_position;
+    let end     = (start + content_height).min(total);
+    let visible = model.wrapped_lines[start..end].to_vec();
 
-    // Join visible lines and add help text at bottom
-    let mut display_text = visible_content.join("\n");
+    let scroll_hint = if total > content_height {
+        format!(
+            "  [{}/{}]  \u{2191}\u{2193} Scroll  PgUp/PgDn Fast  Home/End Jump",
+            start + 1,
+            total
+        )
+    } else {
+        "  Esc \u{00b7} q \u{00b7} Enter  return to menu".to_string()
+    };
 
-    // Add scroll indicator if there's more content
-    if total_lines > visible_lines {
-        let padding = "\n".repeat((visible_lines.saturating_sub(visible_content.len())).max(1));
-        display_text.push_str(&padding);
+    let title = format!("  {} {}{}  ", icon, label.as_str(), scroll_hint);
 
-        if start_line > 0 {
-            display_text.push_str("▲ More content above");
+    let mut display = visible.join("\n");
+    if total > content_height {
+        let pad = "\n".repeat(content_height.saturating_sub(visible.len()).max(1));
+        display.push_str(&pad);
+        if start > 0 {
+            display.push_str("\u{25b2} more above");
         }
-        if end_line < total_lines {
-            if start_line > 0 {
-                display_text.push_str(" | ");
+        if end < total {
+            if start > 0 {
+                display.push_str("  \u{00b7}  ");
             }
-            display_text.push_str("▼ More content below");
+            display.push_str("\u{25bc} more below");
         }
-    } else if total_lines <= visible_lines && total_lines > 0 {
-        let padding = "\n".repeat((visible_lines.saturating_sub(visible_content.len())).max(1));
-        display_text.push_str(&padding);
-        display_text.push_str("Press Esc/q/Enter to return to menu");
+    } else if !visible.is_empty() {
+        let pad = "\n".repeat(content_height.saturating_sub(visible.len()).max(1));
+        display.push_str(&pad);
+        display.push_str("  Esc \u{00b7} q \u{00b7} Enter  return to menu");
     }
 
-    let result_paragraph = Paragraph::new(display_text)
-        .block(result_block)
-        .style(Style::default().fg(Color::White))
-        .alignment(Alignment::Left)
-        .wrap(ratatui::widgets::Wrap { trim: false });
+    Paragraph::new(display)
+        .block(
+            Block::bordered()
+                .title(title)
+                .title_alignment(Alignment::Left)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(border_color)),
+        )
+        .style(Style::default().fg(Color::Rgb(220, 220, 220)))
+        .render(content_area, buf);
 
-    result_paragraph.render(content_area, buf);
-
-    // Render scroll bar if content is scrollable
-    if total_lines > visible_lines {
+    if total > content_height {
         render_scrollbar(
             scrollbar_area,
             buf,
-            total_lines,
-            visible_lines,
-            start_line,
-            color,
+            total,
+            content_height,
+            start,
+            border_color,
         );
     }
 }
 
-/// Render a scrollbar indicator
+// ── Scrollbar ─────────────────────────────────────────────────────────────────
+
 fn render_scrollbar(
-    area: Rect,
-    buf: &mut Buffer,
+    area:        Rect,
+    buf:         &mut Buffer,
     total_lines: usize,
-    visible_lines: usize,
-    scroll_pos: usize,
-    color: Color,
+    visible:     usize,
+    pos:         usize,
+    color:       Color,
 ) {
     if area.height < 3 {
-        return; // Not enough space for scrollbar
-    }
-
-    // Create scrollbar block
-    let scrollbar_block = Block::bordered()
-        .border_type(BorderType::Rounded)
-        .style(Style::default().fg(color));
-
-    // Calculate inner area before rendering
-    let inner_area = scrollbar_block.inner(area);
-
-    scrollbar_block.render(area, buf);
-    let scrollbar_height = inner_area.height as usize;
-
-    if scrollbar_height == 0 {
         return;
     }
 
-    // Calculate thumb position and size
-    let thumb_size =
-        ((visible_lines as f64 / total_lines as f64) * scrollbar_height as f64).max(1.0) as usize;
-    let thumb_pos = ((scroll_pos as f64 / (total_lines - visible_lines) as f64)
-        * (scrollbar_height - thumb_size) as f64) as usize;
+    let scroll_block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .style(Style::default().fg(color));
+    let inner = scroll_block.inner(area);
+    scroll_block.render(area, buf);
 
-    // Render scrollbar track and thumb
-    for y in 0..scrollbar_height {
-        let cell_y = inner_area.y + y as u16;
-        let cell_x = inner_area.x;
+    let h = inner.height as usize;
+    if h == 0 {
+        return;
+    }
 
-        if let Some(cell) = buf.cell_mut((cell_x, cell_y)) {
+    let thumb_size = ((visible as f64 / total_lines as f64) * h as f64).max(1.0) as usize;
+    let thumb_pos  = if total_lines > visible {
+        ((pos as f64 / (total_lines - visible) as f64) * (h - thumb_size) as f64) as usize
+    } else {
+        0
+    };
+
+    for y in 0..h {
+        if let Some(cell) = buf.cell_mut((inner.x, inner.y + y as u16)) {
             if y >= thumb_pos && y < thumb_pos + thumb_size {
-                // Render thumb
-                cell.set_char('█');
+                cell.set_char('\u{2588}');
                 cell.set_fg(color);
             } else {
-                // Render track
-                cell.set_char('░');
+                cell.set_char('\u{2591}');
                 cell.set_fg(Color::DarkGray);
             }
         }
     }
 }
 
-/// Helper function to create a centered rect
-/// Render animated corners around loading popup
-fn render_loading_corners(area: Rect, buf: &mut Buffer, tick_count: u64) {
-    if area.width < 4 || area.height < 4 {
-        return;
-    }
-
-    // Animate corner characters
-    let corner_chars = ['◢', '◣', '◤', '◥'];
-    let corner_index = ((tick_count / 5) % 4) as usize;
-    let corner_char = corner_chars[corner_index];
-
-    // Pulsing color for corners
-    let pulse = ((tick_count as f32 * 0.1).sin() * 0.5 + 0.5 * 255.0) as u8;
-    let corner_color = Color::Rgb(pulse, pulse, 0);
-
-    // Top-left corner
-    if let Some(cell) = buf.cell_mut((area.x, area.y)) {
-        cell.set_char(corner_char);
-        cell.set_fg(corner_color);
-    }
-
-    // Top-right corner
-    if let Some(cell) = buf.cell_mut((area.right().saturating_sub(1), area.y)) {
-        cell.set_char(corner_char);
-        cell.set_fg(corner_color);
-    }
-
-    // Bottom-left corner
-    if let Some(cell) = buf.cell_mut((area.x, area.bottom().saturating_sub(1))) {
-        cell.set_char(corner_char);
-        cell.set_fg(corner_color);
-    }
-
-    // Bottom-right corner
-    if let Some(cell) = buf.cell_mut((
-        area.right().saturating_sub(1),
-        area.bottom().saturating_sub(1),
-    )) {
-        cell.set_char(corner_char);
-        cell.set_fg(corner_color);
-    }
-}
+// ── centered_rect ─────────────────────────────────────────────────────────────
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
+    let vert = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage((100 - percent_y) / 2),
@@ -507,5 +589,5 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             Constraint::Percentage(percent_x),
             Constraint::Percentage((100 - percent_x) / 2),
         ])
-        .split(popup_layout[1])[1]
+        .split(vert[1])[1]
 }

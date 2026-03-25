@@ -4,6 +4,7 @@ pub mod adb;
 pub mod app;
 pub mod effects;
 pub mod event;
+pub mod fastboot;
 pub mod menu;
 pub mod message;
 pub mod model;

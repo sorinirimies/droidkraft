@@ -1,6 +1,7 @@
-use crate::adb::{AdbCommand, AdbManager};
+use crate::adb::{AdbManager, DeviceStatus};
 use crate::effects::EffectsManager;
-use crate::menu::Menu;
+use crate::fastboot::FastbootManager;
+use crate::menu::{Menu, MenuCommand};
 
 use std::time::Instant;
 
@@ -46,6 +47,18 @@ pub struct Model {
 
     /// ADB client manager
     pub adb_manager: AdbManager,
+
+    /// Fastboot manager (shells out to the `fastboot` binary)
+    pub fastboot_manager: FastbootManager,
+
+    /// Label of the last executed command (shown in the result title)
+    pub last_command_label: Option<String>,
+
+    /// Live device status shown in the header status bar.
+    pub device_status: DeviceStatus,
+
+    /// When true the next tick will fetch fresh device info.
+    pub needs_device_refresh: bool,
 }
 
 /// Application states
@@ -56,9 +69,6 @@ pub enum AppState {
 
     /// Main menu navigation
     Menu,
-
-    /// Command is being executed
-    Executing,
 
     /// Loading animation during command execution
     Loading,
@@ -90,6 +100,10 @@ impl Model {
             reveal_counter: 0,
             running: true,
             adb_manager: AdbManager::new(),
+            fastboot_manager: FastbootManager::new(),
+            last_command_label: None,
+            device_status: DeviceStatus::default(),
+            needs_device_refresh: true,
         }
     }
 
@@ -114,7 +128,7 @@ impl Model {
     }
 
     /// Get the currently selected command
-    pub fn get_selected_command(&self) -> AdbCommand {
+    pub fn get_selected_command(&self) -> MenuCommand {
         self.menu.get_selected_command()
     }
 
@@ -168,8 +182,18 @@ impl Model {
     }
 }
 
-/// Helper function to wrap a single line at word boundaries
+/// Helper function to wrap a single line at word boundaries.
+/// Tabs are expanded to 4 spaces before processing so ratatui renders them correctly.
 fn wrap_line(line: &str, max_width: usize) -> Vec<String> {
+    // Expand tabs — ratatui treats \t as zero-width, causing text to overlap.
+    let line = line.replace('\t', "    ");
+    let line = line.as_str();
+
+    // Guard: if max_width is too small to be useful, return the line as-is.
+    if max_width < 4 {
+        return vec![line.to_string()];
+    }
+
     if line.len() <= max_width {
         return vec![line.to_string()];
     }

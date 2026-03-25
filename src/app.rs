@@ -86,32 +86,18 @@ impl App {
                 KeyCode::Esc | KeyCode::Char('q') => Some(Message::Quit),
                 KeyCode::Up | KeyCode::Char('k') => Some(Message::MenuUp),
                 KeyCode::Down | KeyCode::Char('j') => Some(Message::MenuDown),
+                KeyCode::Tab => Some(Message::SectionNext),
+                KeyCode::BackTab => Some(Message::SectionPrev),
+                KeyCode::Char('r') => Some(Message::RefreshDeviceInfo),
+                KeyCode::Char('d') => Some(Message::NextDevice),
                 KeyCode::Enter => {
-                    if self.model.menu.is_in_child_mode() {
-                        let command = self.model.get_selected_command();
-                        Some(Message::ExecuteCommand(command))
-                    } else {
-                        Some(Message::EnterChild)
-                    }
-                }
-                KeyCode::Right => {
-                    if !self.model.menu.is_in_child_mode() {
-                        Some(Message::EnterChild)
-                    } else {
-                        None
-                    }
-                }
-                KeyCode::Left | KeyCode::Backspace => {
-                    if self.model.menu.is_in_child_mode() {
-                        Some(Message::ExitChild)
-                    } else {
-                        None
-                    }
+                    let command = self.model.get_selected_command();
+                    Some(Message::ExecuteCommand(command))
                 }
                 _ => None,
             },
 
-            AppState::Executing | AppState::Loading => match key {
+            AppState::Loading => match key {
                 KeyCode::Esc | KeyCode::Char('q') => Some(Message::ReturnToMenu),
                 _ => None,
             },

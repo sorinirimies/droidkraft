@@ -125,6 +125,53 @@ pub struct DeviceInfo {
     pub device: Option<String>,
 }
 
+/// A single device entry returned by `adb devices`.
+#[derive(Debug, Clone)]
+pub struct AdbDeviceEntry {
+    pub serial: String,
+    /// ADB state string: "device", "offline", "unauthorized", etc.
+    pub state: String,
+}
+
+/// Comprehensive device status shown in the right-hand dashboard.
+#[derive(Debug, Clone, Default)]
+pub struct DeviceStatus {
+    /// All devices currently visible to ADB (empty → nothing connected).
+    pub devices: Vec<AdbDeviceEntry>,
+    /// Which entry in `devices` is active (index).
+    pub selected_idx: usize,
+    // ── Stats for the active device ──────────────────────────────────────────
+    /// Product model (ro.product.model).
+    pub model: String,
+    /// Android version (ro.build.version.release).
+    pub android_version: String,
+    /// Battery percentage 0–100.
+    pub battery_pct: u8,
+    /// Total RAM in MiB.
+    pub ram_total_mib: u64,
+    /// Available RAM in MiB.
+    pub ram_avail_mib: u64,
+    /// 1-minute load average from /proc/loadavg.
+    pub cpu_load_1min: f32,
+}
+
+impl DeviceStatus {
+    pub fn is_connected(&self) -> bool {
+        !self.devices.is_empty()
+    }
+
+    pub fn active(&self) -> Option<&AdbDeviceEntry> {
+        self.devices.get(self.selected_idx)
+    }
+
+    /// Advance selection to the next device, wrapping around.
+    pub fn cycle_next(&mut self) {
+        if !self.devices.is_empty() {
+            self.selected_idx = (self.selected_idx + 1) % self.devices.len();
+        }
+    }
+}
+
 /// ADB Manager - handles connection and command execution
 #[derive(Debug)]
 pub struct AdbManager {
@@ -162,6 +209,116 @@ impl AdbManager {
     /// Set the selected device
     pub fn select_device(&mut self, serial: String) {
         self.selected_device = Some(serial);
+    }
+
+    /// Fetch a comprehensive snapshot of all ADB devices and live stats for
+    /// the active one.  Non-panicking — any failure returns a partial or empty
+    /// `DeviceStatus`.
+    pub fn fetch_device_status(&mut self) -> DeviceStatus {
+        if self.connect().is_err() {
+            return DeviceStatus::default();
+        }
+
+        let server = match self.server.as_mut() {
+            Some(s) => s,
+            None => return DeviceStatus::default(),
+        };
+
+        let raw = match server.devices() {
+            Ok(d) => d,
+            Err(_) => return DeviceStatus::default(),
+        };
+
+        if raw.is_empty() {
+            return DeviceStatus::default();
+        }
+
+        // Build the device list
+        let devices: Vec<AdbDeviceEntry> = raw
+            .iter()
+            .map(|d| AdbDeviceEntry {
+                serial: d.identifier.clone(),
+                state: format!("{:?}", d.state).to_lowercase(),
+            })
+            .collect();
+
+        // Keep previously selected device if it is still present
+        let selected_idx = if let Some(sel) = &self.selected_device {
+            devices.iter().position(|d| &d.serial == sel).unwrap_or(0)
+        } else {
+            0
+        };
+
+        self.selected_device = Some(devices[selected_idx].serial.clone());
+
+        // ── Per-device stats ─────────────────────────────────────────────────
+
+        let clean = |s: String| -> String {
+            let t = s.trim().to_string();
+            if t.is_empty() || t.contains("no output") {
+                String::new()
+            } else {
+                t
+            }
+        };
+
+        let model = self
+            .shell_command("getprop ro.product.model")
+            .ok()
+            .map(clean)
+            .unwrap_or_default();
+
+        let android_version = self
+            .shell_command("getprop ro.build.version.release")
+            .ok()
+            .map(clean)
+            .unwrap_or_default();
+
+        let battery_pct = self
+            .shell_command("dumpsys battery | grep '  level:'")
+            .ok()
+            .and_then(|s| {
+                s.lines()
+                    .next()
+                    .and_then(|l| l.split(':').nth(1))
+                    .and_then(|v| v.trim().parse::<u8>().ok())
+            })
+            .unwrap_or(0);
+
+        let (ram_total_mib, ram_avail_mib) = self
+            .shell_command("grep -E 'MemTotal:|MemAvailable:' /proc/meminfo")
+            .ok()
+            .map(|s| parse_meminfo(&s))
+            .unwrap_or((0, 0));
+
+        let cpu_load_1min = self
+            .shell_command("cat /proc/loadavg")
+            .ok()
+            .and_then(|s| {
+                s.split_whitespace()
+                    .next()
+                    .and_then(|v| v.parse::<f32>().ok())
+            })
+            .unwrap_or(0.0);
+
+        DeviceStatus {
+            devices,
+            selected_idx,
+            model,
+            android_version,
+            battery_pct,
+            ram_total_mib,
+            ram_avail_mib,
+            cpu_load_1min,
+        }
+    }
+
+    /// Select the device at `selected_idx` in `status` and re-fetch stats.
+    pub fn select_device_from_status(&mut self, status: &mut DeviceStatus) {
+        if let Some(dev) = status.devices.get(status.selected_idx) {
+            self.selected_device = Some(dev.serial.clone());
+        }
+        *status = self.fetch_device_status();
     }
 
     /// Get the selected device serial
@@ -210,9 +367,9 @@ impl AdbManager {
             return Ok("No devices found.\n\nMake sure:\n- Device is connected via USB\n- USB debugging is enabled\n- Device is authorized".to_string());
         }
 
-        let mut output = String::from("List of devices attached:\n");
+        let mut output = String::from("List of devices attached:\n\n");
         for device in devices {
-            output.push_str(&format!("{}\t{:?}\n", device.identifier, device.state));
+            output.push_str(&format!("  {:<24} {:?}\n", device.identifier, device.state));
 
             // Auto-select first device if none selected
             if self.selected_device.is_none() {
@@ -382,6 +539,33 @@ impl Default for AdbManager {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Parse `/proc/meminfo` output and return `(total_mib, available_mib)`.
+fn parse_meminfo(s: &str) -> (u64, u64) {
+    let mut total = 0u64;
+    let mut avail = 0u64;
+    for line in s.lines() {
+        let mut parts = line.split_whitespace();
+        match parts.next() {
+            Some("MemTotal:") => {
+                total = parts
+                    .next()
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .unwrap_or(0)
+                    / 1024;
+            }
+            Some("MemAvailable:") => {
+                avail = parts
+                    .next()
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .unwrap_or(0)
+                    / 1024;
+            }
+            _ => {}
+        }
+    }
+    (total, avail)
 }
 
 #[cfg(test)]

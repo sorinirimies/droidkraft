@@ -1,4 +1,4 @@
-use crate::adb::AdbCommand;
+use crate::menu::MenuCommand;
 
 /// Messages represent all possible actions/events in the application
 /// This follows the Elm architecture pattern for clear state transitions
@@ -9,9 +9,17 @@ pub enum Message {
     MenuDown,
     EnterChild,
     ExitChild,
+    /// Jump to the first item of the next section (Tab).
+    SectionNext,
+    /// Jump to the first item of the previous section (Shift+Tab).
+    SectionPrev,
+    /// Refresh the live device status bar (r key).
+    RefreshDeviceInfo,
+    /// Cycle to the next connected device (d key).
+    NextDevice,
 
     // Command execution
-    ExecuteCommand(AdbCommand),
+    ExecuteCommand(MenuCommand),
     CommandStarted,
     CommandCompleted(CommandResult),
 

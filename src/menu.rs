@@ -1,641 +1,786 @@
-// Removed unused import: get_menu_border_color
+//! Command menu rendered as per-section "cards".
+//!
+//! Each section (DEVICE, PACKAGES, …) appears as:
+//!
+//!   SECTION TITLE ─────────────────────────────
+//!   ╭──────────────────────────────────────────╮
+//!   │   icon  Label                            │
+//!   │ ▶ icon  Selected label                   │  ← highlighted
+//!   ╰──────────────────────────────────────────╯
+//!
+//! The full stack of cards scrolls vertically to keep the selected item visible.
+
 use crate::adb::{AdbCommand, PackageFilter};
+use crate::fastboot::FastbootCommand;
 use ratatui::{
     buffer::Buffer,
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, List, ListItem, ListState, Paragraph, Widget},
+    text::Span,
+    widgets::Widget,
 };
 
-#[derive(Debug, Clone)]
-pub struct MenuItem {
-    pub label: String,
-    pub description: String,
-    pub command: AdbCommand,
-    pub children: Vec<MenuChild>,
-}
+// ── Command wrapper ───────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
-pub struct MenuChild {
-    pub label: String,
-    pub description: String,
-    pub command: AdbCommand,
+pub enum MenuCommand {
+    Adb(AdbCommand),
+    Fastboot(FastbootCommand),
 }
+
+// ── Entry types ───────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub enum MenuEntry {
+    Section(&'static str),
+    Item {
+        label: &'static str,
+        description: &'static str,
+        command: MenuCommand,
+        danger: bool,
+    },
+    Spacer,
+}
+
+impl MenuEntry {
+    pub fn is_selectable(&self) -> bool {
+        matches!(self, MenuEntry::Item { .. })
+    }
+}
+
+// ── Menu state ────────────────────────────────────────────────────────────────
 
 #[derive(Debug)]
 pub struct Menu {
-    pub items: Vec<MenuItem>,
-    pub state: ListState,
+    pub entries: Vec<MenuEntry>,
+    /// Full-list index of the currently selected `Item`.
     pub selected: usize,
     pub tick_count: u64,
-    pub last_selected: usize,
-    pub position_change_boost: u64,
-    pub in_child_mode: bool,
-    pub child_selected: usize,
-    pub child_state: ListState,
+    /// How many virtual rows are hidden above the top of the visible area.
+    pub scroll_offset: u16,
+    /// Visible height recorded during the last render — used for scroll math.
+    last_height: u16,
 }
 
 impl Default for Menu {
     fn default() -> Self {
-        let items = vec![
-            MenuItem {
-                label: "📱 List Devices".to_string(),
-                description: "Show all connected Android devices with their status".to_string(),
-                command: AdbCommand::ListDevices,
-                children: vec![
-                    MenuChild {
-                        label: "📋 List Connected Devices".to_string(),
-                        description: "Show basic device list".to_string(),
-                        command: AdbCommand::ListDevices,
-                    },
-                    MenuChild {
-                        label: "📝 Detailed Device Info".to_string(),
-                        description: "Show devices with detailed information".to_string(),
-                        command: AdbCommand::GetDeviceState,
-                    },
-                    MenuChild {
-                        label: "🔍 Device Serial Numbers".to_string(),
-                        description: "List only device serial numbers".to_string(),
-                        command: AdbCommand::GetSerialNumber,
-                    },
-                ],
-            },
-            MenuItem {
-                label: "📋 List Packages".to_string(),
-                description: "List all installed packages on the device".to_string(),
-                command: AdbCommand::ListPackages {
-                    include_path: true,
-                    filter: PackageFilter::All,
-                },
-                children: vec![
-                    MenuChild {
-                        label: "📦 All Packages".to_string(),
-                        description: "List all installed packages".to_string(),
-                        command: AdbCommand::ListPackages {
-                            include_path: false,
-                            filter: PackageFilter::All,
-                        },
-                    },
-                    MenuChild {
-                        label: "📁 Packages with Paths".to_string(),
-                        description: "List packages with file paths".to_string(),
-                        command: AdbCommand::ListPackages {
-                            include_path: true,
-                            filter: PackageFilter::All,
-                        },
-                    },
-                    MenuChild {
-                        label: "👤 User Packages Only".to_string(),
-                        description: "List only user-installed packages".to_string(),
-                        command: AdbCommand::ListPackages {
-                            include_path: false,
-                            filter: PackageFilter::User,
-                        },
-                    },
-                    MenuChild {
-                        label: "⚙️ System Packages Only".to_string(),
-                        description: "List only system packages".to_string(),
-                        command: AdbCommand::ListPackages {
-                            include_path: false,
-                            filter: PackageFilter::System,
-                        },
-                    },
-                ],
-            },
-            MenuItem {
-                label: "🔋 Battery Info".to_string(),
-                description: "Display detailed battery information".to_string(),
-                command: AdbCommand::GetBatteryInfo,
-                children: vec![
-                    MenuChild {
-                        label: "🔋 Full Battery Status".to_string(),
-                        description: "Complete battery information".to_string(),
-                        command: AdbCommand::GetBatteryInfo,
-                    },
-                    MenuChild {
-                        label: "⚡ Battery Level".to_string(),
-                        description: "Show just battery percentage".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "dumpsys battery | grep level".to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "🔌 Charging Status".to_string(),
-                        description: "Show charging state".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "dumpsys battery | grep 'AC powered\\|USB powered\\|status'"
-                                .to_string(),
-                        },
-                    },
-                ],
-            },
-            MenuItem {
-                label: "💾 Memory Usage".to_string(),
-                description: "Show memory usage statistics".to_string(),
-                command: AdbCommand::GetMemoryInfo,
-                children: vec![
-                    MenuChild {
-                        label: "📊 System Memory".to_string(),
-                        description: "Overall system memory usage".to_string(),
-                        command: AdbCommand::GetMemoryInfo,
-                    },
-                    MenuChild {
-                        label: "📱 Available Memory".to_string(),
-                        description: "Show available memory".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "cat /proc/meminfo | grep -E 'MemTotal|MemFree|MemAvailable'"
-                                .to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "🔝 Top Memory Apps".to_string(),
-                        description: "Apps using most memory".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "dumpsys meminfo | grep -E '(Total|TOTAL)' | head -10"
-                                .to_string(),
-                        },
-                    },
-                ],
-            },
-            MenuItem {
-                label: "📊 CPU Info".to_string(),
-                description: "Display CPU information and usage".to_string(),
-                command: AdbCommand::GetCpuInfo,
-                children: vec![
-                    MenuChild {
-                        label: "🔧 CPU Details".to_string(),
-                        description: "Detailed CPU information".to_string(),
-                        command: AdbCommand::GetCpuInfo,
-                    },
-                    MenuChild {
-                        label: "⚡ CPU Usage".to_string(),
-                        description: "Top processes by CPU usage".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "ps -eo PID,PPID,USER,COMM | head -20".to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "📈 Load Average".to_string(),
-                        description: "System load average".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "cat /proc/loadavg".to_string(),
-                        },
-                    },
-                ],
-            },
-            MenuItem {
-                label: "🔗 Network Info".to_string(),
-                description: "Show network connectivity information".to_string(),
-                command: AdbCommand::GetNetworkInfo,
-                children: vec![
-                    MenuChild {
-                        label: "🌐 Connectivity Status".to_string(),
-                        description: "Network connectivity details".to_string(),
-                        command: AdbCommand::GetNetworkInfo,
-                    },
-                    MenuChild {
-                        label: "📶 WiFi Info".to_string(),
-                        description: "WiFi connection details".to_string(),
-                        command: AdbCommand::GetWifiStatus,
-                    },
-                    MenuChild {
-                        label: "🔗 IP Configuration".to_string(),
-                        description: "Network interface configuration".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "ip addr show".to_string(),
-                        },
-                    },
-                ],
-            },
-            MenuItem {
-                label: "📱 Device Properties".to_string(),
-                description: "Get all device system properties".to_string(),
-                command: AdbCommand::GetDeviceProperties,
-                children: vec![
-                    MenuChild {
-                        label: "📋 All Properties".to_string(),
-                        description: "Show all system properties".to_string(),
-                        command: AdbCommand::GetDeviceProperties,
-                    },
-                    MenuChild {
-                        label: "🏷️ Device Model".to_string(),
-                        description: "Show device model and brand".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "getprop | grep -E 'ro.product.model|ro.product.brand|ro.product.name'".to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "🔢 Android Version".to_string(),
-                        description: "Show Android version info".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "getprop | grep -E 'ro.build.version|ro.build.id'"
-                                .to_string(),
-                        },
-                    },
-                ],
-            },
-            MenuItem {
-                label: "🎯 Running Processes".to_string(),
-                description: "List all running processes".to_string(),
-                command: AdbCommand::ListProcesses,
-                children: vec![
-                    MenuChild {
-                        label: "📋 All Processes".to_string(),
-                        description: "List all running processes".to_string(),
-                        command: AdbCommand::ListProcesses,
-                    },
-                    MenuChild {
-                        label: "🔝 Top Processes".to_string(),
-                        description: "Top 20 running processes".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "ps -A | head -20".to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "👤 User Processes".to_string(),
-                        description: "User application processes only".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "ps -A | grep -v 'system' | grep -v 'root' | head -15"
-                                .to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "📊 Process Details".to_string(),
-                        description: "Detailed process information with formatting".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "echo 'PID    USER         COMMAND'; echo '---    ----         -------'; ps -A | awk '{printf \"%-6s %-12s %s\\n\", $2, $1, $9}' | head -20".to_string(),
-                        },
-                    },
-                ],
-            },
-            MenuItem {
-                label: "📊 System Services".to_string(),
-                description: "List all system services status".to_string(),
-                command: AdbCommand::Shell {
-                    command: "service list".to_string(),
-                },
-                children: vec![
-                    MenuChild {
-                        label: "📋 All Services".to_string(),
-                        description: "List all system services".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "service list".to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "🔧 Running Services".to_string(),
-                        description: "Show only running services".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "dumpsys activity services".to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "📱 App Services".to_string(),
-                        description: "Application services only".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "dumpsys activity services | grep -A 5 'ServiceRecord'"
-                                .to_string(),
-                        },
-                    },
-                ],
-            },
-            MenuItem {
-                label: "📷 Screenshot".to_string(),
-                description: "Take and save device screenshots".to_string(),
-                command: AdbCommand::TakeScreenshot,
-                children: vec![
-                    MenuChild {
-                        label: "📸 Take Screenshot".to_string(),
-                        description: "Take screenshot and save to device".to_string(),
-                        command: AdbCommand::TakeScreenshot,
-                    },
-                    MenuChild {
-                        label: "📐 Screen Resolution".to_string(),
-                        description: "Show screen size and density".to_string(),
-                        command: AdbCommand::GetScreenResolution,
-                    },
-                    MenuChild {
-                        label: "🖼️ View Screenshot Path".to_string(),
-                        description: "Show where screenshots are saved".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "ls -la /sdcard/screenshot*.png".to_string(),
-                        },
-                    },
-                ],
-            },
-            MenuItem {
-                label: "🔄 Reboot Device".to_string(),
-                description: "Reboot the connected device".to_string(),
-                command: AdbCommand::Shell {
-                    command: "reboot".to_string(),
-                },
-                children: vec![
-                    MenuChild {
-                        label: "🔄 Normal Reboot".to_string(),
-                        description: "Reboot device normally".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "reboot".to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "⚡ Fast Reboot".to_string(),
-                        description: "Fast reboot (bootloader)".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "reboot bootloader".to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "🔧 Recovery Mode".to_string(),
-                        description: "Reboot to recovery mode".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "reboot recovery".to_string(),
-                        },
-                    },
-                ],
-            },
-            MenuItem {
-                label: "📜 System Log".to_string(),
-                description: "View recent system logs (last 100 lines)".to_string(),
-                command: AdbCommand::GetSystemLog { lines: 100 },
-                children: vec![
-                    MenuChild {
-                        label: "📜 Recent Logs".to_string(),
-                        description: "Last 100 log entries".to_string(),
-                        command: AdbCommand::GetSystemLog { lines: 100 },
-                    },
-                    MenuChild {
-                        label: "🚨 Error Logs Only".to_string(),
-                        description: "Show only error messages".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "logcat -d *:E".to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "⚠️ Warning and Error".to_string(),
-                        description: "Show warnings and errors".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "logcat -d *:W".to_string(),
-                        },
-                    },
-                    MenuChild {
-                        label: "🔄 Clear Logs".to_string(),
-                        description: "Clear the log buffer".to_string(),
-                        command: AdbCommand::Shell {
-                            command: "logcat -c".to_string(),
-                        },
-                    },
-                ],
-            },
-            MenuItem {
-                label: "🔍 ADB Version".to_string(),
-                description: "Display ADB version information".to_string(),
-                command: AdbCommand::GetAdbVersion,
-                children: vec![
-                    MenuChild {
-                        label: "🔍 ADB Version".to_string(),
-                        description: "Show ADB version".to_string(),
-                        command: AdbCommand::GetAdbVersion,
-                    },
-                    MenuChild {
-                        label: "📋 Server Status".to_string(),
-                        description: "Check ADB server status".to_string(),
-                        command: AdbCommand::ListDevices,
-                    },
-                ],
-            },
-        ];
-
-        let mut state = ListState::default();
-        state.select(Some(0));
-
-        let mut child_state = ListState::default();
-        child_state.select(Some(0));
-
-        Self {
-            items,
-            state,
-            selected: 0,
-            tick_count: 0,
-            last_selected: 0,
-            position_change_boost: 0,
-            in_child_mode: false,
-            child_selected: 0,
-            child_state,
-        }
+        Self::new()
     }
 }
 
 impl Menu {
     pub fn new() -> Self {
-        Self::default()
+        let entries = build_entries();
+        let first = entries.iter().position(|e| e.is_selectable()).unwrap_or(0);
+        Self {
+            entries,
+            selected: first,
+            tick_count: 0,
+            scroll_offset: 0,
+            last_height: 20,
+        }
     }
 
     pub fn tick(&mut self) {
-        self.tick_count = self.tick_count.wrapping_add(1);
+        self.tick_count += 1;
     }
 
     pub fn next(&mut self) {
-        let prev = self.selected;
-
-        if self.in_child_mode {
-            let child_count = self.items[self.selected].children.len();
-            if self.child_selected < child_count - 1 {
-                self.child_selected += 1;
-                self.child_state.select(Some(self.child_selected));
+        let len = self.entries.len();
+        for i in (self.selected + 1)..len {
+            if self.entries[i].is_selectable() {
+                return self.commit(i);
             }
-        } else if self.selected < self.items.len() - 1 {
-            self.selected += 1;
-            self.state.select(Some(self.selected));
         }
-
-        // Track movement for effects
-        if prev != self.selected {
-            self.position_change_boost = 30;
-            self.last_selected = prev;
+        for i in 0..self.selected {
+            if self.entries[i].is_selectable() {
+                return self.commit(i);
+            }
         }
     }
 
     pub fn previous(&mut self) {
-        let prev = self.selected;
-
-        if self.in_child_mode {
-            if self.child_selected > 0 {
-                self.child_selected -= 1;
-                self.child_state.select(Some(self.child_selected));
+        for i in (0..self.selected).rev() {
+            if self.entries[i].is_selectable() {
+                return self.commit(i);
             }
-        } else if self.selected > 0 {
-            self.selected -= 1;
-            self.state.select(Some(self.selected));
         }
-
-        // Track movement for effects
-        if prev != self.selected {
-            self.position_change_boost = 30;
-            self.last_selected = prev;
+        for i in (0..self.entries.len()).rev() {
+            if self.entries[i].is_selectable() {
+                return self.commit(i);
+            }
         }
     }
 
-    pub fn get_selected_item(&self) -> &MenuItem {
-        &self.items[self.selected]
-    }
-
-    pub fn get_selected_command(&self) -> AdbCommand {
-        if self.in_child_mode && !self.items[self.selected].children.is_empty() {
-            self.items[self.selected].children[self.child_selected]
-                .command
-                .clone()
-        } else {
-            self.items[self.selected].command.clone()
+    /// Jump to the first item of the next section (wraps around).
+    pub fn next_section(&mut self) {
+        let groups = build_groups(&self.entries);
+        let cur = groups
+            .iter()
+            .position(|g| g.item_indices.contains(&self.selected))
+            .unwrap_or(0);
+        let next = (cur + 1) % groups.len();
+        if let Some(&first) = groups[next].item_indices.first() {
+            self.commit(first);
         }
     }
 
-    pub fn enter_child_mode(&mut self) {
-        if !self.items[self.selected].children.is_empty() {
-            self.in_child_mode = true;
-            self.child_selected = 0;
-            self.child_state.select(Some(0));
+    /// Jump to the first item of the previous section (wraps around).
+    pub fn previous_section(&mut self) {
+        let groups = build_groups(&self.entries);
+        let cur = groups
+            .iter()
+            .position(|g| g.item_indices.contains(&self.selected))
+            .unwrap_or(0);
+        let prev = if cur == 0 { groups.len() - 1 } else { cur - 1 };
+        if let Some(&first) = groups[prev].item_indices.first() {
+            self.commit(first);
         }
     }
 
-    pub fn trigger_fade_in(&mut self) {
-        self.position_change_boost = 60;
+    fn commit(&mut self, idx: usize) {
+        self.selected = idx;
+        self.update_scroll();
     }
 
-    pub fn exit_child_mode(&mut self) {
-        if self.in_child_mode {
-            self.in_child_mode = false;
-            self.child_selected = 0;
+    pub fn get_selected_command(&self) -> MenuCommand {
+        match &self.entries[self.selected] {
+            MenuEntry::Item { command, .. } => command.clone(),
+            _ => MenuCommand::Adb(AdbCommand::ListDevices),
         }
     }
 
-    pub fn is_in_child_mode(&self) -> bool {
-        self.in_child_mode
+    pub fn get_selected_description(&self) -> &str {
+        match &self.entries[self.selected] {
+            MenuEntry::Item { description, .. } => description,
+            _ => "",
+        }
+    }
+
+    pub fn get_selected_label(&self) -> &str {
+        match &self.entries[self.selected] {
+            MenuEntry::Item { label, .. } => label,
+            _ => "",
+        }
+    }
+
+    /// Adjust `scroll_offset` so the selected item stays inside the viewport.
+    fn update_scroll(&mut self) {
+        let h = self.last_height as i32;
+        if h <= 2 {
+            return;
+        }
+
+        let groups = build_groups(&self.entries);
+        let mut vy: i32 = 0; // virtual row counter
+
+        for group in &groups {
+            let section_start = vy;
+            vy += 1; // header row
+            vy += 1; // top border row
+
+            for &idx in &group.item_indices {
+                if idx == self.selected {
+                    let scroll = self.scroll_offset as i32;
+                    if vy < scroll {
+                        // Item is above — scroll up to reveal the section header too
+                        self.scroll_offset = section_start.max(0) as u16;
+                    } else if vy >= scroll + h {
+                        // Item is below — scroll down so item sits at the bottom
+                        self.scroll_offset = (vy - h + 1) as u16;
+                    }
+                    return;
+                }
+                vy += 1;
+            }
+
+            vy += 1; // bottom border row
+            vy += 1; // spacer row
+        }
     }
 }
 
-impl Widget for &Menu {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        // Create border block
-        let block = Block::default()
-            .borders(ratatui::widgets::Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(61, 220, 132)))
-            .title(" ADB Commands ");
+// ── Section groups ────────────────────────────────────────────────────────────
 
-        let inner = block.inner(area);
-        block.render(area, buf);
+struct SectionGroup {
+    title: &'static str,
+    item_indices: Vec<usize>, // indices into Menu::entries
+}
 
-        if self.in_child_mode {
-            // Render child menu
-            let selected_item = &self.items[self.selected];
-
-            // Split area for parent indicator and child menu
-            let chunks = Layout::default()
-                .direction(ratatui::layout::Direction::Vertical)
-                .constraints([Constraint::Length(3), Constraint::Min(0)])
-                .split(inner);
-
-            // Render parent item indicator
-            let parent_text = format!("← {} (Press Backspace to return)", selected_item.label);
-            let parent_para = Paragraph::new(parent_text)
-                .style(
-                    Style::default()
-                        .fg(Color::Rgb(61, 220, 132))
-                        .add_modifier(Modifier::BOLD),
-                )
-                .alignment(Alignment::Left);
-            parent_para.render(chunks[0], buf);
-
-            // Render child items
-            let child_items: Vec<ListItem> = selected_item
-                .children
-                .iter()
-                .enumerate()
-                .map(|(idx, child)| {
-                    let is_selected = idx == self.child_selected;
-                    let style = if is_selected {
-                        Style::default()
-                            .fg(Color::Black)
-                            .bg(Color::Rgb(61, 220, 132))
-                            .add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default().fg(Color::White)
-                    };
-
-                    let content =
-                        Line::from(vec![Span::raw("  "), Span::styled(&child.label, style)]);
-
-                    ListItem::new(content)
-                })
-                .collect();
-
-            let child_list = List::new(child_items);
-            child_list.render(chunks[1], buf);
-
-            // Render description at bottom
-            if !selected_item.children.is_empty() {
-                let selected_child = &selected_item.children[self.child_selected];
-                let desc_area = Rect {
-                    x: inner.x,
-                    y: inner.y + inner.height.saturating_sub(3),
-                    width: inner.width,
-                    height: 3,
-                };
-
-                let desc_text = format!("  {}", selected_child.description);
-                let desc_para = Paragraph::new(desc_text)
-                    .style(Style::default().fg(Color::Gray))
-                    .alignment(Alignment::Left);
-                desc_para.render(desc_area, buf);
+fn build_groups(entries: &[MenuEntry]) -> Vec<SectionGroup> {
+    let mut groups: Vec<SectionGroup> = Vec::new();
+    for (i, entry) in entries.iter().enumerate() {
+        match entry {
+            MenuEntry::Section(t) => groups.push(SectionGroup {
+                title: t,
+                item_indices: Vec::new(),
+            }),
+            MenuEntry::Item { .. } => {
+                if let Some(g) = groups.last_mut() {
+                    g.item_indices.push(i);
+                }
             }
-        } else {
-            // Render main menu
-            let items: Vec<ListItem> = self
-                .items
-                .iter()
-                .enumerate()
-                .map(|(idx, item)| {
-                    let is_selected = idx == self.selected;
-                    let style = if is_selected {
-                        Style::default()
-                            .fg(Color::Black)
-                            .bg(Color::Rgb(61, 220, 132))
-                            .add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default().fg(Color::White)
-                    };
-
-                    let content = Line::from(vec![
-                        Span::raw("  "),
-                        Span::styled(&item.label, style),
-                        if !item.children.is_empty() {
-                            Span::raw(" ▶")
-                        } else {
-                            Span::raw("")
-                        },
-                    ]);
-
-                    ListItem::new(content)
-                })
-                .collect();
-
-            let list = List::new(items);
-            list.render(inner, buf);
-
-            // Render description at bottom
-            let selected_item = &self.items[self.selected];
-            let desc_area = Rect {
-                x: inner.x,
-                y: inner.y + inner.height.saturating_sub(3),
-                width: inner.width,
-                height: 3,
-            };
-
-            let desc_text = format!("  {}", selected_item.description);
-            let desc_para = Paragraph::new(desc_text)
-                .style(Style::default().fg(Color::Gray))
-                .alignment(Alignment::Left);
-            desc_para.render(desc_area, buf);
+            MenuEntry::Spacer => {}
         }
+    }
+    groups
+}
+
+// ── Widget ────────────────────────────────────────────────────────────────────
+
+impl Widget for &mut Menu {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        self.last_height = area.height;
+
+        let groups = build_groups(&self.entries);
+        let sel = self.selected;
+        let scroll = self.scroll_offset as i32;
+
+        let col_active = Color::Rgb(50, 170, 50);
+        let col_inactive = Color::Rgb(40, 65, 40);
+
+        let mut vy: i32 = 0;
+
+        for group in &groups {
+            let n = group.item_indices.len() as i32;
+            let group_h = 1 + 1 + n + 1 + 1; // header + top + items + bot + spacer
+
+            // skip groups entirely above the viewport
+            if vy + group_h <= scroll {
+                vy += group_h;
+                continue;
+            }
+            // stop once we're entirely below
+            if vy - scroll >= area.height as i32 {
+                break;
+            }
+
+            let is_active = group.item_indices.contains(&sel);
+            let bdr_color = if is_active { col_active } else { col_inactive };
+
+            // section header
+            let sy = vy - scroll;
+            if sy >= 0 && sy < area.height as i32 {
+                draw_section_header(
+                    group.title,
+                    area.x,
+                    area.y + sy as u16,
+                    area.width,
+                    buf,
+                    is_active,
+                );
+            }
+            vy += 1;
+
+            // top border
+            let sy = vy - scroll;
+            if sy >= 0 && sy < area.height as i32 {
+                draw_border_top(area.x, area.y + sy as u16, area.width, buf, bdr_color);
+            }
+            vy += 1;
+
+            // items
+            for &idx in &group.item_indices {
+                let sy = vy - scroll;
+                if sy >= 0 && sy < area.height as i32 {
+                    if let MenuEntry::Item { label, danger, .. } = &self.entries[idx] {
+                        draw_item(
+                            area.x,
+                            area.y + sy as u16,
+                            area.width,
+                            buf,
+                            label,
+                            idx == sel,
+                            *danger,
+                            bdr_color,
+                        );
+                    }
+                }
+                vy += 1;
+            }
+
+            // bottom border
+            let sy = vy - scroll;
+            if sy >= 0 && sy < area.height as i32 {
+                draw_border_bottom(area.x, area.y + sy as u16, area.width, buf, bdr_color);
+            }
+            vy += 1;
+
+            vy += 1; // spacer between cards
+        }
+    }
+}
+
+// ── Drawing helpers ───────────────────────────────────────────────────────────
+
+fn draw_section_header(title: &str, x: u16, y: u16, width: u16, buf: &mut Buffer, active: bool) {
+    let title_style = if active {
+        Style::default()
+            .fg(Color::Rgb(130, 210, 130))
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+            .fg(Color::Rgb(120, 120, 120))
+            .add_modifier(Modifier::BOLD)
+    };
+    let rule_style = if active {
+        Style::default().fg(Color::Rgb(45, 90, 45))
+    } else {
+        Style::default().fg(Color::Rgb(45, 45, 45))
+    };
+
+    let title_w = Span::raw(title).width();
+    buf.set_string(x, y, title, title_style);
+
+    let rule_x = x + title_w as u16 + 1;
+    if rule_x < x + width {
+        let rule = "\u{2500}".repeat((x + width - rule_x) as usize); // "─"
+        buf.set_string(rule_x, y, &rule, rule_style);
+    }
+}
+
+fn draw_border_top(x: u16, y: u16, width: u16, buf: &mut Buffer, color: Color) {
+    let style = Style::default().fg(color);
+    let inner = width.saturating_sub(2) as usize;
+    set_cell(buf, x, y, '\u{256d}', style); // ╭
+    for i in 0..inner {
+        set_cell(buf, x + 1 + i as u16, y, '\u{2500}', style); // ─
+    }
+    set_cell(buf, x + width - 1, y, '\u{256e}', style); // ╮
+}
+
+fn draw_border_bottom(x: u16, y: u16, width: u16, buf: &mut Buffer, color: Color) {
+    let style = Style::default().fg(color);
+    let inner = width.saturating_sub(2) as usize;
+    set_cell(buf, x, y, '\u{2570}', style); // ╰
+    for i in 0..inner {
+        set_cell(buf, x + 1 + i as u16, y, '\u{2500}', style); // ─
+    }
+    set_cell(buf, x + width - 1, y, '\u{256f}', style); // ╯
+}
+
+fn draw_item(
+    x: u16,
+    y: u16,
+    width: u16,
+    buf: &mut Buffer,
+    label: &str,
+    is_selected: bool,
+    is_danger: bool,
+    bdr_color: Color,
+) {
+    let inner_w = width.saturating_sub(2);
+    let bdr = Style::default().fg(bdr_color);
+
+    // Left border
+    set_cell(buf, x, y, '\u{2502}', bdr); // │
+
+    // Content style + prefix
+    let (prefix, style) = if is_selected {
+        let bg = if is_danger {
+            Color::Rgb(170, 70, 20)
+        } else {
+            Color::Rgb(50, 170, 50)
+        };
+        (
+            " \u{25b6} ", // ▶
+            Style::default()
+                .fg(Color::Rgb(10, 10, 10))
+                .bg(bg)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        let fg = if is_danger {
+            Color::Rgb(200, 110, 50)
+        } else {
+            Color::Rgb(210, 210, 210)
+        };
+        ("   ", Style::default().fg(fg))
+    };
+
+    // For selected rows: flood-fill the inner width with the highlight background
+    // so the row looks fully highlighted even past the text.
+    if is_selected {
+        let bg = if is_danger {
+            Color::Rgb(170, 70, 20)
+        } else {
+            Color::Rgb(50, 170, 50)
+        };
+        for col in 0..inner_w {
+            if let Some(cell) = buf.cell_mut((x + 1 + col, y)) {
+                cell.set_char(' ');
+                cell.set_bg(bg);
+                cell.set_fg(Color::Rgb(10, 10, 10));
+            }
+        }
+    }
+
+    // Write prefix + label over the filled background
+    let content = format!("{}{}", prefix, label);
+    buf.set_string(x + 1, y, &content, style);
+
+    // Right border — written last so it always wins
+    set_cell(buf, x + width - 1, y, '\u{2502}', bdr); // │
+}
+
+#[inline]
+fn set_cell(buf: &mut Buffer, x: u16, y: u16, ch: char, style: Style) {
+    if let Some(cell) = buf.cell_mut((x, y)) {
+        cell.set_char(ch);
+        cell.set_style(style);
+    }
+}
+
+// ── Entry list ────────────────────────────────────────────────────────────────
+
+fn item(
+    label: &'static str,
+    description: &'static str,
+    command: MenuCommand,
+    danger: bool,
+) -> MenuEntry {
+    MenuEntry::Item {
+        label,
+        description,
+        command,
+        danger,
+    }
+}
+fn adb(cmd: AdbCommand) -> MenuCommand {
+    MenuCommand::Adb(cmd)
+}
+fn fb(cmd: FastbootCommand) -> MenuCommand {
+    MenuCommand::Fastboot(cmd)
+}
+fn sh(command: &str) -> MenuCommand {
+    adb(AdbCommand::Shell {
+        command: command.into(),
+    })
+}
+
+fn build_entries() -> Vec<MenuEntry> {
+    vec![
+        // ── Device ──────────────────────────────────────────────────────────
+        MenuEntry::Section("DEVICE"),
+        item("📱  List Devices",
+             "Show all connected Android devices and their connection status",
+             adb(AdbCommand::ListDevices), false),
+        item("🔍  Device Model",
+             "Show device model, brand and product name",
+             sh("getprop | grep -E 'ro.product.model|ro.product.brand|ro.product.name'"), false),
+        item("🗒   Android Version",
+             "Show Android version, build ID and security patch level",
+             sh("getprop | grep -E 'ro.build.version|ro.build.id|ro.build.date'"), false),
+        item("🔢  ADB Version",
+             "Display the current ADB server version",
+             adb(AdbCommand::GetAdbVersion), false),
+        MenuEntry::Spacer,
+
+        // ── Packages ────────────────────────────────────────────────────────
+        MenuEntry::Section("PACKAGES"),
+        item("📦  All Packages",
+             "List every installed package — system and user",
+             adb(AdbCommand::ListPackages { include_path: false, filter: PackageFilter::All }), false),
+        item("👤  User Packages",
+             "List only third-party user-installed packages",
+             adb(AdbCommand::ListPackages { include_path: false, filter: PackageFilter::User }), false),
+        item("⚙   System Packages",
+             "List only built-in system packages",
+             adb(AdbCommand::ListPackages { include_path: false, filter: PackageFilter::System }), false),
+        item("📁  Packages with Paths",
+             "List all packages together with their APK file paths",
+             adb(AdbCommand::ListPackages { include_path: true,  filter: PackageFilter::All }), false),
+        MenuEntry::Spacer,
+
+        // ── System ──────────────────────────────────────────────────────────
+        MenuEntry::Section("SYSTEM"),
+        item("🔋  Battery Status",
+             "Show detailed battery info — level, health and temperature",
+             adb(AdbCommand::GetBatteryInfo), false),
+        item("💾  Memory Usage",
+             "Show total, available and used RAM",
+             adb(AdbCommand::GetMemoryInfo), false),
+        item("📊  CPU Info",
+             "Display CPU architecture, core count and clock frequency",
+             adb(AdbCommand::GetCpuInfo), false),
+        item("🏃  Running Processes",
+             "List all currently running processes",
+             adb(AdbCommand::ListProcesses), false),
+        item("📜  System Log",
+             "View the last 100 lines of the system log",
+             adb(AdbCommand::GetSystemLog { lines: 100 }), false),
+        item("🚨  Error Log",
+             "Show only error-level log entries",
+             sh("logcat -d *:E"), false),
+        item("🔧  System Services",
+             "List all registered Android system services",
+             sh("service list"), false),
+        item("🏷   Device Properties",
+             "Dump all Android system properties via getprop",
+             adb(AdbCommand::GetDeviceProperties), false),
+        MenuEntry::Spacer,
+
+        // ── Network ─────────────────────────────────────────────────────────
+        MenuEntry::Section("NETWORK"),
+        item("🌐  Network Status",
+             "Show network connectivity and interface status",
+             adb(AdbCommand::GetNetworkInfo), false),
+        item("📶  WiFi Info",
+             "Display WiFi interface name and signal info",
+             adb(AdbCommand::GetWifiStatus), false),
+        item("🔗  IP Configuration",
+             "Show IP addresses for all network interfaces",
+             sh("ip addr show"), false),
+        MenuEntry::Spacer,
+
+        // ── Root Toolkit ─────────────────────────────────────────────────────
+        MenuEntry::Section("ROOT TOOLKIT"),
+        item("🔐  Root Status",
+             "Check whether the device is rooted (requires ADB shell access)",
+             sh("su -c 'id' 2>/dev/null && echo '' && echo 'Device is ROOTED' || echo 'Device is NOT ROOTED'"), false),
+        item("🔒  SELinux Status",
+             "Check current SELinux enforcement mode (Enforcing / Permissive)",
+             sh("getenforce"), false),
+        item("🪄  Magisk Status",
+             "Check whether Magisk is installed and show version",
+             sh("magisk --version 2>/dev/null || (ls /data/adb/magisk 2>/dev/null && echo 'Magisk files present') || echo 'Magisk not found'"), false),
+        item("📋  Bootloader State",
+             "Check bootloader lock state and verified boot status",
+             sh("echo 'Verified boot:' && getprop ro.boot.verifiedbootstate; echo 'Secure:' && getprop ro.secure; echo 'Debuggable:' && getprop ro.debuggable"), false),
+        item("⚠   SELinux Permissive",
+             "Set SELinux to Permissive mode — reduces security. Requires root. ⚠ Dangerous",
+             sh("su -c 'setenforce 0 && echo OK && getenforce'"), true),
+        MenuEntry::Spacer,
+
+        // ── Bootloader & Flash ───────────────────────────────────────────────
+        MenuEntry::Section("BOOTLOADER & FLASH"),
+        item("🔃  Reboot to Recovery",
+             "Reboot device into recovery mode (e.g. TWRP) via ADB",
+             sh("reboot recovery"), false),
+        item("⚡  Reboot to Bootloader",
+             "Reboot device into fastboot / bootloader mode via ADB",
+             sh("reboot bootloader"), false),
+        item("ℹ   Device Info  [fastboot]",
+             "Retrieve all fastboot variables — requires device in bootloader mode",
+             fb(FastbootCommand::GetVarAll), false),
+        item("🔓  OEM Unlock  [fastboot]",
+             "Unlock the bootloader to enable flashing  ⚠ WIPES ALL DATA on the device",
+             fb(FastbootCommand::OemUnlock), true),
+        item("🔒  OEM Lock  [fastboot]",
+             "Re-lock the bootloader — device will verify boot integrity on startup",
+             fb(FastbootCommand::OemLock), true),
+        item("💣  Wipe Data  [fastboot]",
+             "Factory reset: erase userdata + cache partitions  ⚠ ALL DATA PERMANENTLY LOST",
+             fb(FastbootCommand::WipeData), true),
+        MenuEntry::Spacer,
+
+        // ── Actions ──────────────────────────────────────────────────────────
+        MenuEntry::Section("ACTIONS"),
+        item("📸  Take Screenshot",
+             "Capture the screen and save to /sdcard/screenshot.png on the device",
+             adb(AdbCommand::TakeScreenshot), false),
+        item("📐  Screen Resolution",
+             "Show physical screen size and pixel density",
+             adb(AdbCommand::GetScreenResolution), false),
+        item("🗑   Clear Logs",
+             "Flush the entire Android log buffer",
+             sh("logcat -c && echo 'Log buffer cleared'"), false),
+        item("🔄  Reboot Device",
+             "Reboot the connected device normally via ADB",
+             sh("reboot"), false),
+    ]
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_first_selected_is_item() {
+        let menu = Menu::new();
+        assert!(menu.entries[menu.selected].is_selectable());
+    }
+
+    #[test]
+    fn test_next_skips_non_items() {
+        let mut menu = Menu::new();
+        let start = menu.selected;
+        menu.next();
+        assert!(menu.entries[menu.selected].is_selectable());
+        assert_ne!(menu.selected, start);
+    }
+
+    #[test]
+    fn test_previous_wraps_to_last() {
+        let mut menu = Menu::new();
+        menu.previous();
+        assert!(menu.entries[menu.selected].is_selectable());
+    }
+
+    #[test]
+    fn test_next_wraps_to_first() {
+        let mut menu = Menu::new();
+        for _ in 0..200 {
+            menu.next();
+        }
+        menu.next();
+        assert!(menu.entries[menu.selected].is_selectable());
+    }
+
+    #[test]
+    fn test_get_selected_command_returns_list_devices() {
+        let menu = Menu::new();
+        assert!(matches!(
+            menu.get_selected_command(),
+            MenuCommand::Adb(AdbCommand::ListDevices)
+        ));
+    }
+
+    #[test]
+    fn test_get_selected_description_not_empty() {
+        let menu = Menu::new();
+        assert!(!menu.get_selected_description().is_empty());
+    }
+
+    #[test]
+    fn test_get_selected_label_not_empty() {
+        let menu = Menu::new();
+        assert!(!menu.get_selected_label().is_empty());
+    }
+
+    #[test]
+    fn test_all_items_have_non_empty_description() {
+        let entries = build_entries();
+        for entry in &entries {
+            if let MenuEntry::Item {
+                description, label, ..
+            } = entry
+            {
+                assert!(!description.is_empty(), "Empty description for: {}", label);
+            }
+        }
+    }
+
+    #[test]
+    fn test_build_groups_covers_all_items() {
+        let entries = build_entries();
+        let groups = build_groups(&entries);
+        let total_in_groups: usize = groups.iter().map(|g| g.item_indices.len()).sum();
+        let total_items = entries.iter().filter(|e| e.is_selectable()).count();
+        assert_eq!(total_in_groups, total_items);
+    }
+
+    #[test]
+    fn test_scroll_offset_adjusts_on_navigation() {
+        let mut menu = Menu::new();
+        menu.last_height = 10;
+        // Navigate far forward to trigger downward scroll
+        for _ in 0..30 {
+            menu.next();
+        }
+        assert!(menu.scroll_offset > 0, "scroll_offset should have advanced");
+    }
+
+    #[test]
+    fn test_next_section_moves_to_different_section() {
+        let mut menu = Menu::new();
+        // Start at first item (DEVICE section)
+        let initial = menu.selected;
+        menu.next_section();
+        // Should now be in a different section (first item of PACKAGES)
+        assert!(menu.entries[menu.selected].is_selectable());
+        assert_ne!(
+            menu.selected, initial,
+            "next_section should move to a new section"
+        );
+
+        let groups = build_groups(&menu.entries);
+        let initial_group = groups
+            .iter()
+            .position(|g| g.item_indices.contains(&initial))
+            .unwrap();
+        let new_group = groups
+            .iter()
+            .position(|g| g.item_indices.contains(&menu.selected))
+            .unwrap();
+        assert_ne!(
+            initial_group, new_group,
+            "should be in a different group after next_section"
+        );
+    }
+
+    #[test]
+    fn test_next_section_always_lands_on_first_item_of_section() {
+        let mut menu = Menu::new();
+        let groups = build_groups(&menu.entries);
+
+        for _ in 0..groups.len() {
+            menu.next_section();
+            let sel = menu.selected;
+            // The selected item must be the *first* item in its group
+            let group = groups
+                .iter()
+                .find(|g| g.item_indices.contains(&sel))
+                .unwrap();
+            assert_eq!(
+                group.item_indices[0], sel,
+                "next_section must land on the first item of the group"
+            );
+        }
+    }
+
+    #[test]
+    fn test_next_section_wraps_to_first_section() {
+        let mut menu = Menu::new();
+        let groups = build_groups(&menu.entries);
+        // Cycle through all sections — one more brings us back to the start
+        for _ in 0..groups.len() {
+            menu.next_section();
+        }
+        // After a full cycle we should be back at the first section's first item
+        let first_section_first_item = groups[0].item_indices[0];
+        assert_eq!(
+            menu.selected, first_section_first_item,
+            "next_section should wrap around"
+        );
+    }
+
+    #[test]
+    fn test_previous_section_moves_to_different_section() {
+        let mut menu = Menu::new();
+        let initial = menu.selected;
+        menu.previous_section();
+        assert!(menu.entries[menu.selected].is_selectable());
+        assert_ne!(
+            menu.selected, initial,
+            "previous_section should move to a new section"
+        );
+    }
+
+    #[test]
+    fn test_previous_section_wraps_to_last_section() {
+        let mut menu = Menu::new();
+        let groups = build_groups(&menu.entries);
+        // From the first section, going back should wrap to the last
+        menu.previous_section();
+        let last_section_first_item = groups.last().unwrap().item_indices[0];
+        assert_eq!(
+            menu.selected, last_section_first_item,
+            "previous_section from first should wrap to last"
+        );
+    }
+
+    #[test]
+    fn test_next_and_previous_section_are_inverse() {
+        let mut menu = Menu::new();
+        let start = menu.selected;
+        menu.next_section();
+        menu.previous_section();
+        assert_eq!(
+            menu.selected, start,
+            "next_section + previous_section should return to start"
+        );
     }
 }

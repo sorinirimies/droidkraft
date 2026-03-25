@@ -1,4 +1,6 @@
 use crate::adb::AdbCommand;
+use crate::fastboot::FastbootManager;
+use crate::menu::MenuCommand;
 use crate::message::{CommandResult, Message};
 use crate::model::{AppState, Model};
 
@@ -16,18 +18,38 @@ pub async fn update(model: &mut Model, message: Message) {
             model.menu.next();
         }
 
+        Message::SectionNext => {
+            model.menu.next_section();
+        }
+
+        Message::SectionPrev => {
+            model.menu.previous_section();
+        }
+
+        Message::RefreshDeviceInfo => {
+            let status = model.adb_manager.fetch_device_status();
+            model.device_status = status;
+        }
+
+        Message::NextDevice => {
+            model.device_status.cycle_next();
+            let status = model.adb_manager.fetch_device_status();
+            model.device_status = status;
+        }
+
         Message::EnterChild => {
-            model.menu.enter_child_mode();
+            // Flat menu has no child mode — trigger visual effects only
             model.effects.start_fade_in();
             model.effects.start_slide_in();
         }
 
         Message::ExitChild => {
-            model.menu.exit_child_mode();
+            // No-op: flat menu has no child mode
         }
 
         // Command execution
         Message::ExecuteCommand(command) => {
+            model.last_command_label = Some(model.menu.get_selected_label().to_string());
             model.state = AppState::Loading;
             model.clear_results();
             model.loading_counter = 0;
@@ -109,11 +131,14 @@ pub async fn update(model: &mut Model, message: Message) {
         Message::ReturnToMenu => {
             model.state = AppState::Menu;
             model.clear_results();
+            // Refresh device stats after every command so the dashboard stays current.
+            model.needs_device_refresh = true;
         }
 
         Message::SkipStartup => {
             model.state = AppState::Menu;
             model.effects.start_slide_in();
+            model.needs_device_refresh = true;
         }
     }
 }
@@ -143,13 +168,32 @@ async fn tick(model: &mut Model) {
     // Check if startup is complete
     if model.state == AppState::Startup && model.effects.is_startup_complete() {
         model.state = AppState::Menu;
+        model.needs_device_refresh = true;
+    }
+
+    // Auto-fetch device status once after transitioning to the Menu
+    if model.needs_device_refresh && model.state == AppState::Menu {
+        model.needs_device_refresh = false;
+        let status = model.adb_manager.fetch_device_status();
+        model.device_status = status;
     }
 }
 
-/// Execute an ADB command using the ADB manager
-async fn execute_adb_command(model: &mut Model, command: AdbCommand) -> CommandResult {
-    // Execute the command using the ADB manager
-    match model.adb_manager.execute(command) {
+/// Execute a command dispatched from the menu (ADB or fastboot).
+async fn execute_adb_command(model: &mut Model, command: MenuCommand) -> CommandResult {
+    // Dispatch fastboot commands to FastbootManager without ADB
+    let adb_command: AdbCommand = match command {
+        MenuCommand::Fastboot(cmd) => {
+            return match FastbootManager::new().execute(cmd) {
+                Ok(output) => CommandResult::Success(output),
+                Err(e) => CommandResult::Error(format!("{}", e)),
+            };
+        }
+        MenuCommand::Adb(cmd) => cmd,
+    };
+
+    // Execute the ADB command using the ADB manager
+    match model.adb_manager.execute(adb_command) {
         Ok(output) => CommandResult::Success(output),
         Err(e) => {
             let error_msg = format!("{}", e);
@@ -185,11 +229,13 @@ mod tests {
         let mut model = Model::new();
         model.state = AppState::Menu;
 
+        let initial = model.menu.selected;
         update(&mut model, Message::MenuDown).await;
-        assert_eq!(model.menu.selected, 1);
+        assert!(model.menu.selected > initial);
+        assert!(model.menu.entries[model.menu.selected].is_selectable());
 
         update(&mut model, Message::MenuUp).await;
-        assert_eq!(model.menu.selected, 0);
+        assert_eq!(model.menu.selected, initial);
     }
 
     #[tokio::test]
@@ -224,12 +270,11 @@ mod tests {
     async fn test_enter_exit_child_mode() {
         let mut model = Model::new();
         model.state = AppState::Menu;
-
+        // EnterChild/ExitChild are no-ops in the flat menu — verify no panic
+        // and that selection still points at a valid item afterwards.
         update(&mut model, Message::EnterChild).await;
-        assert!(model.menu.is_in_child_mode());
-
         update(&mut model, Message::ExitChild).await;
-        assert!(!model.menu.is_in_child_mode());
+        assert!(model.menu.entries[model.menu.selected].is_selectable());
     }
 
     #[tokio::test]
