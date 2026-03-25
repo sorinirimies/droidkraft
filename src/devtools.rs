@@ -183,11 +183,11 @@ pub enum DevFocus {
 
 impl DevToolsState {
     pub fn new() -> Self {
-        let project_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let has_gradle =
-            project_dir.join("gradlew").exists() || project_dir.join("gradlew.bat").exists();
+        let start_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let (gradle_root, has_gradle) = find_gradle_root(&start_dir);
+        let project_dir = gradle_root.unwrap_or_else(|| start_dir.clone());
 
-        let explorer = tui_file_explorer::FileExplorer::new(project_dir.clone(), vec![]);
+        let explorer = tui_file_explorer::FileExplorer::new(start_dir, vec![]);
 
         Self {
             project_dir: project_dir.clone(),
@@ -209,23 +209,21 @@ impl DevToolsState {
 
     /// Set the project directory and re-detect Gradle.
     pub fn set_project_dir(&mut self, dir: PathBuf) {
-        self.has_gradle = dir.join("gradlew").exists() || dir.join("gradlew.bat").exists();
-        self.project_dir = dir.clone();
+        let (gradle_root, has) = find_gradle_root(&dir);
+        self.has_gradle = has;
+        self.project_dir = gradle_root.unwrap_or_else(|| dir.clone());
         self.file_explorer = Some(tui_file_explorer::FileExplorer::new(dir, vec![]));
     }
 
-    /// Find the Gradle wrapper path.
+    /// Find the Gradle wrapper path by walking up from `project_dir`.
     fn gradle_wrapper(&self) -> Option<PathBuf> {
-        let wrapper = if cfg!(windows) {
-            self.project_dir.join("gradlew.bat")
-        } else {
-            self.project_dir.join("gradlew")
-        };
-        if wrapper.exists() {
-            Some(wrapper)
-        } else {
-            None
-        }
+        find_gradle_root(&self.project_dir).0.map(|root| {
+            if cfg!(windows) {
+                root.join("gradlew.bat")
+            } else {
+                root.join("gradlew")
+            }
+        })
     }
 
     /// Start a build in a background thread.
@@ -237,7 +235,8 @@ impl DevToolsState {
         let wrapper = match self.gradle_wrapper() {
             Some(w) => w,
             None => {
-                self.status_message = Some("No gradlew found in project directory".into());
+                self.status_message =
+                    Some("No gradlew found (searched all parent directories)".into());
                 return;
             }
         };
@@ -482,6 +481,21 @@ impl Default for DevToolsState {
     }
 }
 
+/// Walk up the directory tree from `start` looking for `gradlew` or
+/// `gradlew.bat`.  Returns `(Some(root_dir), true)` on success or
+/// `(None, false)` if neither is found all the way up to `/`.
+fn find_gradle_root(start: &std::path::Path) -> (Option<PathBuf>, bool) {
+    let mut dir = start.to_path_buf();
+    loop {
+        if dir.join("gradlew").exists() || dir.join("gradlew.bat").exists() {
+            return (Some(dir), true);
+        }
+        if !dir.pop() {
+            return (None, false);
+        }
+    }
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -522,6 +536,31 @@ mod tests {
         assert_eq!(state.editor, Editor::None);
         assert!(!state.editor_picker_open);
         assert!(state.file_explorer.is_some());
+    }
+
+    #[test]
+    fn test_find_gradle_root_walks_up() {
+        // Create a temp dir tree: root/sub/deep
+        let tmp = std::env::temp_dir().join("droidtui_test_gradle");
+        let sub = tmp.join("sub").join("deep");
+        let _ = std::fs::create_dir_all(&sub);
+        // Place a fake gradlew at root
+        let _ = std::fs::write(tmp.join("gradlew"), "#!/bin/sh\n");
+
+        let (found, has) = find_gradle_root(&sub);
+        assert!(has, "should find gradlew by walking up");
+        assert_eq!(found.unwrap(), tmp);
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_find_gradle_root_not_found() {
+        // A path that definitely doesn't have gradlew above it
+        let (found, has) = find_gradle_root(std::path::Path::new("/tmp/nonexistent_droidtui_xyz"));
+        assert!(!has);
+        assert!(found.is_none());
     }
 
     #[test]
