@@ -622,6 +622,8 @@ dependencies = [
  "ratatui 0.29.0",
  "ratatui-widgets 0.2.2",
  "regex",
+ "serde",
+ "serde_json",
  "tachyonfx",
  "tokio",
  "tui-file-explorer",

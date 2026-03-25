@@ -7,6 +7,7 @@
 use adb_client::ADBServerDevice;
 use ratatui::style::Color;
 use regex::Regex;
+use serde::Serialize;
 use std::collections::{BTreeSet, HashSet, VecDeque};
 use std::fmt;
 use std::io::{self, Write};
@@ -17,8 +18,38 @@ use std::sync::mpsc;
 // LogLevel
 // ---------------------------------------------------------------------------
 
+/// Format for saving log entries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SaveFormat {
+    /// Plain text — one raw logcat line per line.
+    Text,
+    /// JSON Lines — one JSON object per line.
+    Json,
+}
+
+impl SaveFormat {
+    pub fn cycle(&self) -> Self {
+        match self {
+            SaveFormat::Text => SaveFormat::Json,
+            SaveFormat::Json => SaveFormat::Text,
+        }
+    }
+    pub fn label(&self) -> &'static str {
+        match self {
+            SaveFormat::Text => "TXT",
+            SaveFormat::Json => "JSON",
+        }
+    }
+    pub fn extension(&self) -> &'static str {
+        match self {
+            SaveFormat::Text => "log",
+            SaveFormat::Json => "jsonl",
+        }
+    }
+}
+
 /// Represents Android logcat log levels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub enum LogLevel {
     Verbose,
     Debug,
@@ -145,7 +176,7 @@ fn is_continuation_line(msg: &str) -> bool {
 }
 
 /// A single parsed logcat entry.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct LogEntry {
     /// The original raw line from logcat.
     pub raw: String,
@@ -1199,12 +1230,12 @@ impl LogcatState {
     }
 
     /// Build a timestamped default filename for saving logs.
-    pub fn default_save_filename() -> String {
+    pub fn default_save_filename(format: SaveFormat) -> String {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        format!("logcat_{}.log", now)
+        format!("logcat_{}.{}", now, format.extension())
     }
 
     /// Toggle the paused state.
@@ -1251,6 +1282,38 @@ impl LogcatState {
         for &idx in &self.filtered_indices {
             if let Some(entry) = self.entries.get(idx) {
                 writeln!(writer, "{}", entry.raw)?;
+                count += 1;
+            }
+        }
+        writer.flush()?;
+        Ok(count)
+    }
+
+    /// Save all entries to a JSON file. Each entry is a JSON object on its own line (JSONL format).
+    pub fn save_to_json_file(&self, path: &std::path::Path) -> std::io::Result<usize> {
+        use std::io::BufWriter;
+        let file = std::fs::File::create(path)?;
+        let mut writer = BufWriter::new(file);
+        let mut count = 0;
+        for entry in &self.entries {
+            serde_json::to_writer(&mut writer, entry).map_err(std::io::Error::other)?;
+            writeln!(writer)?;
+            count += 1;
+        }
+        writer.flush()?;
+        Ok(count)
+    }
+
+    /// Save filtered entries to a JSON file (JSONL format).
+    pub fn save_filtered_to_json_file(&self, path: &std::path::Path) -> std::io::Result<usize> {
+        use std::io::BufWriter;
+        let file = std::fs::File::create(path)?;
+        let mut writer = BufWriter::new(file);
+        let mut count = 0;
+        for &idx in &self.filtered_indices {
+            if let Some(entry) = self.entries.get(idx) {
+                serde_json::to_writer(&mut writer, entry).map_err(std::io::Error::other)?;
+                writeln!(writer)?;
                 count += 1;
             }
         }
@@ -1499,6 +1562,82 @@ impl fmt::Debug for LogcatState {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+/// Try to detect and pretty-format JSON content within a log message.
+/// Returns `Some(formatted)` if valid JSON was found, `None` otherwise.
+pub fn try_format_json(message: &str) -> Option<String> {
+    let trimmed = message.trim();
+    // Check if the whole message is JSON
+    if (trimmed.starts_with('{') && trimmed.ends_with('}'))
+        || (trimmed.starts_with('[') && trimmed.ends_with(']'))
+    {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+            return serde_json::to_string_pretty(&value).ok();
+        }
+    }
+    // Check if there's an embedded JSON object (after a colon or equals)
+    for sep in [':', '='] {
+        if let Some(pos) = trimmed.find(sep) {
+            let after = trimmed[pos + 1..].trim();
+            if (after.starts_with('{') && after.ends_with('}'))
+                || (after.starts_with('[') && after.ends_with(']'))
+            {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(after) {
+                    let prefix = &trimmed[..pos + 1];
+                    if let Ok(formatted) = serde_json::to_string_pretty(&value) {
+                        return Some(format!("{} {}", prefix.trim(), formatted));
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Compute wrapped display lines for a log entry message.
+/// Returns a vec of line strings. The first line includes timestamp/pid/tag prefix;
+/// continuation lines are indented.
+pub fn wrap_entry_message(message: &str, max_width: usize, indent: usize) -> Vec<String> {
+    if max_width <= indent || message.is_empty() {
+        return vec![message.to_string()];
+    }
+
+    let first_width = max_width;
+    let cont_width = max_width.saturating_sub(indent);
+
+    let mut lines = Vec::new();
+    let mut remaining = message;
+    let mut is_first = true;
+
+    while !remaining.is_empty() {
+        let width = if is_first { first_width } else { cont_width };
+        if remaining.len() <= width {
+            if is_first {
+                lines.push(remaining.to_string());
+            } else {
+                lines.push(format!("{}{}", " ".repeat(indent), remaining));
+            }
+            break;
+        }
+
+        // Find a break point (prefer word boundary)
+        let break_at = remaining[..width].rfind(' ').unwrap_or(width);
+        let break_at = if break_at == 0 { width } else { break_at };
+
+        if is_first {
+            lines.push(remaining[..break_at].to_string());
+        } else {
+            lines.push(format!("{}{}", " ".repeat(indent), &remaining[..break_at]));
+        }
+        remaining = remaining[break_at..].trim_start();
+        is_first = false;
+    }
+
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
+}
 
 #[cfg(test)]
 #[allow(clippy::field_reassign_with_default)]
@@ -2363,5 +2502,58 @@ mod tests {
         assert!(state.bookmarks.is_empty());
         assert!(state.folded_groups.is_empty());
         assert!(!state.detail_open);
+    }
+
+    #[test]
+    fn test_try_format_json_valid_object() {
+        let result = try_format_json(r#"{"key": "value", "num": 42}"#);
+        assert!(result.is_some());
+        let formatted = result.unwrap();
+        assert!(formatted.contains("\"key\": \"value\""));
+        assert!(formatted.contains('\n')); // should be multi-line
+    }
+
+    #[test]
+    fn test_try_format_json_embedded() {
+        let result = try_format_json(r#"Response: {"status": 200}"#);
+        assert!(result.is_some());
+        assert!(result.unwrap().contains("\"status\": 200"));
+    }
+
+    #[test]
+    fn test_try_format_json_not_json() {
+        assert!(try_format_json("just a normal log message").is_none());
+        assert!(try_format_json("").is_none());
+    }
+
+    #[test]
+    fn test_save_format_cycle() {
+        let fmt = SaveFormat::Text;
+        assert_eq!(fmt.cycle(), SaveFormat::Json);
+        assert_eq!(fmt.cycle().cycle(), SaveFormat::Text);
+    }
+
+    #[test]
+    fn test_save_format_labels() {
+        assert_eq!(SaveFormat::Text.label(), "TXT");
+        assert_eq!(SaveFormat::Json.label(), "JSON");
+        assert_eq!(SaveFormat::Text.extension(), "log");
+        assert_eq!(SaveFormat::Json.extension(), "jsonl");
+    }
+
+    #[test]
+    fn test_wrap_entry_message_short() {
+        let lines = wrap_entry_message("short msg", 80, 4);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0], "short msg");
+    }
+
+    #[test]
+    fn test_wrap_entry_message_long() {
+        let msg = "a ".repeat(50); // 100 chars
+        let lines = wrap_entry_message(&msg, 40, 4);
+        assert!(lines.len() > 1);
+        // Continuation lines should be indented
+        assert!(lines[1].starts_with("    "));
     }
 }

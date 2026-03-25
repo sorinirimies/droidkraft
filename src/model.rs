@@ -86,6 +86,9 @@ pub struct Model {
     /// Whether to save only filtered entries (true) or all entries (false).
     pub logcat_save_filtered_only: bool,
 
+    /// Save format (TXT or JSON).
+    pub logcat_save_format: crate::logcat::SaveFormat,
+
     /// Current mode of the save dialog.
     pub logcat_save_mode: LogcatSaveMode,
 
@@ -149,6 +152,7 @@ impl Model {
             logcat_save_path: String::new(),
             logcat_save_cursor: 0,
             logcat_save_filtered_only: false,
+            logcat_save_format: crate::logcat::SaveFormat::Text,
             logcat_save_mode: LogcatSaveMode::PathInput,
             logcat_file_explorer: None,
             theme: Theme::default(),

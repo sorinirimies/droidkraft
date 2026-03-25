@@ -313,19 +313,35 @@ pub async fn update(model: &mut Model, message: Message) {
         Message::LogcatSave => {
             model.logcat_save_active = true;
             model.logcat_save_filtered_only = false;
-            model.logcat_save_path = "logcat_output.txt".to_string();
-            model.logcat_save_cursor = model.logcat_save_path.len();
+            let filename =
+                crate::logcat::LogcatState::default_save_filename(model.logcat_save_format);
+            model.logcat_save_path = filename;
+            model.logcat_save_cursor = model.logcat_save_path.chars().count();
         }
 
         Message::LogcatSaveFilteredOnly => {
             if model.logcat_save_active {
-                // Toggle filtered-only when already in save dialog
-                model.logcat_save_filtered_only = !model.logcat_save_filtered_only;
+                // Cycle: TXT all → TXT filtered → JSON all → JSON filtered
+                if model.logcat_save_filtered_only {
+                    // Was filtered, switch to next format, all
+                    model.logcat_save_filtered_only = false;
+                    model.logcat_save_format = model.logcat_save_format.cycle();
+                } else {
+                    // Was all, switch to filtered same format
+                    model.logcat_save_filtered_only = true;
+                }
+                // Update filename extension
+                let filename =
+                    crate::logcat::LogcatState::default_save_filename(model.logcat_save_format);
+                model.logcat_save_path = filename;
+                model.logcat_save_cursor = model.logcat_save_path.chars().count();
             } else {
                 model.logcat_save_active = true;
                 model.logcat_save_filtered_only = true;
-                model.logcat_save_path = "logcat_filtered.txt".to_string();
-                model.logcat_save_cursor = model.logcat_save_path.len();
+                let filename =
+                    crate::logcat::LogcatState::default_save_filename(model.logcat_save_format);
+                model.logcat_save_path = filename;
+                model.logcat_save_cursor = model.logcat_save_path.chars().count();
             }
         }
 
@@ -346,10 +362,15 @@ pub async fn update(model: &mut Model, message: Message) {
         Message::LogcatFileSaved(path_str) => {
             model.logcat_save_active = false;
             let path = std::path::PathBuf::from(&path_str);
-            let result = if model.logcat_save_filtered_only {
-                model.logcat.save_filtered_to_file(&path)
-            } else {
-                model.logcat.save_to_file(&path)
+            let result = match (model.logcat_save_filtered_only, model.logcat_save_format) {
+                (true, crate::logcat::SaveFormat::Json) => {
+                    model.logcat.save_filtered_to_json_file(&path)
+                }
+                (false, crate::logcat::SaveFormat::Json) => model.logcat.save_to_json_file(&path),
+                (true, crate::logcat::SaveFormat::Text) => {
+                    model.logcat.save_filtered_to_file(&path)
+                }
+                (false, crate::logcat::SaveFormat::Text) => model.logcat.save_to_file(&path),
             };
             match result {
                 Ok(count) => {
@@ -358,10 +379,12 @@ pub async fn update(model: &mut Model, message: Message) {
                     } else {
                         "all"
                     };
+                    let fmt = model.logcat_save_format.label();
                     model.logcat.status_message = Some(format!(
-                        "\u{2705} Saved {} {} entries to {}",
+                        "\u{2705} Saved {} {} entries as {} to {}",
                         count,
                         kind,
+                        fmt,
                         path.display()
                     ));
                 }
@@ -572,7 +595,9 @@ pub async fn update(model: &mut Model, message: Message) {
                     }
                     KeyCode::Char('S') => {
                         // "Save Here" — save into the current directory
-                        let filename = crate::logcat::LogcatState::default_save_filename();
+                        let filename = crate::logcat::LogcatState::default_save_filename(
+                            crate::logcat::SaveFormat::Text,
+                        );
                         let save_path = explorer.current_dir.join(filename);
                         tui_file_explorer::ExplorerOutcome::Selected(save_path)
                     }

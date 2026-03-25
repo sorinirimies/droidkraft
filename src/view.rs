@@ -891,6 +891,51 @@ fn render_logcat_filter_bar(state: &LogcatState, area: Rect, buf: &mut Buffer) {
 
 // ── Logcat log lines ──────────────────────────────────────────────────────────
 
+fn highlight_search_spans(text: &str, search_lower: &str, base_color: Color) -> Vec<Span<'static>> {
+    if search_lower.is_empty() {
+        return vec![Span::styled(
+            text.to_string(),
+            Style::default().fg(base_color),
+        )];
+    }
+    let text_lower = text.to_lowercase();
+    let mut spans = Vec::new();
+    let mut last_end = 0;
+    let mut search_start = 0;
+    while let Some(pos) = text_lower[search_start..].find(search_lower) {
+        let abs_pos = search_start + pos;
+        if abs_pos > last_end {
+            spans.push(Span::styled(
+                text[last_end..abs_pos].to_string(),
+                Style::default().fg(base_color),
+            ));
+        }
+        let match_end = abs_pos + search_lower.len();
+        spans.push(Span::styled(
+            text[abs_pos..match_end].to_string(),
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Rgb(255, 200, 50))
+                .add_modifier(Modifier::BOLD),
+        ));
+        last_end = match_end;
+        search_start = match_end;
+    }
+    if last_end < text.len() {
+        spans.push(Span::styled(
+            text[last_end..].to_string(),
+            Style::default().fg(base_color),
+        ));
+    }
+    if spans.is_empty() {
+        spans.push(Span::styled(
+            text.to_string(),
+            Style::default().fg(base_color),
+        ));
+    }
+    spans
+}
+
 fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
     let border_color = if state.is_streaming && !state.paused {
         Color::Rgb(35, 70, 35)
@@ -936,9 +981,10 @@ fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
     let search_lower = state.filter.search_query.to_lowercase();
     let has_search = !search_lower.is_empty();
 
-    for (row, &idx) in indices.iter().enumerate() {
-        let y = inner.y + row as u16;
-        if y >= inner.y + inner.height {
+    let mut display_row: u16 = 0;
+
+    for (entry_pos, &idx) in indices.iter().enumerate() {
+        if display_row >= inner.height {
             break;
         }
 
@@ -951,7 +997,7 @@ fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
             let filtered_pos = if state.auto_scroll {
                 let total = state.filtered_indices.len();
                 let start = total.saturating_sub(visible_height);
-                start + row
+                start + entry_pos
             } else {
                 state.scroll_position.min(
                     state
@@ -959,30 +1005,16 @@ fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
                         .len()
                         .saturating_sub(visible_height)
                         .max(0),
-                ) + row
+                ) + entry_pos
             };
             filtered_pos == state.selected_line
         };
-        if is_selected {
-            for x in inner.x..inner.x + inner.width {
-                if let Some(cell) = buf.cell_mut((x, y)) {
-                    cell.set_bg(Color::Rgb(30, 40, 50));
-                }
-            }
-        }
+
+        let is_bm = state.is_bookmarked(idx);
 
         // Build spans for this line
         let mut spans: Vec<Span<'static>> = Vec::with_capacity(8);
         let mut used_width: usize = 0;
-
-        // Bookmark indicator
-        let is_bm = state.is_bookmarked(idx);
-        if is_bm {
-            if let Some(cell) = buf.cell_mut((inner.x, y)) {
-                cell.set_char('●');
-                cell.set_fg(Color::Rgb(255, 200, 50));
-            }
-        }
 
         if !state.compact {
             // Timestamp (dimmed)
@@ -1066,60 +1098,116 @@ fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
             entry.message.clone()
         };
 
-        // Message (truncated to fit, with search highlight)
-        let remaining = max_width.saturating_sub(used_width);
-        let msg = if msg_to_display.len() > remaining {
-            format!("{}…", &msg_to_display[..remaining.saturating_sub(1)])
-        } else {
-            msg_to_display
-        };
+        if state.word_wrap {
+            // ── Soft-wrap mode ──────────────────────────────────────────
+            let remaining_width = max_width.saturating_sub(used_width);
+            let wrapped =
+                crate::logcat::wrap_entry_message(&msg_to_display, remaining_width, used_width);
+            let first_y = inner.y + display_row;
 
-        if has_search {
-            // Highlight search matches in the message
-            let msg_lower = msg.to_lowercase();
-            let mut last_end = 0;
-            let mut search_start = 0;
-            while let Some(pos) = msg_lower[search_start..].find(&search_lower) {
-                let abs_pos = search_start + pos;
-                // Text before match
-                if abs_pos > last_end {
-                    spans.push(Span::styled(
-                        msg[last_end..abs_pos].to_string(),
-                        Style::default().fg(level_color),
-                    ));
+            for (wrap_idx, wrap_line) in wrapped.iter().enumerate() {
+                if display_row >= inner.height {
+                    break;
                 }
-                // Highlighted match
-                let match_end = abs_pos + search_lower.len();
-                spans.push(Span::styled(
-                    msg[abs_pos..match_end].to_string(),
-                    Style::default()
-                        .fg(Color::Black)
-                        .bg(Color::Rgb(255, 200, 50))
-                        .add_modifier(Modifier::BOLD),
-                ));
-                last_end = match_end;
-                search_start = match_end;
+                let y = inner.y + display_row;
+
+                // Selected background for all wrapped rows of this entry
+                if is_selected {
+                    for x in inner.x..inner.x + inner.width {
+                        if let Some(cell) = buf.cell_mut((x, y)) {
+                            cell.set_bg(Color::Rgb(30, 40, 50));
+                        }
+                    }
+                }
+
+                if wrap_idx == 0 {
+                    // First line: prefix spans + first message chunk
+                    let mut line_spans = spans.clone();
+                    line_spans.extend(highlight_search_spans(
+                        wrap_line,
+                        &search_lower,
+                        level_color,
+                    ));
+                    let line = Line::from(line_spans);
+                    Paragraph::new(line).render(
+                        Rect {
+                            x: inner.x,
+                            y,
+                            width: inner.width,
+                            height: 1,
+                        },
+                        buf,
+                    );
+                } else {
+                    // Continuation line: indented message (indent baked into wrap_line)
+                    let cont_spans = highlight_search_spans(wrap_line, &search_lower, level_color);
+                    let line = Line::from(cont_spans);
+                    Paragraph::new(line).render(
+                        Rect {
+                            x: inner.x,
+                            y,
+                            width: inner.width,
+                            height: 1,
+                        },
+                        buf,
+                    );
+                }
+
+                display_row += 1;
             }
-            // Remaining text after last match
-            if last_end < msg.len() {
-                spans.push(Span::styled(
-                    msg[last_end..].to_string(),
-                    Style::default().fg(level_color),
-                ));
+
+            // Bookmark on first row of the entry
+            if is_bm {
+                if let Some(cell) = buf.cell_mut((inner.x, first_y)) {
+                    cell.set_char('●');
+                    cell.set_fg(Color::Rgb(255, 200, 50));
+                }
             }
         } else {
-            spans.push(Span::styled(msg, Style::default().fg(level_color)));
-        }
+            // ── Single-line mode (no wrap) ──────────────────────────────
+            let y = inner.y + display_row;
 
-        // Render the line
-        let line = Line::from(spans);
-        let line_area = Rect {
-            x: inner.x,
-            y,
-            width: inner.width,
-            height: 1,
-        };
-        Paragraph::new(line).render(line_area, buf);
+            if is_selected {
+                for x in inner.x..inner.x + inner.width {
+                    if let Some(cell) = buf.cell_mut((x, y)) {
+                        cell.set_bg(Color::Rgb(30, 40, 50));
+                    }
+                }
+            }
+
+            if is_bm {
+                if let Some(cell) = buf.cell_mut((inner.x, y)) {
+                    cell.set_char('●');
+                    cell.set_fg(Color::Rgb(255, 200, 50));
+                }
+            }
+
+            // Message (truncated to fit, with search highlight)
+            let remaining = max_width.saturating_sub(used_width);
+            let msg = if msg_to_display.len() > remaining {
+                format!("{}…", &msg_to_display[..remaining.saturating_sub(1)])
+            } else {
+                msg_to_display
+            };
+
+            if has_search {
+                spans.extend(highlight_search_spans(&msg, &search_lower, level_color));
+            } else {
+                spans.push(Span::styled(msg, Style::default().fg(level_color)));
+            }
+
+            // Render the line
+            let line = Line::from(spans);
+            let line_area = Rect {
+                x: inner.x,
+                y,
+                width: inner.width,
+                height: 1,
+            };
+            Paragraph::new(line).render(line_area, buf);
+
+            display_row += 1;
+        }
     }
 
     // ── Scrollbar ─────────────────────────────────────────────────────────
@@ -1393,16 +1481,46 @@ fn render_logcat_detail(state: &LogcatState, area: Rect, buf: &mut Buffer) {
         Style::default().fg(Color::Rgb(100, 100, 120)),
     )));
 
-    // Word-wrap the message to fit popup width
+    // Try to format as JSON, otherwise use raw message
+    let display_msg = if let Some(formatted) = crate::logcat::try_format_json(&entry.message) {
+        formatted
+    } else {
+        entry.message.clone()
+    };
+
+    lines.push(Line::from(""));
+
     let max_w = popup.width.saturating_sub(4) as usize;
-    let msg = &entry.message;
-    for chunk_start in (0..msg.len()).step_by(max_w.max(1)) {
-        let chunk_end = (chunk_start + max_w).min(msg.len());
-        let chunk = &msg[chunk_start..chunk_end];
-        lines.push(Line::from(Span::styled(
-            format!("  {}", chunk),
-            Style::default().fg(entry.level.color()),
-        )));
+    for msg_line in display_msg.lines() {
+        // Determine color based on JSON syntax
+        let trimmed = msg_line.trim();
+        let line_color = if trimmed.starts_with('"') && msg_line.contains(':') {
+            Color::Rgb(130, 180, 255) // JSON key
+        } else if trimmed.starts_with('"') {
+            Color::Rgb(180, 220, 140) // JSON string value
+        } else if trimmed.starts_with('{')
+            || trimmed.starts_with('}')
+            || trimmed.starts_with('[')
+            || trimmed.starts_with(']')
+        {
+            Color::Rgb(180, 180, 180) // JSON brackets
+        } else {
+            entry.level.color() // Regular text
+        };
+
+        if msg_line.is_empty() {
+            lines.push(Line::from(""));
+        } else {
+            // Wrap long lines to fit popup width
+            for chunk_start in (0..msg_line.len()).step_by(max_w.max(1)) {
+                let chunk_end = (chunk_start + max_w).min(msg_line.len());
+                let chunk = &msg_line[chunk_start..chunk_end];
+                lines.push(Line::from(Span::styled(
+                    format!("  {}", chunk),
+                    Style::default().fg(line_color),
+                )));
+            }
+        }
     }
 
     lines.push(Line::from(""));
@@ -1486,7 +1604,15 @@ fn render_save_path_input(model: &Model, area: Rect, buf: &mut Buffer, bg: Color
         model.logcat.total_count()
     };
 
-    let title = format!("  \u{1f4be}  Save {} entries ({})  ", count, kind);
+    let fmt_label = if model.logcat_save_format == crate::logcat::SaveFormat::Json {
+        "JSON"
+    } else {
+        "TXT"
+    };
+    let title = format!(
+        "  \u{1f4be}  Save {} entries ({}) [{}]  ",
+        count, kind, fmt_label
+    );
 
     // Build the path input with cursor
     let path = &model.logcat_save_path;
@@ -1499,11 +1625,15 @@ fn render_save_path_input(model: &Model, area: Rect, buf: &mut Buffer, bg: Color
     let (before, after) = path.split_at(byte_idx);
     let path_display = format!("{}▏{}", before, after);
 
-    let toggle_hint = if model.logcat_save_filtered_only {
-        "Tab \u{2192} save all"
-    } else {
-        "Tab \u{2192} save filtered only"
-    };
+    let toggle_hint = format!(
+        "Tab → cycle: {} {} → next",
+        fmt_label,
+        if model.logcat_save_filtered_only {
+            "filtered"
+        } else {
+            "all"
+        }
+    );
 
     let lines: Vec<Line<'static>> = vec![
         Line::from(""),
@@ -1518,7 +1648,7 @@ fn render_save_path_input(model: &Model, area: Rect, buf: &mut Buffer, bg: Color
         ]),
         Line::from(""),
         Line::from(Span::styled(
-            format!("  {}", toggle_hint),
+            format!("  {}", &toggle_hint),
             Style::default().fg(Color::Rgb(120, 120, 140)),
         )),
         Line::from(""),

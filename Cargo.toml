@@ -32,3 +32,5 @@ ratatui-widgets = "0.2.2"
 adb_client = "2.1.17"
 tui-file-explorer = { version = "0.8.8", default-features = false }
 regex = "1"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
