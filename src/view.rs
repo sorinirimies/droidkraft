@@ -2683,14 +2683,11 @@ fn render_theme_selector(model: &Model, area: Rect, buf: &mut Buffer) {
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(Span::styled(
-            format!(
-                "  {}",
-                if active_desc.len() > inner.width as usize - 4 {
-                    &active_desc[..inner.width as usize - 4]
-                } else {
-                    active_desc
-                }
-            ),
+            {
+                let max_chars = inner.width as usize - 4;
+                let truncated: String = active_desc.chars().take(max_chars).collect();
+                format!("  {}", truncated)
+            },
             Style::default().fg(Color::Rgb(100, 100, 120)),
         )),
     ];
