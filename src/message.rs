@@ -76,6 +76,12 @@ pub enum Message {
     LogcatSelectDown,
     CloseLogcat,
 
+    // Theme messages
+    ToggleThemeSelector,
+    ThemeNext,
+    ThemePrev,
+    ThemeApply,
+
     // Application lifecycle
     Tick,
     Quit,

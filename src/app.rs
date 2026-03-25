@@ -79,6 +79,22 @@ impl App {
 
     /// Map keyboard input to messages based on current state
     fn key_to_message(&self, key: KeyCode) -> Option<Message> {
+        // ── Global: theme selector ──────────────────────────────────────
+        if self.model.theme_selector.open {
+            return match key {
+                KeyCode::Esc | KeyCode::Char('q') => Some(Message::ToggleThemeSelector),
+                KeyCode::Up | KeyCode::Char('k') => Some(Message::ThemePrev),
+                KeyCode::Down | KeyCode::Char('j') => Some(Message::ThemeNext),
+                KeyCode::Char('t') => Some(Message::ThemeNext),
+                KeyCode::Enter => Some(Message::ThemeApply),
+                _ => None,
+            };
+        }
+        // Shift+T opens theme selector from any state
+        if key == KeyCode::Char('T') {
+            return Some(Message::ToggleThemeSelector);
+        }
+
         match self.model.state {
             AppState::Startup => Some(Message::SkipStartup),
 
@@ -197,7 +213,7 @@ impl App {
                         KeyCode::Char('c') => Some(Message::LogcatClear),
                         KeyCode::Char('l') => Some(Message::LogcatCycleLevel),
                         KeyCode::Char('w') => Some(Message::LogcatToggleWordWrap),
-                        KeyCode::Char('/') => Some(Message::LogcatToggleSearch),
+                        KeyCode::Char('F') => Some(Message::LogcatToggleSearch),
                         KeyCode::Char('t') => Some(Message::LogcatToggleTagFilter),
                         KeyCode::Char('p') => Some(Message::LogcatTogglePackageFilter),
                         KeyCode::Char('s') => Some(Message::LogcatSave),

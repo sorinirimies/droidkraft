@@ -12,5 +12,6 @@ pub mod logcat;
 pub mod menu;
 pub mod message;
 pub mod model;
+pub mod theme;
 pub mod update;
 pub mod view;

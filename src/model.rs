@@ -3,6 +3,7 @@ use crate::effects::EffectsManager;
 use crate::fastboot::FastbootManager;
 use crate::logcat::LogcatState;
 use crate::menu::{Menu, MenuCommand};
+use crate::theme::{Theme, ThemeSelector};
 
 use std::time::Instant;
 
@@ -90,6 +91,11 @@ pub struct Model {
 
     /// File explorer for "Save As…" browsing.
     pub logcat_file_explorer: Option<tui_file_explorer::FileExplorer>,
+
+    /// Current active colour theme.
+    pub theme: Theme,
+    /// Theme selector overlay state.
+    pub theme_selector: ThemeSelector,
 }
 
 /// Application states
@@ -145,6 +151,8 @@ impl Model {
             logcat_save_filtered_only: false,
             logcat_save_mode: LogcatSaveMode::PathInput,
             logcat_file_explorer: None,
+            theme: Theme::default(),
+            theme_selector: ThemeSelector::default(),
         }
     }
 

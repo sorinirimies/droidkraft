@@ -620,6 +620,24 @@ pub async fn update(model: &mut Model, message: Message) {
             }
         }
 
+        // ── Theme ─────────────────────────────────────────────────────────
+        Message::ToggleThemeSelector => {
+            model.theme_selector.toggle();
+        }
+
+        Message::ThemeNext => {
+            model.theme_selector.next();
+        }
+
+        Message::ThemePrev => {
+            model.theme_selector.prev();
+        }
+
+        Message::ThemeApply => {
+            let theme = model.theme_selector.apply();
+            model.theme = theme;
+        }
+
         // Application lifecycle
         Message::Tick => {
             tick(model).await;

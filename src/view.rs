@@ -22,6 +22,7 @@ use crate::adb::DeviceStatus;
 use crate::effects::{get_loading_spinner, RevealWidget};
 use crate::logcat::{tag_color, FilterField, LogcatState};
 use crate::model::{AppState, Model};
+use crate::theme::Theme;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -39,6 +40,11 @@ pub fn render(model: &mut Model, area: Rect, buf: &mut Buffer) {
         AppState::Loading => render_loading(model, area, buf),
         AppState::ShowResult => render_result(model, area, buf),
         AppState::Logcat => render_logcat(model, area, buf),
+    }
+
+    // ── Global overlays ───────────────────────────────────────────────
+    if model.theme_selector.open {
+        render_theme_selector(model, area, buf);
     }
 }
 
@@ -132,7 +138,7 @@ fn render_menu(model: &mut Model, area: Rect, buf: &mut Buffer) {
 
     // ── Footer ────────────────────────────────────────────────────────────────
     Paragraph::new(
-        "  \u{2191}/\u{2193} j/k Navigate  Tab/S-Tab Section  Enter Execute  L Logcat  d Device  r Refresh  q Quit  ",
+        "  \u{2191}/\u{2193} j/k Navigate  Tab/S-Tab Section  Enter Execute  L Logcat  T Theme  d Device  r Refresh  q Quit  ",
     )
     .block(
         Block::bordered()
@@ -597,6 +603,7 @@ fn render_scrollbar(
 // ── Logcat view ───────────────────────────────────────────────────────────────
 
 fn render_logcat(model: &mut Model, area: Rect, buf: &mut Buffer) {
+    let theme = model.theme.clone();
     let state = &mut model.logcat;
 
     // ── Layout ────────────────────────────────────────────────────────────
@@ -623,7 +630,7 @@ fn render_logcat(model: &mut Model, area: Rect, buf: &mut Buffer) {
 
     render_logcat_filter_bar(state, filter_area, buf);
     render_logcat_lines(state, log_area, buf);
-    render_logcat_footer(state, footer_area, buf);
+    render_logcat_footer(state, &theme, footer_area, buf);
 
     // ── Save dialog overlay ───────────────────────────────────────────────
     if model.logcat_save_active {
@@ -1158,54 +1165,162 @@ fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
 
 // ── Logcat footer ─────────────────────────────────────────────────────────────
 
-fn render_logcat_footer(state: &LogcatState, area: Rect, buf: &mut Buffer) {
+fn render_logcat_footer(state: &LogcatState, theme: &Theme, area: Rect, buf: &mut Buffer) {
     let editing = state.filter.active_field != FilterField::None;
 
-    let help_text = if editing {
-        "  Type to filter  \u{00b7}  Esc/Enter confirm  ".to_string()
-    } else {
-        let wrap_icon = if state.word_wrap { "W\u{0332}" } else { "w" };
-        let compact_icon = if state.compact { "X\u{0332}" } else { "x" };
-        format!(
-            "  /Srch  eExcl  tTag  pPID  lLvl  {}Wrap  {}Cmpct  rRegex  Enter Detail  sSave  q Close  ",
-            wrap_icon, compact_icon
-        )
-    };
-
-    // Status message bar (if present)
-    let status = state.status_message.as_deref().unwrap_or("");
-    let status_color = if status.starts_with('\u{2705}') {
-        Color::Rgb(80, 200, 80)
-    } else if status.starts_with('\u{274c}') || status.contains("ERROR") {
-        Color::Rgb(220, 60, 60)
-    } else {
-        Color::Rgb(160, 160, 80)
-    };
-
-    let content = if status.is_empty() {
-        vec![Line::from(Span::styled(
-            help_text,
-            Style::default().fg(Color::Rgb(100, 100, 120)),
-        ))]
-    } else {
-        vec![Line::from(vec![
-            Span::styled(format!("  {}  ", status), Style::default().fg(status_color)),
-            Span::styled("\u{00b7}  ", Style::default().fg(Color::Rgb(60, 60, 60))),
+    if editing {
+        // Simple editing hint bar
+        let content = Line::from(vec![
+            Span::styled("  Type to filter  ", Style::default().fg(theme.fg)),
+            Span::styled("·  ", Style::default().fg(theme.border)),
             Span::styled(
-                help_text.trim().to_string(),
-                Style::default().fg(Color::Rgb(80, 80, 100)),
+                "Esc",
+                Style::default()
+                    .fg(theme.key_hint)
+                    .add_modifier(Modifier::BOLD),
             ),
-        ])]
-    };
+            Span::styled("/", Style::default().fg(theme.dim)),
+            Span::styled(
+                "Enter",
+                Style::default()
+                    .fg(theme.key_hint)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" confirm", Style::default().fg(theme.dim)),
+        ]);
+        Paragraph::new(content)
+            .block(
+                Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(theme.border)),
+            )
+            .alignment(Alignment::Center)
+            .render(area, buf);
+        return;
+    }
 
-    Paragraph::new(content)
+    // Split footer into two bordered sections like tui-file-explorer
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(62), // Navigate + Filters
+            Constraint::Percentage(38), // Actions
+        ])
+        .split(area);
+
+    // Helper to build a key hint span pair: highlighted key + dimmed label
+    fn kh<'a>(key: &'a str, label: &'a str, key_color: Color, dim_color: Color) -> Vec<Span<'a>> {
+        vec![
+            Span::styled(
+                key,
+                Style::default().fg(key_color).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(format!(" {}  ", label), Style::default().fg(dim_color)),
+        ]
+    }
+
+    // ── Left group: Navigate + Filters ────────────────────────────────────
+    let mut left_spans: Vec<Span<'static>> = Vec::new();
+    left_spans.push(Span::raw(" "));
+    // Navigation
+    left_spans.extend(
+        kh("↑/k", "up", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left_spans.extend(
+        kh("↓/j", "down", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left_spans.push(Span::styled("│ ", Style::default().fg(theme.border)));
+    // Filters
+    left_spans.extend(
+        kh("F", "find", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left_spans.extend(
+        kh("e", "excl", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left_spans.extend(
+        kh("t", "tag", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left_spans.extend(
+        kh("p", "pid", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left_spans.extend(
+        kh("l", "level", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left_spans.extend(
+        kh("r", "regex", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+
+    let left_line = Line::from(left_spans);
+    Paragraph::new(left_line)
         .block(
             Block::bordered()
+                .title(" Navigate ")
+                .title_style(Style::default().fg(theme.dim))
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::Rgb(50, 50, 70))),
+                .border_style(Style::default().fg(theme.border)),
         )
-        .alignment(Alignment::Center)
-        .render(area, buf);
+        .render(cols[0], buf);
+
+    // ── Right group: Actions ──────────────────────────────────────────────
+    let mut right_spans: Vec<Span<'static>> = Vec::new();
+    right_spans.push(Span::raw(" "));
+    right_spans.extend(
+        kh("y", "copy", theme.accent, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    right_spans.extend(
+        kh("s", "save", theme.accent, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    right_spans.extend(
+        kh("m", "mark", theme.accent, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    right_spans.extend(
+        kh("f", "fold", theme.accent, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    right_spans.extend(
+        kh("x", "cmpct", theme.accent, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    right_spans.extend(
+        kh("Esc", "close", theme.error, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+
+    let right_line = Line::from(right_spans);
+    Paragraph::new(right_line)
+        .block(
+            Block::bordered()
+                .title(" Actions ")
+                .title_style(Style::default().fg(theme.dim))
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(theme.border)),
+        )
+        .render(cols[1], buf);
 }
 
 // ── Logcat line detail popup ──────────────────────────────────────────────────
@@ -1674,6 +1789,172 @@ fn format_file_size(bytes: u64) -> String {
     } else {
         format!("{}B", bytes)
     }
+}
+
+// ── Theme selector overlay ────────────────────────────────────────────────────
+
+/// Render the theme selector overlay panel (right side).
+fn render_theme_selector(model: &Model, area: Rect, buf: &mut Buffer) {
+    let sel = &model.theme_selector;
+    let presets = crate::theme::Theme::all_presets();
+
+    // Panel on the right side, about 30 chars wide
+    let panel_width = 32.min(area.width);
+    let panel = Rect {
+        x: area.x + area.width - panel_width,
+        y: area.y,
+        width: panel_width,
+        height: area.height,
+    };
+
+    // Solid background
+    let bg = Color::Rgb(20, 22, 28);
+    for y in panel.top()..panel.bottom() {
+        for x in panel.left()..panel.right() {
+            if let Some(cell) = buf.cell_mut((x, y)) {
+                cell.set_char(' ');
+                cell.set_bg(bg);
+            }
+        }
+    }
+
+    let block = Block::bordered()
+        .title("  🎨  Themes  ")
+        .title_alignment(Alignment::Left)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Rgb(100, 100, 140)));
+    let inner = block.inner(panel);
+    block.render(panel, buf);
+
+    if inner.height < 3 {
+        return;
+    }
+
+    // Header hints
+    let header = Line::from(vec![
+        Span::styled(
+            "  ↑ ",
+            Style::default()
+                .fg(Color::Rgb(130, 180, 255))
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            "↓ prev/next  ",
+            Style::default().fg(Color::Rgb(100, 100, 120)),
+        ),
+        Span::styled(
+            "Enter ",
+            Style::default()
+                .fg(Color::Rgb(130, 180, 255))
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("apply", Style::default().fg(Color::Rgb(100, 100, 120))),
+    ]);
+    let header_area = Rect { height: 1, ..inner };
+    Paragraph::new(header).render(header_area, buf);
+
+    // List area
+    let list_area = Rect {
+        y: inner.y + 2,
+        height: inner.height.saturating_sub(4),
+        ..inner
+    };
+
+    // Compute scroll
+    let visible = list_area.height as usize;
+    let scroll = if sel.cursor >= visible {
+        sel.cursor - visible + 1
+    } else {
+        0
+    };
+
+    for (row, idx) in (scroll..presets.len()).take(visible).enumerate() {
+        let (name, _desc, _theme) = &presets[idx];
+        let is_cursor = idx == sel.cursor;
+        let is_active = idx == sel.active;
+
+        let y = list_area.y + row as u16;
+        let prefix = if is_active { "→ " } else { "  " };
+        let num = format!("{}{}. ", prefix, idx + 1);
+
+        let fg = if is_cursor {
+            Color::Rgb(15, 15, 15)
+        } else if is_active {
+            Color::Rgb(255, 200, 80)
+        } else {
+            Color::Rgb(180, 180, 190)
+        };
+        let row_bg = if is_cursor {
+            Color::Rgb(60, 140, 220)
+        } else {
+            bg
+        };
+
+        let line = Line::from(vec![
+            Span::styled(
+                num,
+                Style::default()
+                    .fg(if is_cursor {
+                        fg
+                    } else {
+                        Color::Rgb(80, 80, 100)
+                    })
+                    .bg(row_bg),
+            ),
+            Span::styled(
+                format!(
+                    "{:<width$}",
+                    name,
+                    width = (inner.width as usize).saturating_sub(6)
+                ),
+                Style::default()
+                    .fg(fg)
+                    .bg(row_bg)
+                    .add_modifier(if is_cursor {
+                        Modifier::BOLD
+                    } else {
+                        Modifier::empty()
+                    }),
+            ),
+        ]);
+        let line_area = Rect {
+            x: list_area.x,
+            y,
+            width: list_area.width,
+            height: 1,
+        };
+        Paragraph::new(line).render(line_area, buf);
+    }
+
+    // Footer with current theme name + description
+    let footer_area = Rect {
+        y: inner.y + inner.height.saturating_sub(2),
+        height: 2.min(inner.height),
+        ..inner
+    };
+    let (active_name, active_desc, _) = &presets[sel.active];
+    let footer_lines = vec![
+        Line::from(Span::styled(
+            format!("  {}", active_name),
+            Style::default()
+                .fg(Color::Rgb(255, 200, 80))
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            format!(
+                "  {}",
+                if active_desc.len() > inner.width as usize - 4 {
+                    &active_desc[..inner.width as usize - 4]
+                } else {
+                    active_desc
+                }
+            ),
+            Style::default().fg(Color::Rgb(100, 100, 120)),
+        )),
+    ];
+    Paragraph::new(footer_lines)
+        .style(Style::default().bg(bg))
+        .render(footer_area, buf);
 }
 
 // ── centered_rect ─────────────────────────────────────────────────────────────
