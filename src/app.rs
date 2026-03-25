@@ -104,6 +104,7 @@ impl App {
                 KeyCode::Down | KeyCode::Char('j') => Some(Message::MenuDown),
                 KeyCode::Tab => Some(Message::SectionNext),
                 KeyCode::BackTab => Some(Message::SectionPrev),
+                KeyCode::Char('t') => Some(Message::ThemeNext),
                 KeyCode::Char('r') => Some(Message::RefreshDeviceInfo),
                 KeyCode::Char('d') => Some(Message::NextDevice),
                 KeyCode::Char('L') => Some(Message::OpenLogcat),
@@ -161,6 +162,7 @@ impl App {
                 // Global dev mode keys (regardless of focus)
                 match key {
                     KeyCode::Esc | KeyCode::Char('q') => Some(Message::CloseDevMode),
+                    KeyCode::Char('t') => Some(Message::ThemeNext),
                     KeyCode::Char('b') => Some(Message::DevBuild),
                     KeyCode::Char('R') => Some(Message::DevRun),
                     KeyCode::Char('E') => Some(Message::DevToggleEditorPicker),
