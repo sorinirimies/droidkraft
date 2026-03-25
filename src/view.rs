@@ -71,9 +71,9 @@ fn render_loading(model: &Model, area: Rect, buf: &mut Buffer) {
             .title("  \u{26a1} Running  ")
             .title_alignment(Alignment::Center)
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::Rgb(190, 160, 30))),
+            .border_style(Style::default().fg(model.theme.warn)),
     )
-    .style(Style::default().fg(Color::Rgb(230, 205, 60)))
+    .style(Style::default().fg(model.theme.warn))
     .alignment(Alignment::Center)
     .render(centered_rect(44, 30, area), buf);
 }
@@ -81,6 +81,8 @@ fn render_loading(model: &Model, area: Rect, buf: &mut Buffer) {
 // ── Menu (full layout) ────────────────────────────────────────────────────────
 
 fn render_menu(model: &mut Model, area: Rect, buf: &mut Buffer) {
+    let theme = &model.theme;
+
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -103,9 +105,9 @@ fn render_menu(model: &mut Model, area: Rect, buf: &mut Buffer) {
                 .title("  \u{1f916}  DroidTUI  ")
                 .title_alignment(Alignment::Center)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::Rgb(40, 160, 40))),
+                .border_style(Style::default().fg(theme.brand)),
         )
-        .style(Style::default().fg(Color::Rgb(120, 200, 120)))
+        .style(Style::default().fg(theme.accent))
         .alignment(Alignment::Center)
         .render(header_area, buf);
 
@@ -120,21 +122,21 @@ fn render_menu(model: &mut Model, area: Rect, buf: &mut Buffer) {
 
     let cmd_block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Rgb(35, 70, 35)));
+        .border_style(Style::default().fg(theme.border));
     let cmd_inner = cmd_block.inner(body[0]);
     cmd_block.render(body[0], buf);
     model.menu.render(cmd_inner, buf);
 
-    render_device_panel(&model.device_status, body[1], buf);
+    render_device_panel(&model.device_status, &model.theme, body[1], buf);
 
     // ── Description ───────────────────────────────────────────────────────────
     Paragraph::new(format!("  {}", model.menu.get_selected_description()))
         .block(
             Block::bordered()
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::Rgb(50, 50, 70))),
+                .border_style(Style::default().fg(theme.border)),
         )
-        .style(Style::default().fg(Color::Rgb(150, 150, 175)))
+        .style(Style::default().fg(theme.dim))
         .render(desc_area, buf);
 
     // ── Footer ────────────────────────────────────────────────────────────────
@@ -144,16 +146,21 @@ fn render_menu(model: &mut Model, area: Rect, buf: &mut Buffer) {
     .block(
         Block::bordered()
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::Rgb(50, 50, 70))),
+            .border_style(Style::default().fg(theme.border)),
     )
-    .style(Style::default().fg(Color::Rgb(100, 100, 120)))
+    .style(Style::default().fg(theme.dim))
     .alignment(Alignment::Center)
     .render(footer_area, buf);
 }
 
 // ── Device panel (right column) ───────────────────────────────────────────────
 
-fn render_device_panel(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
+fn render_device_panel(
+    status: &DeviceStatus,
+    theme: &crate::theme::Theme,
+    area: Rect,
+    buf: &mut Buffer,
+) {
     // Device selector height: 2 borders + max(1, num_devices) content rows, capped at 6
     let list_rows = (status.devices.len().max(1) as u16 + 2).min(6);
 
@@ -165,18 +172,23 @@ fn render_device_panel(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
         ])
         .split(area);
 
-    render_device_list(status, panel[0], buf);
-    render_device_stats(status, panel[1], buf);
+    render_device_list(status, theme, panel[0], buf);
+    render_device_stats(status, theme, panel[1], buf);
 }
 
 // ── Device selector ───────────────────────────────────────────────────────────
 
-fn render_device_list(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
+fn render_device_list(
+    status: &DeviceStatus,
+    theme: &crate::theme::Theme,
+    area: Rect,
+    buf: &mut Buffer,
+) {
     let connected = status.is_connected();
     let bdr_color = if connected {
-        Color::Rgb(40, 120, 40)
+        theme.success
     } else {
-        Color::Rgb(60, 50, 35)
+        theme.border
     };
     let multi_hint = if status.devices.len() > 1 {
         "  d \u{2013} cycle"
@@ -196,14 +208,14 @@ fn render_device_list(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
     if !connected {
         Paragraph::new(Line::from(vec![Span::styled(
             "  \u{25cb}  No device connected",
-            Style::default().fg(Color::Rgb(160, 130, 60)),
+            Style::default().fg(theme.warn),
         )]))
         .render(inner, buf);
         return;
     }
 
-    let dim = Color::Rgb(100, 100, 100);
-    let sel_bg = Color::Rgb(40, 140, 40);
+    let dim = theme.dim;
+    let sel_bg = theme.accent;
     let sel_fg = Color::Rgb(10, 10, 10);
 
     let lines: Vec<Line<'static>> = status
@@ -246,13 +258,14 @@ fn render_device_list(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
 
 // ── Device stats ──────────────────────────────────────────────────────────────
 
-fn render_device_stats(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
+fn render_device_stats(
+    status: &DeviceStatus,
+    theme: &crate::theme::Theme,
+    area: Rect,
+    buf: &mut Buffer,
+) {
     let connected = status.is_connected();
-    let bdr_color = if connected {
-        Color::Rgb(35, 70, 35)
-    } else {
-        Color::Rgb(55, 45, 35)
-    };
+    let bdr_color = theme.border;
 
     let title = status
         .active()
@@ -269,7 +282,7 @@ fn render_device_stats(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
     block.render(area, buf);
 
     if !connected {
-        render_no_device_content(inner, buf);
+        render_no_device_content(theme, inner, buf);
         return;
     }
 
@@ -303,8 +316,8 @@ fn render_device_stats(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
         _ => Color::Rgb(220, 60, 60),
     };
 
-    let dim = Color::Rgb(90, 90, 90);
-    let bright = Color::Rgb(205, 205, 205);
+    let dim = theme.dim;
+    let bright = theme.fg;
 
     let model_text = if status.model.is_empty() {
         "Unknown".to_string()
@@ -376,10 +389,10 @@ fn render_device_stats(status: &DeviceStatus, area: Rect, buf: &mut Buffer) {
 
 // ── No-device content ─────────────────────────────────────────────────────────
 
-fn render_no_device_content(area: Rect, buf: &mut Buffer) {
-    let dim = Color::Rgb(90, 90, 90);
-    let amber = Color::Rgb(160, 130, 60);
-    let subtle = Color::Rgb(80, 80, 80);
+fn render_no_device_content(theme: &crate::theme::Theme, area: Rect, buf: &mut Buffer) {
+    let dim = theme.dim;
+    let amber = theme.warn;
+    let subtle = theme.border;
 
     let lines: Vec<Line<'static>> = vec![
         Line::from(""),
@@ -452,9 +465,9 @@ fn fmt_mib(mib: u64) -> String {
 
 fn render_result(model: &mut Model, area: Rect, buf: &mut Buffer) {
     let (icon, border_color) = if model.command_result.is_some() {
-        ("\u{2705}", Color::Rgb(40, 160, 40))
+        ("\u{2705}", model.theme.success)
     } else {
-        ("\u{274c}", Color::Rgb(160, 40, 40))
+        ("\u{274c}", model.theme.error)
     };
 
     let label = model
@@ -539,7 +552,7 @@ fn render_result(model: &mut Model, area: Rect, buf: &mut Buffer) {
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(border_color)),
         )
-        .style(Style::default().fg(Color::Rgb(220, 220, 220)))
+        .style(Style::default().fg(model.theme.fg))
         .render(content_area, buf);
 
     if total > content_height {

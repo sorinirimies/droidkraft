@@ -233,6 +233,242 @@ impl Theme {
         }
     }
 
+    pub fn grape() -> Self {
+        Self::default()
+            .brand(Color::Rgb(200, 120, 255))
+            .accent(Color::Rgb(130, 180, 255))
+            .success(Color::Rgb(160, 110, 255))
+            .dim(Color::Rgb(110, 100, 130))
+            .fg(Color::Rgb(220, 210, 240))
+            .sel_bg(Color::Rgb(50, 35, 80))
+            .warn(Color::Rgb(200, 180, 120))
+            .error(Color::Rgb(220, 80, 80))
+            .surface(Color::Rgb(25, 18, 40))
+            .border(Color::Rgb(60, 45, 90))
+            .key_hint(Color::Rgb(180, 130, 255))
+    }
+
+    pub fn ocean() -> Self {
+        Self::default()
+            .brand(Color::Rgb(0, 200, 180))
+            .accent(Color::Rgb(0, 175, 210))
+            .success(Color::Rgb(80, 230, 200))
+            .dim(Color::Rgb(80, 120, 130))
+            .fg(Color::Rgb(200, 240, 245))
+            .sel_bg(Color::Rgb(0, 50, 70))
+            .warn(Color::Rgb(200, 200, 100))
+            .error(Color::Rgb(220, 80, 80))
+            .surface(Color::Rgb(5, 25, 35))
+            .border(Color::Rgb(20, 60, 80))
+            .key_hint(Color::Rgb(80, 220, 210))
+    }
+
+    pub fn sunset() -> Self {
+        Self::default()
+            .brand(Color::Rgb(255, 80, 80))
+            .accent(Color::Rgb(255, 150, 50))
+            .success(Color::Rgb(255, 180, 80))
+            .dim(Color::Rgb(140, 100, 80))
+            .fg(Color::Rgb(255, 235, 210))
+            .sel_bg(Color::Rgb(80, 30, 20))
+            .warn(Color::Rgb(255, 200, 60))
+            .error(Color::Rgb(220, 50, 50))
+            .surface(Color::Rgb(35, 15, 10))
+            .border(Color::Rgb(80, 35, 25))
+            .key_hint(Color::Rgb(255, 160, 80))
+    }
+
+    pub fn rose() -> Self {
+        Self::default()
+            .brand(Color::Rgb(255, 100, 150))
+            .accent(Color::Rgb(255, 140, 180))
+            .success(Color::Rgb(255, 160, 190))
+            .dim(Color::Rgb(140, 90, 110))
+            .fg(Color::Rgb(255, 230, 235))
+            .sel_bg(Color::Rgb(80, 20, 40))
+            .warn(Color::Rgb(255, 200, 150))
+            .error(Color::Rgb(220, 60, 60))
+            .surface(Color::Rgb(35, 10, 20))
+            .border(Color::Rgb(80, 30, 50))
+            .key_hint(Color::Rgb(255, 150, 180))
+    }
+
+    pub fn solarized_light() -> Self {
+        Self {
+            brand: Color::Rgb(38, 139, 210),
+            accent: Color::Rgb(42, 161, 152),
+            success: Color::Rgb(133, 153, 0),
+            dim: Color::Rgb(147, 161, 161),
+            fg: Color::Rgb(101, 123, 131),
+            sel_bg: Color::Rgb(238, 232, 213),
+            warn: Color::Rgb(181, 137, 0),
+            error: Color::Rgb(220, 50, 47),
+            surface: Color::Rgb(253, 246, 227),
+            border: Color::Rgb(238, 232, 213),
+            key_hint: Color::Rgb(42, 161, 152),
+        }
+    }
+
+    pub fn gruvbox_light() -> Self {
+        Self {
+            brand: Color::Rgb(214, 93, 14),
+            accent: Color::Rgb(215, 153, 33),
+            success: Color::Rgb(121, 116, 14),
+            dim: Color::Rgb(146, 131, 116),
+            fg: Color::Rgb(60, 56, 54),
+            sel_bg: Color::Rgb(213, 196, 161),
+            warn: Color::Rgb(181, 118, 20),
+            error: Color::Rgb(204, 36, 29),
+            surface: Color::Rgb(251, 241, 199),
+            border: Color::Rgb(213, 196, 161),
+            key_hint: Color::Rgb(104, 157, 106),
+        }
+    }
+
+    pub fn catppuccin_latte() -> Self {
+        Self {
+            brand: Color::Rgb(136, 57, 239),
+            accent: Color::Rgb(30, 102, 245),
+            success: Color::Rgb(64, 160, 43),
+            dim: Color::Rgb(156, 160, 176),
+            fg: Color::Rgb(76, 79, 105),
+            sel_bg: Color::Rgb(204, 208, 218),
+            warn: Color::Rgb(223, 142, 29),
+            error: Color::Rgb(210, 15, 57),
+            surface: Color::Rgb(239, 241, 245),
+            border: Color::Rgb(204, 208, 218),
+            key_hint: Color::Rgb(23, 146, 153),
+        }
+    }
+
+    pub fn catppuccin_frappe() -> Self {
+        Self {
+            brand: Color::Rgb(202, 158, 230),
+            accent: Color::Rgb(140, 170, 238),
+            success: Color::Rgb(166, 209, 137),
+            dim: Color::Rgb(115, 121, 148),
+            fg: Color::Rgb(198, 208, 245),
+            sel_bg: Color::Rgb(65, 69, 89),
+            warn: Color::Rgb(229, 200, 144),
+            error: Color::Rgb(231, 130, 132),
+            surface: Color::Rgb(48, 52, 70),
+            border: Color::Rgb(65, 69, 89),
+            key_hint: Color::Rgb(129, 200, 190),
+        }
+    }
+
+    pub fn catppuccin_macchiato() -> Self {
+        Self {
+            brand: Color::Rgb(198, 160, 246),
+            accent: Color::Rgb(138, 173, 244),
+            success: Color::Rgb(166, 218, 149),
+            dim: Color::Rgb(110, 115, 141),
+            fg: Color::Rgb(202, 211, 245),
+            sel_bg: Color::Rgb(54, 58, 79),
+            warn: Color::Rgb(238, 212, 159),
+            error: Color::Rgb(237, 135, 150),
+            surface: Color::Rgb(36, 39, 58),
+            border: Color::Rgb(54, 58, 79),
+            key_hint: Color::Rgb(139, 213, 202),
+        }
+    }
+
+    pub fn tokyo_night_storm() -> Self {
+        Self {
+            brand: Color::Rgb(187, 154, 247),
+            accent: Color::Rgb(122, 162, 247),
+            success: Color::Rgb(158, 206, 106),
+            dim: Color::Rgb(86, 95, 137),
+            fg: Color::Rgb(192, 202, 245),
+            sel_bg: Color::Rgb(45, 49, 75),
+            warn: Color::Rgb(224, 175, 104),
+            error: Color::Rgb(247, 118, 142),
+            surface: Color::Rgb(36, 40, 59),
+            border: Color::Rgb(45, 49, 75),
+            key_hint: Color::Rgb(115, 218, 202),
+        }
+    }
+
+    pub fn tokyo_night_light() -> Self {
+        Self {
+            brand: Color::Rgb(90, 74, 120),
+            accent: Color::Rgb(46, 126, 233),
+            success: Color::Rgb(72, 94, 48),
+            dim: Color::Rgb(132, 140, 176),
+            fg: Color::Rgb(52, 59, 88),
+            sel_bg: Color::Rgb(208, 213, 227),
+            warn: Color::Rgb(140, 108, 62),
+            error: Color::Rgb(200, 55, 75),
+            surface: Color::Rgb(213, 214, 219),
+            border: Color::Rgb(208, 213, 227),
+            key_hint: Color::Rgb(15, 75, 110),
+        }
+    }
+
+    pub fn kanagawa_wave() -> Self {
+        Self {
+            brand: Color::Rgb(210, 126, 153),
+            accent: Color::Rgb(126, 156, 216),
+            success: Color::Rgb(118, 148, 106),
+            dim: Color::Rgb(114, 113, 105),
+            fg: Color::Rgb(220, 215, 186),
+            sel_bg: Color::Rgb(42, 42, 55),
+            warn: Color::Rgb(220, 165, 97),
+            error: Color::Rgb(195, 64, 67),
+            surface: Color::Rgb(31, 31, 40),
+            border: Color::Rgb(42, 42, 55),
+            key_hint: Color::Rgb(106, 149, 137),
+        }
+    }
+
+    pub fn kanagawa_dragon() -> Self {
+        Self {
+            brand: Color::Rgb(210, 126, 153),
+            accent: Color::Rgb(139, 164, 176),
+            success: Color::Rgb(135, 169, 135),
+            dim: Color::Rgb(166, 166, 156),
+            fg: Color::Rgb(197, 201, 197),
+            sel_bg: Color::Rgb(40, 39, 39),
+            warn: Color::Rgb(200, 170, 109),
+            error: Color::Rgb(195, 64, 67),
+            surface: Color::Rgb(24, 24, 24),
+            border: Color::Rgb(40, 39, 39),
+            key_hint: Color::Rgb(142, 164, 162),
+        }
+    }
+
+    pub fn kanagawa_lotus() -> Self {
+        Self {
+            brand: Color::Rgb(160, 154, 190),
+            accent: Color::Rgb(77, 105, 155),
+            success: Color::Rgb(111, 137, 78),
+            dim: Color::Rgb(196, 178, 138),
+            fg: Color::Rgb(84, 84, 100),
+            sel_bg: Color::Rgb(231, 219, 160),
+            warn: Color::Rgb(119, 113, 63),
+            error: Color::Rgb(195, 64, 67),
+            surface: Color::Rgb(242, 236, 188),
+            border: Color::Rgb(231, 219, 160),
+            key_hint: Color::Rgb(78, 140, 162),
+        }
+    }
+
+    pub fn nightfly() -> Self {
+        Self {
+            brand: Color::Rgb(199, 146, 234),
+            accent: Color::Rgb(130, 170, 255),
+            success: Color::Rgb(161, 205, 94),
+            dim: Color::Rgb(75, 100, 121),
+            fg: Color::Rgb(172, 187, 203),
+            sel_bg: Color::Rgb(11, 41, 66),
+            warn: Color::Rgb(255, 202, 40),
+            error: Color::Rgb(255, 85, 85),
+            surface: Color::Rgb(1, 22, 39),
+            border: Color::Rgb(11, 41, 66),
+            key_hint: Color::Rgb(33, 199, 168),
+        }
+    }
+
     pub fn forest() -> Self {
         Self::default()
             .brand(Color::Rgb(100, 200, 80))
@@ -287,15 +523,72 @@ impl Theme {
                 Theme::default(),
             ),
             (
+                "Grape",
+                "Deep violet & soft blue — easy on the eyes",
+                Theme::grape(),
+            ),
+            (
+                "Ocean",
+                "Teal & aquamarine — calm nautical feel",
+                Theme::ocean(),
+            ),
+            (
+                "Sunset",
+                "Warm amber & rose — vibrant high-energy",
+                Theme::sunset(),
+            ),
+            (
+                "Forest",
+                "Earthy greens & bark browns — natural",
+                Theme::forest(),
+            ),
+            (
+                "Rose",
+                "Pinks & corals — playful pastel-inspired",
+                Theme::rose(),
+            ),
+            ("Mono", "Greyscale only — distraction-free", Theme::mono()),
+            ("Neon", "Electric brights — synthwave retro", Theme::neon()),
+            (
                 "Dracula",
                 "Pink, cyan & purple on dark grey",
                 Theme::dracula(),
             ),
             ("Nord", "Arctic bluish tones", Theme::nord()),
             (
+                "Solarized Dark",
+                "Precision colours — dark",
+                Theme::solarized_dark(),
+            ),
+            (
+                "Solarized Light",
+                "Precision colours — light",
+                Theme::solarized_light(),
+            ),
+            (
                 "Gruvbox Dark",
                 "Retro groove — warm dark background",
                 Theme::gruvbox_dark(),
+            ),
+            (
+                "Gruvbox Light",
+                "Retro groove — warm light background",
+                Theme::gruvbox_light(),
+            ),
+            (
+                "Catppuccin Latte",
+                "Soothing pastel — light",
+                Theme::catppuccin_latte(),
+            ),
+            (
+                "Catppuccin Frappé",
+                "Soothing pastel — medium-dark",
+                Theme::catppuccin_frappe(),
+            ),
+            (
+                "Catppuccin Macchiato",
+                "Soothing pastel — dark",
+                Theme::catppuccin_macchiato(),
             ),
             (
                 "Catppuccin Mocha",
@@ -308,23 +601,41 @@ impl Theme {
                 Theme::tokyo_night(),
             ),
             (
-                "Solarized Dark",
-                "Precision colours — dark",
-                Theme::solarized_dark(),
+                "Tokyo Night Storm",
+                "Slightly lighter dark variant",
+                Theme::tokyo_night_storm(),
+            ),
+            (
+                "Tokyo Night Light",
+                "Light variant",
+                Theme::tokyo_night_light(),
+            ),
+            (
+                "Kanagawa Wave",
+                "Deep blue ink on parchment",
+                Theme::kanagawa_wave(),
+            ),
+            (
+                "Kanagawa Dragon",
+                "Darker earth tones — charcoal & moss",
+                Theme::kanagawa_dragon(),
+            ),
+            (
+                "Kanagawa Lotus",
+                "Light parchment variant",
+                Theme::kanagawa_lotus(),
             ),
             (
                 "Moonfly",
                 "Deep dark with vibrant accents",
                 Theme::moonfly(),
             ),
+            ("Nightfly", "Deep ocean blues", Theme::nightfly()),
             (
                 "Oxocarbon",
                 "IBM Carbon Design System inspired",
                 Theme::oxocarbon(),
             ),
-            ("Forest", "Earthy greens & bark browns", Theme::forest()),
-            ("Neon", "Electric brights — synthwave retro", Theme::neon()),
-            ("Mono", "Greyscale only — distraction-free", Theme::mono()),
         ]
     }
 }
@@ -395,7 +706,7 @@ mod tests {
 
     #[test]
     fn all_presets_non_empty() {
-        assert!(Theme::all_presets().len() >= 10);
+        assert!(Theme::all_presets().len() >= 27);
     }
 
     #[test]
