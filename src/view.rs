@@ -1291,6 +1291,11 @@ fn render_logcat_footer(state: &LogcatState, theme: &Theme, area: Rect, buf: &mu
             .map(|s| Span::styled(s.content.to_string(), s.style)),
     );
     right_spans.extend(
+        kh("S", "save as", theme.accent, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    right_spans.extend(
         kh("m", "mark", theme.accent, theme.dim)
             .into_iter()
             .map(|s| Span::styled(s.content.to_string(), s.style)),
@@ -1534,7 +1539,7 @@ fn render_save_path_input(model: &Model, area: Rect, buf: &mut Buffer, bg: Color
                 Style::default().fg(Color::Rgb(90, 90, 100)),
             ),
             Span::styled(
-                "F2 ",
+                "S ",
                 Style::default()
                     .fg(Color::Rgb(80, 200, 255))
                     .add_modifier(Modifier::BOLD),
@@ -1737,11 +1742,12 @@ fn render_save_file_browser(model: &Model, area: Rect, buf: &mut Buffer, bg: Col
                 Style::default().fg(Color::Rgb(80, 80, 100)),
             ),
             Span::styled(
-                "S Save Here  ",
+                "Shift+S ",
                 Style::default()
                     .fg(Color::Rgb(80, 200, 80))
                     .add_modifier(Modifier::BOLD),
             ),
+            Span::styled("Save Here  ", Style::default().fg(Color::Rgb(80, 80, 100))),
             Span::styled(
                 "/search  n mkdir  Esc back  ",
                 Style::default().fg(Color::Rgb(80, 80, 100)),

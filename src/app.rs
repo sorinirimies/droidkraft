@@ -159,7 +159,7 @@ impl App {
                                 Some(Message::LogcatFileSaved(path))
                             }
                         }
-                        KeyCode::F(2) => Some(Message::LogcatSaveAs),
+                        KeyCode::Char('S') => Some(Message::LogcatSaveAs),
                         KeyCode::Backspace => Some(Message::LogcatSearchBackspace),
                         KeyCode::Left => Some(Message::LogcatCursorLeft),
                         KeyCode::Right => Some(Message::LogcatCursorRight),
@@ -217,7 +217,7 @@ impl App {
                         KeyCode::Char('t') => Some(Message::LogcatToggleTagFilter),
                         KeyCode::Char('p') => Some(Message::LogcatTogglePackageFilter),
                         KeyCode::Char('s') => Some(Message::LogcatSave),
-                        KeyCode::Char('S') => Some(Message::LogcatSaveFilteredOnly),
+                        KeyCode::Char('S') => Some(Message::LogcatSaveAs),
                         // New feature keys
                         KeyCode::Char('r') => Some(Message::LogcatToggleRegex),
                         KeyCode::Char('e') => Some(Message::LogcatToggleExclude),
