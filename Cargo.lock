@@ -613,7 +613,7 @@ dependencies = [
 
 [[package]]
 name = "droidtui"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "adb_client",
  "color-eyre",
