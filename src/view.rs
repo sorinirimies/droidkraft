@@ -40,6 +40,7 @@ pub fn render(model: &mut Model, area: Rect, buf: &mut Buffer) {
         AppState::Loading => render_loading(model, area, buf),
         AppState::ShowResult => render_result(model, area, buf),
         AppState::Logcat => render_logcat(model, area, buf),
+        AppState::DevMode => render_devmode(model, area, buf),
     }
 
     // ── Global overlays ───────────────────────────────────────────────
@@ -138,7 +139,7 @@ fn render_menu(model: &mut Model, area: Rect, buf: &mut Buffer) {
 
     // ── Footer ────────────────────────────────────────────────────────────────
     Paragraph::new(
-        "  \u{2191}/\u{2193} j/k Navigate  Tab/S-Tab Section  Enter Execute  L Logcat  T Theme  d Device  r Refresh  q Quit  ",
+        "  \u{2191}/\u{2193} j/k Navigate  Tab/S-Tab Section  Enter Execute  D Dev  L Logcat  T Theme  d Device  r Refresh  q Quit  ",
     )
     .block(
         Block::bordered()
@@ -599,6 +600,603 @@ fn render_scrollbar(
 }
 
 // ── centered_rect ─────────────────────────────────────────────────────────────
+
+// ── Dev Mode view ─────────────────────────────────────────────────────────────
+
+fn render_devmode(model: &mut Model, area: Rect, buf: &mut Buffer) {
+    let theme = model.theme.clone();
+    let devtools = &model.devtools;
+
+    // ┌─ Toolbar ──────────────────────────────────────────────────────────┐
+    // │ 🔨 Debug ▾ │ b Build │ R Run │ E Editor: nvim │ 📂 project/     │
+    // ├─ File Browser (left) ──────┬─ Build Output (right) ────────────────┤
+    // │ 📁 src/                    │ > Task :app:assembleDebug             │
+    // │ 📁 app/                    │ BUILD SUCCESSFUL                      │
+    // │ 📄 build.gradle.kts        │                                       │
+    // ├─ Footer ───────────────────┴───────────────────────────────────────┤
+    // │ Tab focus │ b build │ R run │ e edit │ v variant │ E editor │ q   │
+    // └────────────────────────────────────────────────────────────────────┘
+
+    let outer = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // toolbar
+            Constraint::Min(1),    // body (file browser + build output)
+            Constraint::Length(3), // footer
+        ])
+        .split(area);
+
+    let toolbar_area = outer[0];
+    let body_area = outer[1];
+    let footer_area = outer[2];
+
+    // ── Toolbar ───────────────────────────────────────────────────────────
+    render_devmode_toolbar(devtools, &theme, toolbar_area, buf);
+
+    // ── Body: file browser left | build output right ──────────────────────
+    let body = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(45), // file browser
+            Constraint::Percentage(55), // build output
+        ])
+        .split(body_area);
+
+    render_devmode_file_browser(devtools, &theme, body[0], buf);
+    render_devmode_build_output(devtools, &theme, body[1], buf);
+
+    // ── Footer ────────────────────────────────────────────────────────────
+    render_devmode_footer(devtools, &theme, footer_area, buf);
+
+    // ── Editor picker overlay ─────────────────────────────────────────────
+    if devtools.editor_picker_open {
+        render_devmode_editor_picker(devtools, &theme, area, buf);
+    }
+
+    // ── Variant picker overlay ────────────────────────────────────────────
+    if devtools.variant_picker_open {
+        render_devmode_variant_picker(devtools, &theme, area, buf);
+    }
+}
+
+fn render_devmode_toolbar(
+    devtools: &crate::devtools::DevToolsState,
+    theme: &crate::theme::Theme,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    use crate::devtools::BuildStatus;
+
+    let variant = devtools.current_variant();
+    let build_icon = match devtools.build_status {
+        BuildStatus::Idle => "⏸",
+        BuildStatus::Building => "🔄",
+        BuildStatus::Success => "✅",
+        BuildStatus::Failed => "❌",
+    };
+
+    let editor_label = devtools.editor.label();
+    let project_name = devtools
+        .project_dir
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| devtools.project_dir.display().to_string());
+
+    let gradle_icon = if devtools.has_gradle { "🐘" } else { "⚠" };
+
+    let spans = vec![
+        Span::styled(format!(" {} ", gradle_icon), Style::default().fg(theme.dim)),
+        Span::styled(
+            format!("{} ", project_name),
+            Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("│ ", Style::default().fg(theme.border)),
+        Span::styled(
+            format!("🔨 {} ", variant.name),
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("│ ", Style::default().fg(theme.border)),
+        Span::styled(format!("{} ", build_icon), Style::default().fg(theme.fg)),
+        Span::styled("│ ", Style::default().fg(theme.border)),
+        Span::styled(
+            format!("📝 {} ", editor_label),
+            Style::default().fg(theme.success),
+        ),
+    ];
+
+    Paragraph::new(Line::from(spans))
+        .block(
+            Block::bordered()
+                .title("  🛠  Dev Tools  ")
+                .title_alignment(Alignment::Left)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(theme.accent)),
+        )
+        .render(area, buf);
+}
+
+fn render_devmode_file_browser(
+    devtools: &crate::devtools::DevToolsState,
+    theme: &crate::theme::Theme,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    use crate::devtools::DevFocus;
+
+    let border_color = if devtools.focus == DevFocus::FileBrowser {
+        theme.accent
+    } else {
+        theme.border
+    };
+
+    let explorer = match &devtools.file_explorer {
+        Some(e) => e,
+        None => return,
+    };
+
+    let title = format!("  📂  {}  ", explorer.current_dir.display());
+    let block = Block::bordered()
+        .title(title)
+        .title_alignment(Alignment::Left)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(border_color));
+    let inner = block.inner(area);
+    block.render(area, buf);
+
+    if inner.height < 2 {
+        return;
+    }
+
+    let visible = inner.height as usize;
+    let total = explorer.entries.len();
+    let scroll = if explorer.cursor >= visible {
+        explorer.cursor - visible + 1
+    } else {
+        0
+    };
+
+    if total == 0 {
+        Paragraph::new("  (empty)")
+            .style(Style::default().fg(theme.dim))
+            .render(inner, buf);
+        return;
+    }
+
+    for (row, idx) in (scroll..total).take(visible).enumerate() {
+        let entry = &explorer.entries[idx];
+        let is_cursor = idx == explorer.cursor;
+
+        let icon = if entry.is_dir {
+            "📁 "
+        } else {
+            match entry.extension.as_str() {
+                "kt" | "kts" => "🟣 ",
+                "java" => "☕ ",
+                "xml" => "📋 ",
+                "gradle" => "🐘 ",
+                "json" => "📦 ",
+                "rs" => "🦀 ",
+                "toml" => "⚙  ",
+                "md" => "📝 ",
+                "yaml" | "yml" => "📄 ",
+                _ => "📄 ",
+            }
+        };
+
+        let name_max = inner.width as usize - 4;
+        let display_name: String = if entry.name.len() > name_max {
+            format!("{}…", &entry.name[..name_max.saturating_sub(1)])
+        } else {
+            entry.name.clone()
+        };
+
+        let (fg, bg) = if is_cursor {
+            (Color::Rgb(15, 15, 15), theme.accent)
+        } else if entry.is_dir {
+            (theme.warn, theme.surface)
+        } else {
+            (theme.fg, theme.surface)
+        };
+
+        let y = inner.y + row as u16;
+        let line = Line::from(vec![
+            Span::styled(format!(" {}", icon), Style::default().fg(fg).bg(bg)),
+            Span::styled(
+                format!("{:<width$}", display_name, width = name_max),
+                Style::default().fg(fg).bg(bg).add_modifier(if is_cursor {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
+            ),
+        ]);
+        Paragraph::new(line).render(
+            Rect {
+                x: inner.x,
+                y,
+                width: inner.width,
+                height: 1,
+            },
+            buf,
+        );
+    }
+}
+
+fn render_devmode_build_output(
+    devtools: &crate::devtools::DevToolsState,
+    theme: &crate::theme::Theme,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    use crate::devtools::{BuildStatus, DevFocus};
+
+    let border_color = if devtools.focus == DevFocus::BuildOutput {
+        theme.accent
+    } else {
+        theme.border
+    };
+    let title = match devtools.build_status {
+        BuildStatus::Idle => "  📋  Build Output  ",
+        BuildStatus::Building => "  🔄  Building…  ",
+        BuildStatus::Success => "  ✅  Build Successful  ",
+        BuildStatus::Failed => "  ❌  Build Failed  ",
+    };
+
+    let block = Block::bordered()
+        .title(title)
+        .title_alignment(Alignment::Left)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(border_color));
+    let inner = block.inner(area);
+    block.render(area, buf);
+
+    if inner.height < 2 {
+        return;
+    }
+
+    let visible = inner.height as usize;
+    let total = devtools.build_output.len();
+
+    if total == 0 {
+        let hints = vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "  No build output yet.",
+                Style::default().fg(theme.dim),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "  Press b to start a build.",
+                Style::default().fg(theme.dim),
+            )),
+            Line::from(Span::styled(
+                "  Press v to change the build variant.",
+                Style::default().fg(theme.dim),
+            )),
+        ];
+        Paragraph::new(hints).render(inner, buf);
+        return;
+    }
+
+    // Show the last `visible` lines (auto-scroll to bottom)
+    let start = total.saturating_sub(visible);
+    for (row, idx) in (start..total).enumerate() {
+        let line_text = &devtools.build_output[idx];
+        let y = inner.y + row as u16;
+        if y >= inner.y + inner.height {
+            break;
+        }
+
+        let color = if line_text.contains("BUILD SUCCESSFUL") {
+            theme.success
+        } else if line_text.contains("BUILD FAILED")
+            || line_text.contains("FAILED")
+            || line_text.starts_with("ERR:")
+        {
+            theme.error
+        } else if line_text.contains("WARNING") || line_text.contains("w:") {
+            theme.warn
+        } else if line_text.starts_with("▶") || line_text.starts_with("──") {
+            theme.accent
+        } else {
+            theme.dim
+        };
+
+        let truncated = if line_text.len() > inner.width as usize {
+            format!("{}…", &line_text[..inner.width as usize - 1])
+        } else {
+            line_text.clone()
+        };
+
+        let line = Line::from(Span::styled(
+            format!(" {}", truncated),
+            Style::default().fg(color),
+        ));
+        Paragraph::new(line).render(
+            Rect {
+                x: inner.x,
+                y,
+                width: inner.width,
+                height: 1,
+            },
+            buf,
+        );
+    }
+}
+
+fn render_devmode_footer(
+    devtools: &crate::devtools::DevToolsState,
+    theme: &crate::theme::Theme,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    fn kh(key: &str, label: &str, key_color: Color, dim_color: Color) -> Vec<Span<'static>> {
+        vec![
+            Span::styled(
+                key.to_string(),
+                Style::default().fg(key_color).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(format!(" {}  ", label), Style::default().fg(dim_color)),
+        ]
+    }
+
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+        .split(area);
+
+    // Left: navigation
+    let mut left: Vec<Span<'static>> = Vec::new();
+    left.push(Span::raw(" "));
+    left.extend(
+        kh("Tab", "focus", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left.extend(
+        kh("↑↓", "nav", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left.push(Span::styled("│ ", Style::default().fg(theme.border)));
+    left.extend(
+        kh("b", "build", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left.extend(
+        kh("R", "run", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left.extend(
+        kh("v", "variant", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+
+    Paragraph::new(Line::from(left))
+        .block(
+            Block::bordered()
+                .title(" Dev ")
+                .title_style(Style::default().fg(theme.dim))
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(theme.border)),
+        )
+        .render(cols[0], buf);
+
+    // Right: actions
+    let mut right: Vec<Span<'static>> = Vec::new();
+    right.push(Span::raw(" "));
+    right.extend(
+        kh("e", "edit", theme.accent, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    right.extend(
+        kh("E", "editor", theme.accent, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    right.extend(
+        kh("L", "logcat", theme.accent, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    right.extend(
+        kh("Esc", "close", theme.error, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+
+    // Status message
+    if let Some(ref msg) = devtools.status_message {
+        right.push(Span::styled("│ ", Style::default().fg(theme.border)));
+        right.push(Span::styled(
+            msg.clone(),
+            Style::default().fg(theme.success),
+        ));
+    }
+
+    Paragraph::new(Line::from(right))
+        .block(
+            Block::bordered()
+                .title(" Actions ")
+                .title_style(Style::default().fg(theme.dim))
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(theme.border)),
+        )
+        .render(cols[1], buf);
+}
+
+fn render_devmode_editor_picker(
+    devtools: &crate::devtools::DevToolsState,
+    theme: &crate::theme::Theme,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    let panel_width = 30.min(area.width);
+    let panel = Rect {
+        x: area.x + area.width - panel_width,
+        y: area.y,
+        width: panel_width,
+        height: area.height,
+    };
+
+    // Solid bg
+    for y in panel.top()..panel.bottom() {
+        for x in panel.left()..panel.right() {
+            if let Some(cell) = buf.cell_mut((x, y)) {
+                cell.set_char(' ');
+                cell.set_bg(theme.surface);
+            }
+        }
+    }
+
+    let block = Block::bordered()
+        .title("  📝  Editor  ")
+        .title_alignment(Alignment::Left)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(theme.accent));
+    let inner = block.inner(panel);
+    block.render(panel, buf);
+
+    let editors = crate::devtools::Editor::all();
+    for (i, editor) in editors.iter().enumerate() {
+        if i as u16 >= inner.height {
+            break;
+        }
+        let is_cursor = i == devtools.editor_picker_cursor;
+        let is_active = *editor == devtools.editor;
+
+        let marker = if is_active { "→ " } else { "  " };
+        let fg = if is_cursor {
+            Color::Rgb(15, 15, 15)
+        } else if is_active {
+            theme.success
+        } else {
+            theme.fg
+        };
+        let bg = if is_cursor {
+            theme.accent
+        } else {
+            theme.surface
+        };
+
+        let line = Line::from(vec![
+            Span::styled(
+                marker.to_string(),
+                Style::default()
+                    .fg(if is_active { theme.success } else { theme.dim })
+                    .bg(bg),
+            ),
+            Span::styled(
+                format!("{:<20}", editor.label()),
+                Style::default().fg(fg).bg(bg).add_modifier(if is_cursor {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
+            ),
+        ]);
+        let y = inner.y + i as u16;
+        Paragraph::new(line).render(
+            Rect {
+                x: inner.x,
+                y,
+                width: inner.width,
+                height: 1,
+            },
+            buf,
+        );
+    }
+}
+
+fn render_devmode_variant_picker(
+    devtools: &crate::devtools::DevToolsState,
+    theme: &crate::theme::Theme,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    let variants = &devtools.variants;
+    let panel_height = (variants.len() as u16 + 4).min(area.height);
+    let panel_width = 40.min(area.width);
+    let panel = Rect {
+        x: area.x + (area.width - panel_width) / 2,
+        y: area.y + (area.height - panel_height) / 2,
+        width: panel_width,
+        height: panel_height,
+    };
+
+    // Solid bg
+    for y in panel.top()..panel.bottom() {
+        for x in panel.left()..panel.right() {
+            if let Some(cell) = buf.cell_mut((x, y)) {
+                cell.set_char(' ');
+                cell.set_bg(theme.surface);
+            }
+        }
+    }
+
+    let block = Block::bordered()
+        .title("  🔨  Build Variant  ")
+        .title_alignment(Alignment::Left)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(theme.accent));
+    let inner = block.inner(panel);
+    block.render(panel, buf);
+
+    for (i, variant) in variants.iter().enumerate() {
+        if i as u16 >= inner.height {
+            break;
+        }
+        let is_selected = i == devtools.selected_variant;
+        let marker = if is_selected { "▶ " } else { "  " };
+        let fg = if is_selected {
+            Color::Rgb(15, 15, 15)
+        } else {
+            theme.fg
+        };
+        let bg = if is_selected {
+            theme.accent
+        } else {
+            theme.surface
+        };
+
+        let line = Line::from(vec![
+            Span::styled(
+                marker.to_string(),
+                Style::default()
+                    .fg(if is_selected {
+                        theme.success
+                    } else {
+                        theme.dim
+                    })
+                    .bg(bg),
+            ),
+            Span::styled(
+                format!("{:<30}", variant.name),
+                Style::default().fg(fg).bg(bg).add_modifier(if is_selected {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
+            ),
+        ]);
+        let y = inner.y + i as u16;
+        Paragraph::new(line).render(
+            Rect {
+                x: inner.x,
+                y,
+                width: inner.width,
+                height: 1,
+            },
+            buf,
+        );
+    }
+}
 
 // ── Logcat view ───────────────────────────────────────────────────────────────
 

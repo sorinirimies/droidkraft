@@ -2,6 +2,7 @@ use crate::app::App;
 
 pub mod adb;
 pub mod app;
+pub mod devtools;
 pub mod effects;
 pub mod event;
 pub mod fastboot;

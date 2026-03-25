@@ -107,6 +107,7 @@ impl App {
                 KeyCode::Char('r') => Some(Message::RefreshDeviceInfo),
                 KeyCode::Char('d') => Some(Message::NextDevice),
                 KeyCode::Char('L') => Some(Message::OpenLogcat),
+                KeyCode::Char('D') => Some(Message::OpenDevMode),
                 KeyCode::Enter => {
                     let command = self.model.get_selected_command();
                     Some(Message::ExecuteCommand(command))
@@ -131,6 +132,69 @@ impl App {
                 }
                 _ => Some(Message::ReturnToMenu),
             },
+
+            AppState::DevMode => {
+                use crate::devtools::DevFocus;
+
+                // Editor picker takes priority when open
+                if self.model.devtools.editor_picker_open {
+                    return match key {
+                        KeyCode::Up | KeyCode::Char('k') => Some(Message::DevEditorUp),
+                        KeyCode::Down | KeyCode::Char('j') => Some(Message::DevEditorDown),
+                        KeyCode::Enter => Some(Message::DevEditorConfirm),
+                        KeyCode::Esc => Some(Message::DevToggleEditorPicker),
+                        _ => None,
+                    };
+                }
+
+                // Variant picker
+                if self.model.devtools.variant_picker_open {
+                    return match key {
+                        KeyCode::Up | KeyCode::Char('k') => Some(Message::DevPrevVariant),
+                        KeyCode::Down | KeyCode::Char('j') => Some(Message::DevNextVariant),
+                        KeyCode::Enter => Some(Message::DevToggleVariantPicker),
+                        KeyCode::Esc => Some(Message::DevToggleVariantPicker),
+                        _ => None,
+                    };
+                }
+
+                // Global dev mode keys (regardless of focus)
+                match key {
+                    KeyCode::Esc | KeyCode::Char('q') => Some(Message::CloseDevMode),
+                    KeyCode::Char('b') => Some(Message::DevBuild),
+                    KeyCode::Char('R') => Some(Message::DevRun),
+                    KeyCode::Char('E') => Some(Message::DevToggleEditorPicker),
+                    KeyCode::Char('v') => Some(Message::DevToggleVariantPicker),
+                    KeyCode::Tab => Some(Message::DevCycleFocus),
+                    KeyCode::Char('L') => Some(Message::OpenLogcat),
+                    KeyCode::Char('e') => Some(Message::DevOpenFile),
+                    // Focus-specific keys
+                    _ => {
+                        match self.model.devtools.focus {
+                            DevFocus::FileBrowser => {
+                                let key_event = crossterm::event::KeyEvent::new(
+                                    key,
+                                    crossterm::event::KeyModifiers::NONE,
+                                );
+                                Some(Message::DevFileExplorerKey(key_event))
+                            }
+                            DevFocus::BuildOutput => {
+                                // Scroll build output
+                                match key {
+                                    KeyCode::Up | KeyCode::Char('k') => None, // TODO: scroll build
+                                    KeyCode::Down | KeyCode::Char('j') => None,
+                                    _ => None,
+                                }
+                            }
+                            DevFocus::Toolbar => match key {
+                                KeyCode::Left => Some(Message::DevPrevVariant),
+                                KeyCode::Right => Some(Message::DevNextVariant),
+                                _ => None,
+                            },
+                        }
+                    }
+                }
+            }
 
             AppState::Logcat => {
                 use crate::logcat::FilterField;

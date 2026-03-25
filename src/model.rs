@@ -1,4 +1,5 @@
 use crate::adb::{AdbManager, DeviceStatus};
+use crate::devtools::DevToolsState;
 use crate::effects::EffectsManager;
 use crate::fastboot::FastbootManager;
 use crate::logcat::LogcatState;
@@ -95,6 +96,9 @@ pub struct Model {
     /// File explorer for "Save As…" browsing.
     pub logcat_file_explorer: Option<tui_file_explorer::FileExplorer>,
 
+    /// Dev Tools state.
+    pub devtools: DevToolsState,
+
     /// Current active colour theme.
     pub theme: Theme,
     /// Theme selector overlay state.
@@ -118,6 +122,9 @@ pub enum AppState {
 
     /// Logcat viewer
     Logcat,
+
+    /// Dev Tools workstation
+    DevMode,
 }
 
 impl Default for Model {
@@ -155,6 +162,7 @@ impl Model {
             logcat_save_format: crate::logcat::SaveFormat::Text,
             logcat_save_mode: LogcatSaveMode::PathInput,
             logcat_file_explorer: None,
+            devtools: DevToolsState::new(),
             theme: Theme::default(),
             theme_selector: ThemeSelector::default(),
         }

@@ -27,6 +27,7 @@ pub enum MenuCommand {
     Adb(AdbCommand),
     Fastboot(FastbootCommand),
     OpenLogcat,
+    OpenDevMode,
 }
 
 // ── Entry types ───────────────────────────────────────────────────────────────
@@ -462,6 +463,14 @@ fn sh(command: &str) -> MenuCommand {
 
 fn build_entries() -> Vec<MenuEntry> {
     vec![
+        // ── Dev Tools ───────────────────────────────────────────────────────
+        MenuEntry::Section("DEV TOOLS"),
+        item("🛠   Dev Mode",
+             "Open the developer workstation — build, run, edit, and logcat in one view",
+             MenuCommand::OpenDevMode,
+             false),
+        MenuEntry::Spacer,
+
         // ── Device ──────────────────────────────────────────────────────────
         MenuEntry::Section("DEVICE"),
         item("📱  List Devices",
@@ -636,11 +645,12 @@ mod tests {
     }
 
     #[test]
-    fn test_get_selected_command_returns_list_devices() {
+    fn test_get_selected_command_returns_first_item() {
         let menu = Menu::new();
+        // First selectable item is now Dev Mode (DEV TOOLS section comes first)
         assert!(matches!(
             menu.get_selected_command(),
-            MenuCommand::Adb(AdbCommand::ListDevices)
+            MenuCommand::OpenDevMode
         ));
     }
 

@@ -61,6 +61,11 @@ pub async fn update(model: &mut Model, message: Message) {
                 return;
             }
 
+            if matches!(command, MenuCommand::OpenDevMode) {
+                model.state = AppState::DevMode;
+                return;
+            }
+
             model.last_command_label = Some(model.menu.get_selected_label().to_string());
             model.state = AppState::Loading;
             model.clear_results();
@@ -645,6 +650,146 @@ pub async fn update(model: &mut Model, message: Message) {
             }
         }
 
+        // ── Dev Tools ─────────────────────────────────────────────────────
+        Message::OpenDevMode => {
+            model.state = AppState::DevMode;
+        }
+
+        Message::CloseDevMode => {
+            model.state = AppState::Menu;
+            model.needs_device_refresh = true;
+        }
+
+        Message::DevBuild => {
+            model.devtools.start_build();
+        }
+
+        Message::DevRun => match model.devtools.run_app() {
+            Ok(()) => {}
+            Err(e) => {
+                model.devtools.status_message = Some(format!("❌ {}", e));
+            }
+        },
+
+        Message::DevCycleFocus => {
+            model.devtools.cycle_focus();
+        }
+
+        Message::DevToggleEditorPicker => {
+            model.devtools.toggle_editor_picker();
+        }
+
+        Message::DevEditorUp => {
+            model.devtools.editor_picker_up();
+        }
+
+        Message::DevEditorDown => {
+            model.devtools.editor_picker_down();
+        }
+
+        Message::DevEditorConfirm => {
+            model.devtools.editor_picker_confirm();
+        }
+
+        Message::DevToggleVariantPicker => {
+            model.devtools.toggle_variant_picker();
+        }
+
+        Message::DevNextVariant => {
+            model.devtools.next_variant();
+        }
+
+        Message::DevPrevVariant => {
+            model.devtools.prev_variant();
+        }
+
+        Message::DevFileExplorerKey(key_event) => {
+            use ratatui::crossterm::event::KeyCode;
+            if let Some(ref mut explorer) = model.devtools.file_explorer {
+                // Same crossterm version bridge as logcat save dialog
+                match key_event.code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        explorer.cursor = explorer.cursor.saturating_sub(1);
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        if !explorer.entries.is_empty()
+                            && explorer.cursor < explorer.entries.len() - 1
+                        {
+                            explorer.cursor += 1;
+                        }
+                    }
+                    KeyCode::Enter | KeyCode::Char('l') => {
+                        if let Some(entry) = explorer.entries.get(explorer.cursor) {
+                            if entry.is_dir {
+                                let path = entry.path.clone();
+                                explorer.navigate_to(path);
+                            }
+                            // File selection is handled by DevOpenFile
+                        }
+                    }
+                    KeyCode::Right => {
+                        if let Some(entry) = explorer.entries.get(explorer.cursor) {
+                            if entry.is_dir {
+                                let path = entry.path.clone();
+                                explorer.navigate_to(path);
+                            }
+                        }
+                    }
+                    KeyCode::Left | KeyCode::Backspace | KeyCode::Char('h') => {
+                        if let Some(parent) = explorer.current_dir.parent().map(|p| p.to_path_buf())
+                        {
+                            let prev = explorer.current_dir.clone();
+                            explorer.navigate_to(parent);
+                            if let Some(idx) = explorer.entries.iter().position(|e| e.path == prev)
+                            {
+                                explorer.cursor = idx;
+                            }
+                        }
+                    }
+                    KeyCode::Char('/') => {
+                        explorer.search_active = true;
+                    }
+                    KeyCode::Char('.') => {
+                        explorer.show_hidden = !explorer.show_hidden;
+                        explorer.reload();
+                    }
+                    KeyCode::Char(c) if explorer.search_active => {
+                        explorer.search_query.push(c);
+                        explorer.cursor = 0;
+                        explorer.reload();
+                    }
+                    KeyCode::Esc if explorer.search_active => {
+                        explorer.search_active = false;
+                        explorer.search_query.clear();
+                        explorer.reload();
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        Message::DevOpenFile => {
+            // Open the selected file in the configured editor
+            if let Some(_binary) = model.devtools.editor.binary() {
+                if let Some(ref explorer) = model.devtools.file_explorer {
+                    if let Some(entry) = explorer.entries.get(explorer.cursor) {
+                        if !entry.is_dir {
+                            let path = entry.path.clone();
+                            model.devtools.status_message = Some(format!(
+                                "Opening {} in {}…",
+                                path.file_name().unwrap_or_default().to_string_lossy(),
+                                model.devtools.editor.label()
+                            ));
+                            // The actual editor launch will be handled in app.rs
+                            // since it needs terminal suspend/resume
+                        }
+                    }
+                }
+            } else {
+                model.devtools.status_message = Some("No editor set — press E to pick one".into());
+            }
+        }
+
         // ── Theme ─────────────────────────────────────────────────────────
         Message::ToggleThemeSelector => {
             model.theme_selector.toggle();
@@ -714,6 +859,11 @@ async fn tick(model: &mut Model) {
         model.logcat.poll_new_entries();
     }
 
+    // Poll for build output in dev mode
+    if model.state == AppState::DevMode {
+        model.devtools.poll_build_output();
+    }
+
     // Check if startup is complete
     if model.state == AppState::Startup && model.effects.is_startup_complete() {
         model.state = AppState::Menu;
@@ -742,6 +892,11 @@ async fn execute_adb_command(model: &mut Model, command: MenuCommand) -> Command
         MenuCommand::OpenLogcat => {
             // Should never reach here — intercepted earlier in ExecuteCommand handler
             return CommandResult::Error("Logcat should be opened via OpenLogcat message".into());
+        }
+        MenuCommand::OpenDevMode => {
+            return CommandResult::Error(
+                "Dev Mode should be opened via OpenDevMode message".into(),
+            );
         }
     };
 

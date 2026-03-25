@@ -76,6 +76,22 @@ pub enum Message {
     LogcatSelectDown,
     CloseLogcat,
 
+    // Dev Tools messages
+    OpenDevMode,
+    CloseDevMode,
+    DevBuild,
+    DevRun,
+    DevCycleFocus,
+    DevToggleEditorPicker,
+    DevEditorUp,
+    DevEditorDown,
+    DevEditorConfirm,
+    DevToggleVariantPicker,
+    DevNextVariant,
+    DevPrevVariant,
+    DevFileExplorerKey(ratatui::crossterm::event::KeyEvent),
+    DevOpenFile,
+
     // Theme messages
     ToggleThemeSelector,
     ThemeNext,
@@ -113,6 +129,8 @@ impl Message {
                 | Message::SkipStartup
                 | Message::OpenLogcat
                 | Message::CloseLogcat
+                | Message::OpenDevMode
+                | Message::CloseDevMode
                 | Message::LogcatSave
                 | Message::LogcatCancelSave
         )
