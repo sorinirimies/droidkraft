@@ -1291,11 +1291,6 @@ fn render_logcat_footer(state: &LogcatState, theme: &Theme, area: Rect, buf: &mu
             .map(|s| Span::styled(s.content.to_string(), s.style)),
     );
     right_spans.extend(
-        kh("S", "save as", theme.accent, theme.dim)
-            .into_iter()
-            .map(|s| Span::styled(s.content.to_string(), s.style)),
-    );
-    right_spans.extend(
         kh("m", "mark", theme.accent, theme.dim)
             .into_iter()
             .map(|s| Span::styled(s.content.to_string(), s.style)),
