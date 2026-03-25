@@ -671,7 +671,7 @@ fn render_logcat_filter_bar(state: &LogcatState, area: Rect, buf: &mut Buffer) {
         Color::Rgb(50, 50, 70)
     };
     let search_text = if state.filter.search_query.is_empty() && !search_active {
-        "  / search…".to_string()
+        "  f find…".to_string()
     } else {
         let cursor = if search_active {
             let pos = state.filter.search_cursor;
@@ -691,9 +691,9 @@ fn render_logcat_filter_bar(state: &LogcatState, area: Rect, buf: &mut Buffer) {
         cursor
     };
     let search_title = if state.filter.use_regex {
-        "  \u{1f50d}  Regex  "
+        "  \u{1f50d}  Regex Find  "
     } else {
-        "  \u{1f50d}  Search  "
+        "  \u{1f50d}  Find  "
     };
     Paragraph::new(search_text)
         .block(
@@ -1236,7 +1236,7 @@ fn render_logcat_footer(state: &LogcatState, theme: &Theme, area: Rect, buf: &mu
     left_spans.push(Span::styled("│ ", Style::default().fg(theme.border)));
     // Filters
     left_spans.extend(
-        kh("F", "find", theme.key_hint, theme.dim)
+        kh("f", "find", theme.key_hint, theme.dim)
             .into_iter()
             .map(|s| Span::styled(s.content.to_string(), s.style)),
     );
@@ -1296,7 +1296,7 @@ fn render_logcat_footer(state: &LogcatState, theme: &Theme, area: Rect, buf: &mu
             .map(|s| Span::styled(s.content.to_string(), s.style)),
     );
     right_spans.extend(
-        kh("f", "fold", theme.accent, theme.dim)
+        kh("F", "fold", theme.accent, theme.dim)
             .into_iter()
             .map(|s| Span::styled(s.content.to_string(), s.style)),
     );

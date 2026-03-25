@@ -213,7 +213,7 @@ impl App {
                         KeyCode::Char('c') => Some(Message::LogcatClear),
                         KeyCode::Char('l') => Some(Message::LogcatCycleLevel),
                         KeyCode::Char('w') => Some(Message::LogcatToggleWordWrap),
-                        KeyCode::Char('F') => Some(Message::LogcatToggleSearch),
+                        KeyCode::Char('f') => Some(Message::LogcatToggleSearch),
                         KeyCode::Char('t') => Some(Message::LogcatToggleTagFilter),
                         KeyCode::Char('p') => Some(Message::LogcatTogglePackageFilter),
                         KeyCode::Char('s') => Some(Message::LogcatSave),
@@ -230,7 +230,7 @@ impl App {
                         KeyCode::Right => Some(Message::LogcatHScrollRight),
                         KeyCode::Char('0') => Some(Message::LogcatHScrollReset),
                         KeyCode::Char('y') => Some(Message::LogcatCopyLine),
-                        KeyCode::Char('f') => Some(Message::LogcatToggleFold),
+                        KeyCode::Char('F') => Some(Message::LogcatToggleFold),
                         _ => None,
                     }
                 }
