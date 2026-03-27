@@ -18,6 +18,8 @@ pub enum Message {
     RefreshDeviceInfo,
     /// Cycle to the next connected device (d key).
     NextDevice,
+    /// Background device watcher pushed a fresh status snapshot.
+    DeviceStatusUpdate(crate::adb::DeviceStatus),
 
     // Command execution
     ExecuteCommand(MenuCommand),

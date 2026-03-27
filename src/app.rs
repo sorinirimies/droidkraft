@@ -1,10 +1,13 @@
 use crate::{
+    adb::AdbManager,
     event::{AppEvent, Event, EventHandler},
     message::Message,
     model::{AppState, Model},
     update,
 };
 use ratatui::{crossterm::event::KeyCode, DefaultTerminal};
+use std::time::Duration;
+use tokio::sync::mpsc;
 
 /// Main application following Elm architecture
 /// This is a thin wrapper that connects the event loop to the Model-Update-View cycle
@@ -19,9 +22,15 @@ pub struct App {
 impl App {
     /// Create a new application
     pub fn new() -> Self {
+        let events = EventHandler::new();
+
+        // Spawn the background device watcher that detects connect/disconnect events.
+        let sender = events.sender();
+        tokio::spawn(device_watcher(sender));
+
         Self {
             model: Model::new(),
-            events: EventHandler::new(),
+            events,
         }
     }
 
@@ -73,6 +82,7 @@ impl App {
                 AppEvent::EnterChild => Message::EnterChild,
                 AppEvent::ExitChild => Message::ExitChild,
                 AppEvent::Quit => Message::Quit,
+                AppEvent::DeviceStatusUpdate(status) => Message::DeviceStatusUpdate(status),
             })),
         }
     }
@@ -308,5 +318,45 @@ impl App {
 impl Default for App {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Background task: polls `adb devices` every 2 seconds.
+///
+/// When the set of connected device serials changes (a device connects or disconnects),
+/// a full `DeviceStatus` snapshot is fetched off the async thread via `spawn_blocking`
+/// and pushed into the event queue so the UI reflects the change immediately.
+async fn device_watcher(sender: mpsc::UnboundedSender<Event>) {
+    let mut interval = tokio::time::interval(Duration::from_secs(2));
+    // The first tick fires immediately — skip it so we don't duplicate the
+    // initial load that `needs_device_refresh` already triggers on startup.
+    interval.tick().await;
+
+    let mut last_serials: Vec<String> = Vec::new();
+
+    loop {
+        interval.tick().await;
+
+        // Stop the watcher once the app has shut down and dropped the receiver.
+        if sender.is_closed() {
+            break;
+        }
+
+        // Run the (blocking) ADB calls on the thread-pool so the async runtime
+        // is never stalled.
+        let status = tokio::task::spawn_blocking(|| {
+            let mut mgr = AdbManager::new();
+            mgr.fetch_device_status()
+        })
+        .await
+        .unwrap_or_default();
+
+        let new_serials: Vec<String> = status.devices.iter().map(|d| d.serial.clone()).collect();
+
+        // Only push an event when the device list actually changed.
+        if new_serials != last_serials {
+            last_serials = new_serials;
+            let _ = sender.send(Event::App(AppEvent::DeviceStatusUpdate(status)));
+        }
     }
 }

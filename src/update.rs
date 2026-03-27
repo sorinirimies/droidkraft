@@ -31,6 +31,32 @@ pub async fn update(model: &mut Model, message: Message) {
             model.device_status = status;
         }
 
+        // Pushed by the background device-watcher task whenever the set of
+        // connected devices changes (connect or disconnect event).
+        Message::DeviceStatusUpdate(mut new_status) => {
+            // Try to keep the device the user had selected.  The watcher
+            // always creates a fresh AdbManager (no selection memory), so we
+            // re-apply the previously active serial if it still exists in the
+            // new device list.
+            if let Some(prev_serial) = model.device_status.active().map(|d| d.serial.clone()) {
+                if let Some(idx) = new_status
+                    .devices
+                    .iter()
+                    .position(|d| d.serial == prev_serial)
+                {
+                    new_status.selected_idx = idx;
+                }
+            }
+
+            // Keep the AdbManager's internal selection in sync so that
+            // subsequent manual commands target the right device.
+            if let Some(active) = new_status.active() {
+                model.adb_manager.select_device(active.serial.clone());
+            }
+
+            model.device_status = new_status;
+        }
+
         Message::NextDevice => {
             model.device_status.cycle_next();
             let status = model.adb_manager.fetch_device_status();

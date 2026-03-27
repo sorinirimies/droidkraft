@@ -43,6 +43,8 @@ pub enum AppEvent {
     ExitChild,
     /// Quit the application.
     Quit,
+    /// Background device watcher detected a change in connected devices.
+    DeviceStatusUpdate(crate::adb::DeviceStatus),
 }
 
 /// Terminal event handler.
@@ -83,6 +85,11 @@ impl EventHandler {
             .recv()
             .await
             .ok_or_eyre("Failed to receive event")
+    }
+
+    /// Clone the sender so external tasks can push events into the queue.
+    pub fn sender(&self) -> mpsc::UnboundedSender<Event> {
+        self.sender.clone()
     }
 
     /// Queue an app event to be sent to the event receiver.
