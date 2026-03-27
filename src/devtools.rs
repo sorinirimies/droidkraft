@@ -184,8 +184,21 @@ pub enum DevFocus {
 impl DevToolsState {
     pub fn new() -> Self {
         let start_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let (gradle_root, has_gradle) = find_gradle_root(&start_dir);
+        let (gradle_root, _) = find_gradle_root(&start_dir);
         let project_dir = gradle_root.unwrap_or_else(|| start_dir.clone());
+        // has_gradle: true if wrapper found OR system gradle available
+        let has_gradle = project_dir.join("gradlew").exists()
+            || project_dir.join("gradlew.bat").exists()
+            || std::process::Command::new("which")
+                .arg("gradle")
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+            || PathBuf::from(std::env::var("HOME").unwrap_or_default())
+                .join(".sdkman/candidates/gradle/current/bin/gradle")
+                .exists()
+            || PathBuf::from("/opt/homebrew/bin/gradle").exists()
+            || PathBuf::from("/usr/local/bin/gradle").exists();
 
         let explorer = tui_file_explorer::FileExplorer::new(start_dir, vec![]);
 
@@ -209,21 +222,84 @@ impl DevToolsState {
 
     /// Set the project directory and re-detect Gradle.
     pub fn set_project_dir(&mut self, dir: PathBuf) {
-        let (gradle_root, has) = find_gradle_root(&dir);
-        self.has_gradle = has;
+        let (gradle_root, _) = find_gradle_root(&dir);
         self.project_dir = gradle_root.unwrap_or_else(|| dir.clone());
+        // Re-run full detection (wrapper + system)
+        self.has_gradle = self.resolve_gradle().is_some();
         self.file_explorer = Some(tui_file_explorer::FileExplorer::new(dir, vec![]));
     }
 
-    /// Find the Gradle wrapper path by walking up from `project_dir`.
-    fn gradle_wrapper(&self) -> Option<PathBuf> {
-        find_gradle_root(&self.project_dir).0.map(|root| {
-            if cfg!(windows) {
+    /// Resolve the best available Gradle executable using multiple strategies:
+    ///
+    /// 1. `gradlew` / `gradlew.bat` wrapper found by walking up from `project_dir`
+    /// 2. System-wide `gradle` on PATH (`which gradle`)
+    /// 3. SDKMAN managed install (`~/.sdkman/candidates/gradle/current/bin/gradle`)
+    /// 4. Homebrew install (`/opt/homebrew/bin/gradle` or `/usr/local/bin/gradle`)
+    ///
+    /// Returns `(executable_path_or_name, is_wrapper, label)`.
+    fn resolve_gradle(&self) -> Option<GradleExecutable> {
+        // Strategy 1: local gradlew wrapper (preferred — uses project-pinned version)
+        if let Some(root) = find_gradle_root(&self.project_dir).0 {
+            let wrapper = if cfg!(windows) {
                 root.join("gradlew.bat")
             } else {
                 root.join("gradlew")
+            };
+            if wrapper.exists() {
+                return Some(GradleExecutable {
+                    path: wrapper,
+                    _is_wrapper: true,
+                    label: "gradlew".into(),
+                });
             }
-        })
+        }
+
+        // Strategy 2: system-wide `gradle` on PATH
+        let which_result = std::process::Command::new("which")
+            .arg("gradle")
+            .output()
+            .ok()
+            .filter(|o| o.status.success());
+
+        if let Some(output) = which_result {
+            let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path_str.is_empty() {
+                let path = PathBuf::from(&path_str);
+                if path.exists() {
+                    return Some(GradleExecutable {
+                        path,
+                        _is_wrapper: false,
+                        label: "gradle (system)".into(),
+                    });
+                }
+            }
+        }
+
+        // Strategy 3: SDKMAN
+        if let Ok(home) = std::env::var("HOME") {
+            let sdkman = PathBuf::from(&home).join(".sdkman/candidates/gradle/current/bin/gradle");
+            if sdkman.exists() {
+                return Some(GradleExecutable {
+                    path: sdkman,
+                    _is_wrapper: false,
+                    label: "gradle (sdkman)".into(),
+                });
+            }
+        }
+
+        // Strategy 4: Homebrew (Apple Silicon and Intel paths)
+        for brew_path in &["/opt/homebrew/bin/gradle", "/usr/local/bin/gradle"] {
+            let path = PathBuf::from(brew_path);
+            if path.exists() {
+                return Some(GradleExecutable {
+                    path,
+                    _is_wrapper: false,
+                    label: "gradle (homebrew)".into(),
+                });
+            }
+        }
+
+        None
     }
 
     /// Start a build in a background thread.
@@ -232,11 +308,13 @@ impl DevToolsState {
             return; // already building
         }
 
-        let wrapper = match self.gradle_wrapper() {
-            Some(w) => w,
+        let gradle = match self.resolve_gradle() {
+            Some(g) => g,
             None => {
-                self.status_message =
-                    Some("No gradlew found (searched all parent directories)".into());
+                self.status_message = Some(
+                    "Gradle not found. Install gradle or add a gradlew wrapper to your project."
+                        .into(),
+                );
                 return;
             }
         };
@@ -251,11 +329,15 @@ impl DevToolsState {
 
         self.build_status = BuildStatus::Building;
         self.build_output.clear();
-        self.build_output
-            .push_back(format!("▶ Running: ./gradlew {}", variant.task));
-        self.build_output
-            .push_back(format!("  in: {}", project_dir.display()));
+        self.build_output.push_back(format!(
+            "▶ {} {} [{}]",
+            gradle.label,
+            variant.task,
+            project_dir.display()
+        ));
         self.build_output.push_back(String::new());
+
+        let wrapper = gradle.path;
 
         let (tx, rx) = mpsc::channel::<String>();
         self.build_receiver = Some(rx);
@@ -479,6 +561,16 @@ impl Default for DevToolsState {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Describes a resolved Gradle executable.
+struct GradleExecutable {
+    /// Absolute path to the executable.
+    path: PathBuf,
+    /// True when this is a `gradlew` project wrapper (vs a system install).
+    _is_wrapper: bool,
+    /// Human-readable label shown in the build output header.
+    label: String,
 }
 
 /// Walk up the directory tree from `start` looking for `gradlew` or
