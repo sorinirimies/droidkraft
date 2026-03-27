@@ -2,7 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.2] - 2026-03-27
+
+### 🐛 Bug Fixes
+
+- Remove 'S save as' from logcat footer — only shown in save dialog - ([93697c9](https://github.com/sorinirimies/droidtui/commit/93697c90b435c4fef57a6b68dc5b28ab3b01a451))
+
+- Walk up directory tree to find gradlew (like Gradle itself) - ([0008144](https://github.com/sorinirimies/droidtui/commit/0008144663c56cf13d5f20d866a9dc6afa12431b))
+
+- Skip startup animation, go straight to menu - ([5013241](https://github.com/sorinirimies/droidtui/commit/5013241a33125a66b87af284840b9f7deedd749b))
+
+- Theme applies immediately on ↑/↓/t — live preview while browsing - ([c74a57e](https://github.com/sorinirimies/droidtui/commit/c74a57ed41e65641f0391688c4d82e88fbac01be))
+
+- UTF-8 panic in theme description truncation - ([1c0e858](https://github.com/sorinirimies/droidtui/commit/1c0e8586f873bb180e4982877d0222f7c70fb139))
+
+- T cycles theme immediately from Menu and DevMode - ([128a5e0](https://github.com/sorinirimies/droidtui/commit/128a5e0cb0bbb619f1a0e6267c310d1ffd0c3fdb))
+
+- Multi-strategy Gradle resolution (wrapper → PATH → SDKMAN → Homebrew) - ([ff2893f](https://github.com/sorinirimies/droidtui/commit/ff2893f1c26f0d0a64401984958667d4e0187413))
+
+
+### 📚 Documentation
+
+- Rewrite README.md and FEATURES.md for v0.5 - ([1d94eb9](https://github.com/sorinirimies/droidtui/commit/1d94eb922e6ad4ff08df6224fdfd157bb7a65fa4))
+
+
+### 🚀 Features
+
+- JSON export, soft wrap, CLI query mode, Nu recipes, formatted JSON - ([0f1172f](https://github.com/sorinirimies/droidtui/commit/0f1172fc16007deb723877dfa91fcf4991b1d1ad))
+
+- Dev Mode — build, run, edit Android projects from the terminal - ([e0b1e3e](https://github.com/sorinirimies/droidtui/commit/e0b1e3e5edf440b2c4ca2977bc31c511a0555ebd))
+
+- Theme applies to entire UI + 27 presets matching tui-file-explorer - ([49aedd4](https://github.com/sorinirimies/droidtui/commit/49aedd4e4028276ed68b7718fa1b284a43c1d5df))
+
+
 ## [0.5.1] - 2026-03-25
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 0.5.1 - ([865e62a](https://github.com/sorinirimies/droidtui/commit/865e62a26c73d77f723348f86c95633d45209c79))
+
 
 ### 🐛 Bug Fixes
 
