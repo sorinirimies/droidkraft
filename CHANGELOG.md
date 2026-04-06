@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [0.5.2] - 2026-03-27
 
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 0.5.2 - ([70082fd](https://github.com/sorinirimies/droidtui/commit/70082fdf24fef693fecf3ec8c0d18b52b1e2f40a))
+
+
 ### 🐛 Bug Fixes
 
 - Remove 'S save as' from logcat footer — only shown in save dialog - ([93697c9](https://github.com/sorinirimies/droidtui/commit/93697c90b435c4fef57a6b68dc5b28ab3b01a451))
