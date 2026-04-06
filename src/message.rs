@@ -82,6 +82,7 @@ pub enum Message {
     OpenDevMode,
     CloseDevMode,
     DevBuild,
+    DevBuildAndInstall,
     DevRun,
     DevCycleFocus,
     DevToggleEditorPicker,

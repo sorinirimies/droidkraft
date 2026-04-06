@@ -980,6 +980,11 @@ fn render_devmode_footer(
             .map(|s| Span::styled(s.content.to_string(), s.style)),
     );
     left.extend(
+        kh("i", "install", theme.key_hint, theme.dim)
+            .into_iter()
+            .map(|s| Span::styled(s.content.to_string(), s.style)),
+    );
+    left.extend(
         kh("R", "run", theme.key_hint, theme.dim)
             .into_iter()
             .map(|s| Span::styled(s.content.to_string(), s.style)),

@@ -156,6 +156,10 @@ pub struct DevToolsState {
     build_receiver: Option<mpsc::Receiver<String>>,
     /// Whether variant picker is open.
     pub variant_picker_open: bool,
+    /// Discovered Android application modules.
+    pub app_modules: Vec<AppModule>,
+    /// Index of the currently targeted app module (for Build & Install).
+    pub selected_app_module: usize,
 
     // ── File browser ──────────────────────────────────────────────────────
     /// File explorer state for browsing project files.
@@ -181,12 +185,22 @@ pub enum DevFocus {
     Toolbar,
 }
 
+/// Discovered Android application module inside the Gradle project.
+#[derive(Debug, Clone)]
+pub struct AppModule {
+    /// Gradle module path, e.g. `:app` or `:apps:mobile`.
+    pub gradle_path: String,
+    /// Short display name, e.g. `app` or `mobile`.
+    pub name: String,
+    /// File-system path relative to the project root, e.g. `app` or `apps/mobile`.
+    pub fs_path: String,
+}
+
 impl DevToolsState {
     pub fn new() -> Self {
         let start_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let (gradle_root, _) = find_gradle_root(&start_dir);
         let project_dir = gradle_root.unwrap_or_else(|| start_dir.clone());
-        // has_gradle: true if wrapper found OR system gradle available
         let has_gradle = project_dir.join("gradlew").exists()
             || project_dir.join("gradlew.bat").exists()
             || std::process::Command::new("which")
@@ -202,7 +216,7 @@ impl DevToolsState {
 
         let explorer = tui_file_explorer::FileExplorer::new(start_dir, vec![]);
 
-        Self {
+        let mut state = Self {
             project_dir: project_dir.clone(),
             has_gradle,
             editor: Editor::default(),
@@ -214,19 +228,131 @@ impl DevToolsState {
             build_output: VecDeque::with_capacity(5000),
             build_receiver: None,
             variant_picker_open: false,
+            app_modules: Vec::new(),
+            selected_app_module: 0,
             file_explorer: Some(explorer),
             focus: DevFocus::FileBrowser,
             status_message: None,
-        }
+        };
+
+        state.discover_app_modules();
+        state.rebuild_variants();
+        state
     }
 
     /// Set the project directory and re-detect Gradle.
     pub fn set_project_dir(&mut self, dir: PathBuf) {
         let (gradle_root, _) = find_gradle_root(&dir);
         self.project_dir = gradle_root.unwrap_or_else(|| dir.clone());
-        // Re-run full detection (wrapper + system)
         self.has_gradle = self.resolve_gradle().is_some();
         self.file_explorer = Some(tui_file_explorer::FileExplorer::new(dir, vec![]));
+        self.discover_app_modules();
+        self.rebuild_variants();
+    }
+
+    /// Called after the file browser navigates to a new directory.
+    /// If the browser is now inside a Gradle project that differs from the
+    /// current `project_dir`, update the project root and re-discover modules.
+    pub fn sync_project_from_browser(&mut self, browser_dir: &std::path::Path) {
+        let (gradle_root, _) = find_gradle_root(browser_dir);
+        if let Some(root) = gradle_root {
+            if root != self.project_dir {
+                self.project_dir = root;
+                self.has_gradle = true;
+                self.discover_app_modules();
+                self.rebuild_variants();
+                let module_count = self.app_modules.len();
+                if module_count > 0 {
+                    let names: Vec<&str> =
+                        self.app_modules.iter().map(|m| m.name.as_str()).collect();
+                    self.status_message = Some(format!(
+                        "📱 Found {} app module{}: {}",
+                        module_count,
+                        if module_count == 1 { "" } else { "s" },
+                        names.join(", ")
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Walk the project tree and find all modules that apply the
+    /// `com.android.application` plugin (i.e. modules that produce an APK).
+    pub fn discover_app_modules(&mut self) {
+        self.app_modules.clear();
+        self.selected_app_module = 0;
+        discover_app_modules_recursive(&self.project_dir, &self.project_dir, &mut self.app_modules);
+        // Sort by gradle path for deterministic order
+        self.app_modules
+            .sort_by(|a, b| a.gradle_path.cmp(&b.gradle_path));
+    }
+
+    /// Regenerate the build-variant list based on discovered app modules.
+    ///
+    /// When app modules are found the variants become module-specific (e.g.
+    /// `:app:assembleDebug`); otherwise fall back to generic tasks.
+    pub fn rebuild_variants(&mut self) {
+        if self.app_modules.is_empty() {
+            self.variants = BuildVariant::common();
+        } else if self.app_modules.len() == 1 {
+            let m = &self.app_modules[0];
+            self.variants = vec![
+                BuildVariant {
+                    name: format!("{}: Debug", m.name),
+                    task: format!("{}:assembleDebug", m.gradle_path),
+                },
+                BuildVariant {
+                    name: format!("{}: Release", m.name),
+                    task: format!("{}:assembleRelease", m.gradle_path),
+                },
+                BuildVariant {
+                    name: format!("{}: Install Debug", m.name),
+                    task: format!("{}:installDebug", m.gradle_path),
+                },
+                BuildVariant {
+                    name: format!("{}: Install Release", m.name),
+                    task: format!("{}:installRelease", m.gradle_path),
+                },
+                BuildVariant {
+                    name: "Clean".into(),
+                    task: "clean".into(),
+                },
+                BuildVariant {
+                    name: format!("Clean + {} Debug", m.name),
+                    task: format!("clean {}:assembleDebug", m.gradle_path),
+                },
+                BuildVariant {
+                    name: format!("{}: Lint", m.name),
+                    task: format!("{}:lint", m.gradle_path),
+                },
+                BuildVariant {
+                    name: format!("{}: Test", m.name),
+                    task: format!("{}:test", m.gradle_path),
+                },
+            ];
+        } else {
+            let mut variants = Vec::new();
+            for m in &self.app_modules {
+                variants.push(BuildVariant {
+                    name: format!("{}: Debug", m.name),
+                    task: format!("{}:assembleDebug", m.gradle_path),
+                });
+                variants.push(BuildVariant {
+                    name: format!("{}: Install Debug", m.name),
+                    task: format!("{}:installDebug", m.gradle_path),
+                });
+                variants.push(BuildVariant {
+                    name: format!("{}: Release", m.name),
+                    task: format!("{}:assembleRelease", m.gradle_path),
+                });
+            }
+            variants.push(BuildVariant {
+                name: "Clean".into(),
+                task: "clean".into(),
+            });
+            self.variants = variants;
+        }
+        self.selected_variant = 0;
     }
 
     /// Resolve the best available Gradle executable using multiple strategies:
@@ -302,8 +428,32 @@ impl DevToolsState {
         None
     }
 
-    /// Start a build in a background thread.
+    /// Start a build in a background thread using the currently selected variant.
     pub fn start_build(&mut self) {
+        let variant = self.variants[self.selected_variant].clone();
+        self.start_build_variant(&variant);
+    }
+
+    /// Build and install the debug APK for the currently selected app module.
+    /// Uses Gradle's `installDebug` task which handles both building AND pushing.
+    pub fn build_and_install(&mut self) {
+        if self.app_modules.is_empty() {
+            self.status_message = Some(
+                "No app modules found — navigate the file browser into an Android project first."
+                    .into(),
+            );
+            return;
+        }
+        let module = &self.app_modules[self.selected_app_module];
+        let variant = BuildVariant {
+            name: format!("{}: Build & Install Debug", module.name),
+            task: format!("{}:installDebug", module.gradle_path),
+        };
+        self.start_build_variant(&variant);
+    }
+
+    /// Internal: run a Gradle build with the given variant/task.
+    fn start_build_variant(&mut self, variant: &BuildVariant) {
         if self.build_status == BuildStatus::Building {
             return; // already building
         }
@@ -319,7 +469,6 @@ impl DevToolsState {
             }
         };
 
-        let variant = &self.variants[self.selected_variant];
         let tasks: Vec<String> = variant
             .task
             .split_whitespace()
@@ -446,9 +595,26 @@ impl DevToolsState {
 
     /// Install the debug APK and launch the main activity.
     pub fn run_app(&mut self) -> Result<(), String> {
-        // Find the APK
-        let apk_dir = self.project_dir.join("app/build/outputs/apk/debug");
-        let apk_path = if apk_dir.join("app-debug.apk").exists() {
+        // Determine which module to look for
+        let module_fs_path = if !self.app_modules.is_empty() {
+            self.app_modules[self.selected_app_module].fs_path.clone()
+        } else {
+            "app".to_string()
+        };
+
+        let apk_dir = self
+            .project_dir
+            .join(&module_fs_path)
+            .join("build/outputs/apk/debug");
+        let module_name = std::path::Path::new(&module_fs_path)
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        let apk_path = if apk_dir.join(format!("{}-debug.apk", module_name)).exists() {
+            apk_dir.join(format!("{}-debug.apk", module_name))
+        } else if apk_dir.join("app-debug.apk").exists() {
             apk_dir.join("app-debug.apk")
         } else {
             // Try to find any APK
@@ -465,7 +631,6 @@ impl DevToolsState {
 
         self.status_message = Some(format!("Installing {}…", apk_path.display()));
 
-        // Use adb shell to install
         let output = Command::new("adb")
             .args(["install", "-r", &apk_path.display().to_string()])
             .output()
@@ -478,8 +643,6 @@ impl DevToolsState {
 
         self.status_message = Some("✅ APK installed. Launching…".into());
 
-        // Try to extract package name and launch
-        // This is a best-effort heuristic
         let stdout = String::from_utf8_lossy(&output.stdout);
         self.build_output
             .push_back(format!("Install: {}", stdout.trim()));
@@ -584,6 +747,58 @@ fn find_gradle_root(start: &std::path::Path) -> (Option<PathBuf>, bool) {
         }
         if !dir.pop() {
             return (None, false);
+        }
+    }
+}
+
+/// Recursively walk `dir` looking for `build.gradle.kts` / `build.gradle`
+/// files that contain the `com.android.application` plugin declaration.
+fn discover_app_modules_recursive(
+    root: &std::path::Path,
+    dir: &std::path::Path,
+    modules: &mut Vec<AppModule>,
+) {
+    // Don't scan the project root's own build file — it's the umbrella.
+    if dir != root {
+        for build_file in &["build.gradle.kts", "build.gradle"] {
+            let path = dir.join(build_file);
+            if path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if content.contains("com.android.application") {
+                        let rel = dir.strip_prefix(root).unwrap_or(dir);
+                        let gradle_path = format!(":{}", rel.to_string_lossy().replace('/', ":"));
+                        let name = dir
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string();
+                        modules.push(AppModule {
+                            gradle_path,
+                            name,
+                            fs_path: rel.to_string_lossy().to_string(),
+                        });
+                    }
+                }
+                break; // found a build file, don't check both
+            }
+        }
+    }
+
+    // Recurse into subdirectories, skipping well-known non-module dirs
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let name = path.file_name().unwrap_or_default().to_string_lossy();
+                if !name.starts_with('.')
+                    && name != "build"
+                    && name != "buildSrc"
+                    && name != "gradle"
+                    && name != "node_modules"
+                {
+                    discover_app_modules_recursive(root, &path, modules);
+                }
+            }
         }
     }
 }
@@ -708,5 +923,62 @@ mod tests {
     fn test_build_status_default() {
         assert_eq!(BuildStatus::Idle, BuildStatus::Idle);
         assert_ne!(BuildStatus::Idle, BuildStatus::Building);
+    }
+
+    #[test]
+    fn test_discover_app_modules_with_app_plugin() {
+        let tmp = std::env::temp_dir().join("droidtui_test_app_modules");
+        let app_dir = tmp.join("app");
+        let lib_dir = tmp.join("lib");
+        let _ = std::fs::create_dir_all(&app_dir);
+        let _ = std::fs::create_dir_all(&lib_dir);
+        let _ = std::fs::write(tmp.join("gradlew"), "#!/bin/sh\n");
+        let _ = std::fs::write(
+            app_dir.join("build.gradle.kts"),
+            "plugins {\n    id(\"com.android.application\")\n}\n",
+        );
+        let _ = std::fs::write(
+            lib_dir.join("build.gradle.kts"),
+            "plugins {\n    id(\"com.android.library\")\n}\n",
+        );
+
+        let mut modules = Vec::new();
+        discover_app_modules_recursive(&tmp, &tmp, &mut modules);
+
+        assert_eq!(modules.len(), 1, "should find exactly 1 app module");
+        assert_eq!(modules[0].name, "app");
+        assert_eq!(modules[0].gradle_path, ":app");
+        assert_eq!(modules[0].fs_path, "app");
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_rebuild_variants_single_module() {
+        let mut state = DevToolsState::new();
+        state.app_modules = vec![AppModule {
+            gradle_path: ":app".into(),
+            name: "app".into(),
+            fs_path: "app".into(),
+        }];
+        state.rebuild_variants();
+        assert!(state.variants[0].task.contains(":app:"));
+        assert!(state
+            .variants
+            .iter()
+            .any(|v| v.task.contains("assembleDebug")));
+        assert!(state
+            .variants
+            .iter()
+            .any(|v| v.task.contains("installDebug")));
+    }
+
+    #[test]
+    fn test_rebuild_variants_no_modules() {
+        let mut state = DevToolsState::new();
+        state.app_modules.clear();
+        state.rebuild_variants();
+        assert_eq!(state.variants[0].name, "Debug");
+        assert_eq!(state.variants[0].task, "assembleDebug");
     }
 }

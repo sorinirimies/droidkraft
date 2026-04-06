@@ -174,6 +174,7 @@ impl App {
                     KeyCode::Esc | KeyCode::Char('q') => Some(Message::CloseDevMode),
                     KeyCode::Char('t') => Some(Message::ThemeNext),
                     KeyCode::Char('b') => Some(Message::DevBuild),
+                    KeyCode::Char('i') => Some(Message::DevBuildAndInstall),
                     KeyCode::Char('R') => Some(Message::DevRun),
                     KeyCode::Char('E') => Some(Message::DevToggleEditorPicker),
                     KeyCode::Char('v') => Some(Message::DevToggleVariantPicker),

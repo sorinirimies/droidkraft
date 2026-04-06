@@ -690,6 +690,10 @@ pub async fn update(model: &mut Model, message: Message) {
             model.devtools.start_build();
         }
 
+        Message::DevBuildAndInstall => {
+            model.devtools.build_and_install();
+        }
+
         Message::DevRun => match model.devtools.run_app() {
             Ok(()) => {}
             Err(e) => {
@@ -791,6 +795,11 @@ pub async fn update(model: &mut Model, message: Message) {
                     }
                     _ => {}
                 }
+
+                // After any navigation, check if we've entered a different
+                // Gradle project and auto-update project_dir + app modules.
+                let browser_dir = explorer.current_dir.clone();
+                model.devtools.sync_project_from_browser(&browser_dir);
             }
         }
 
