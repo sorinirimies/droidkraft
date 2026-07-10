@@ -1655,7 +1655,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-core"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "adb_client",
  "regex",
@@ -1665,7 +1665,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-gui"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "droidkraft-core",
  "gpui",
@@ -1676,7 +1676,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-tui"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "adb_client",
  "color-eyre",

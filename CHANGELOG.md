@@ -2,11 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1] - 2026-07-10
+
+### 🐛 Bug Fixes
+
+- Clean up rename fallout (BSD sed \b misses) + workspace-aware scripts - ([b74e85e](https://github.com/sorinirimies/droidkraft/commit/b74e85ea25fdb2cb97d30541f744754165deacd8))
+
+
+### 🚜 Refactor
+
+- Rename project droidtui → droidkraft - ([92ded36](https://github.com/sorinirimies/droidkraft/commit/92ded3654d78c58f1ebbafe69a6ad95a21e500a6))
+
+
 ## [0.6.0] - 2026-07-10
 
 ### ⚙️ Miscellaneous Tasks
 
 - Workspace-aware release tooling + publishable TUI crate - ([d2a34cd](https://github.com/sorinirimies/droidkraft/commit/d2a34cd15e2941c9e38f3f6a121929fb9b1ac09c))
+
+- Bump version to 0.6.0 - ([606f92e](https://github.com/sorinirimies/droidkraft/commit/606f92e8b6d7c99af79770cfef7e693e27540a30))
 
 
 ### 🐛 Bug Fixes
@@ -16,14 +30,14 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
-- **gui:** New droidkraft-gui — Zed GPUI device monitor & toolkit - ([7c5f3bf](https://github.com/sorinirimies/droidkraft/commit/7c5f3bf0ae5ca1593609ea7bf02fd3cb43075dd3))
+- **gui:** New droidtui-gui — Zed GPUI device monitor & toolkit - ([7c5f3bf](https://github.com/sorinirimies/droidkraft/commit/7c5f3bf0ae5ca1593609ea7bf02fd3cb43075dd3))
 
 
 ### 🚜 Refactor
 
-- Convert to Cargo workspace, extract droidkraft-core library - ([48a3ba2](https://github.com/sorinirimies/droidkraft/commit/48a3ba2153b1b20fadcb9a9fb2f7a1cd0258d857))
+- Convert to Cargo workspace, extract droidtui-core library - ([48a3ba2](https://github.com/sorinirimies/droidkraft/commit/48a3ba2153b1b20fadcb9a9fb2f7a1cd0258d857))
 
-- **tui:** Consume droidkraft-core logcat engine, drop duplicated domain - ([6add84c](https://github.com/sorinirimies/droidkraft/commit/6add84c5c85a4a95c0b9610168f6b3463197276f))
+- **tui:** Consume droidtui-core logcat engine, drop duplicated domain - ([6add84c](https://github.com/sorinirimies/droidkraft/commit/6add84c5c85a4a95c0b9610168f6b3463197276f))
 
 
 ### 🧪 Testing
