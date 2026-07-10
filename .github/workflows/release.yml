@@ -54,7 +54,7 @@ jobs:
         run: cargo install git-cliff
 
       - name: Install Nushell
-        run: cargo install nu --locked
+        run: cargo install nu --locked --version 0.111.0
 
       - name: Prepare release
         run: nu scripts/release_prepare.nu ${{ github.ref_name }}

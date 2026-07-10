@@ -89,6 +89,6 @@ jobs:
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
       - name: Install Nushell
-        run: cargo install nu --locked
+        run: cargo install nu --locked --version 0.111.0
       - name: Run Nu script tests
         run: nu scripts/tests/run_all.nu
