@@ -254,7 +254,7 @@ fn test_list_packages_integration() {
         Ok(output) => {
             println!(
                 "Packages (first 200 chars): {}",
-                &output.chars().take(200).collect::<String>()
+                output.chars().take(200).collect::<String>()
             );
             // Should contain package information or error message
             assert!(!output.is_empty());

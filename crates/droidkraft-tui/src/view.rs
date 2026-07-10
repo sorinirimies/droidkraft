@@ -2265,7 +2265,7 @@ fn render_save_path_input(model: &Model, area: Rect, buf: &mut Buffer, bg: Color
         ]),
         Line::from(""),
         Line::from(Span::styled(
-            format!("  {}", &toggle_hint),
+            format!("  {}", toggle_hint),
             Style::default().fg(Color::Rgb(120, 120, 140)),
         )),
         Line::from(""),
