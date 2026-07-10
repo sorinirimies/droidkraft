@@ -1,37 +1,37 @@
-# DroidTUI 🤖
+# DroidKraft 🤖
 
-[![Crates.io](https://img.shields.io/crates/v/droidtui.svg)](https://crates.io/crates/droidtui)
+[![Crates.io](https://img.shields.io/crates/v/droidkraft.svg)](https://crates.io/crates/droidkraft)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Release](https://github.com/sorinirimies/droidtui/actions/workflows/release.yml/badge.svg)](https://github.com/sorinirimies/droidtui/actions/workflows/release.yml)
-[![CI](https://github.com/sorinirimies/droidtui/actions/workflows/ci.yml/badge.svg)](https://github.com/sorinirimies/droidtui/actions/workflows/ci.yml)
+[![Release](https://github.com/sorinirimies/droidkraft/actions/workflows/release.yml/badge.svg)](https://github.com/sorinirimies/droidkraft/actions/workflows/release.yml)
+[![CI](https://github.com/sorinirimies/droidkraft/actions/workflows/ci.yml/badge.svg)](https://github.com/sorinirimies/droidkraft/actions/workflows/ci.yml)
 
 A beautiful Terminal User Interface (TUI) for Android development — ADB commands, live logcat viewer, device dashboard, and more. Built with Rust, Ratatui, and the pure-Rust `adb_client` crate (no Android SDK required).
 
 ## Workspace layout 🏗️
 
-DroidTUI is a Cargo workspace with a reusable core library and two frontends:
+DroidKraft is a Cargo workspace with a reusable core library and two frontends:
 
 | Crate | Kind | Description |
 |-------|------|-------------|
-| [`droidtui-core`](crates/droidtui-core) | library (`droidtui_core`) | Framework-free ADB & fastboot API: device info, packages, system, logcat parsing + streaming engine, flash/root toolkit, screen capture. **No** GUI/TUI deps — publishable and reusable. |
-| [`droidtui`](crates/droidtui-tui) | binary (TUI) | The Ratatui terminal app, built on `droidtui-core`. |
-| [`droidtui-gui`](crates/droidtui-gui) | binary (GUI) | A [Zed GPUI](https://www.gpui.rs/) desktop app: device monitor, realtime logs, one-click commands, flash/root toolkit, and live screen mirroring. |
+| [`droidkraft-core`](crates/droidkraft-core) | library (`droidkraft_core`) | Framework-free ADB & fastboot API: device info, packages, system, logcat parsing + streaming engine, flash/root toolkit, screen capture. **No** GUI/TUI deps — publishable and reusable. |
+| [`droidkraft`](crates/droidkraft-tui) | binary (TUI) | The Ratatui terminal app, built on `droidkraft-core`. |
+| [`droidkraft-gui`](crates/droidkraft-gui) | binary (GUI) | A [Zed GPUI](https://www.gpui.rs/) desktop app: device monitor, realtime logs, one-click commands, flash/root toolkit, and live screen mirroring. |
 
 ```
-droidtui-core  ◄── droidtui (TUI, Ratatui)
+droidkraft-core  ◄── droidkraft (TUI, Ratatui)
      ▲
-     └────────── droidtui-gui (GUI, GPUI)
+     └────────── droidkraft-gui (GUI, GPUI)
 ```
 
 The GUI is an **opt-in** member (it needs the full Xcode/Metal toolchain on
 macOS), so `cargo build` / `cargo test` build only the core + TUI. Build the GUI
-explicitly with `cargo build -p droidtui-gui` (see its
-[README](crates/droidtui-gui/README.md)).
+explicitly with `cargo build -p droidkraft-gui` (see its
+[README](crates/droidkraft-gui/README.md)).
 
 ### Using the core library
 
 ```rust,no_run
-use droidtui_core::AdbManager;
+use droidkraft_core::AdbManager;
 
 let mut adb = AdbManager::new();
 let status = adb.fetch_device_status();
@@ -83,12 +83,12 @@ Full-screen, real-time logcat streaming with professional-grade tooling:
 Stream logcat as JSON lines to stdout — designed for piping into Nushell, jq, or grep:
 
 ```bash
-droidtui --query                          # Stream live logcat as JSONL
-droidtui --query --last 500               # Dump last 500 lines
-droidtui --query --level E                # Only errors
-droidtui --query --tag MyApp              # Filter by tag
-droidtui --query --grep "timeout"         # Filter by message
-droidtui --query | nu -c 'lines | each { from json } | where level == "Error"'
+droidkraft --query                          # Stream live logcat as JSONL
+droidkraft --query --last 500               # Dump last 500 lines
+droidkraft --query --level E                # Only errors
+droidkraft --query --tag MyApp              # Filter by tag
+droidkraft --query --grep "timeout"         # Filter by message
+droidkraft --query | nu -c 'lines | each { from json } | where level == "Error"'
 ```
 
 ### 📂 Nushell Recipe Scripts
@@ -103,7 +103,7 @@ Pre-built analysis scripts in `scripts/logcat/`:
 | `filter_json.nu` | Extract and pretty-print JSON payloads from messages |
 
 ```bash
-droidtui --query --last 5000 > logcat.jsonl
+droidkraft --query --last 5000 > logcat.jsonl
 nu scripts/logcat/top_tags.nu logcat.jsonl
 ```
 
@@ -112,14 +112,14 @@ nu scripts/logcat/top_tags.nu logcat.jsonl
 ### From crates.io
 
 ```bash
-cargo install droidtui
+cargo install droidkraft
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/sorinirimies/droidtui.git
-cd droidtui
+git clone https://github.com/sorinirimies/droidkraft.git
+cd droidkraft
 cargo install --path .
 ```
 
@@ -131,9 +131,9 @@ cargo install --path .
 ## Usage 🎮
 
 ```bash
-droidtui          # Launch the TUI
-droidtui --query   # CLI mode — stream logcat as JSON
-droidtui --help    # Show all options
+droidkraft          # Launch the TUI
+droidkraft --query   # CLI mode — stream logcat as JSON
+droidkraft --help    # Show all options
 ```
 
 ### Key Bindings — Main Menu
@@ -209,7 +209,7 @@ droidtui --help    # Show all options
 
 ## Architecture 🏗️
 
-DroidTUI follows an **Elm-like architecture** with clear separation of concerns:
+DroidKraft follows an **Elm-like architecture** with clear separation of concerns:
 
 ```
 ┌── Model ──────────────────────┐
@@ -229,7 +229,7 @@ DroidTUI follows an **Elm-like architecture** with clear separation of concerns:
 ### Project Structure
 
 ```
-droidtui/
+droidkraft/
 ├── src/
 │   ├── main.rs       # Entry point + CLI query mode
 │   ├── app.rs        # Event loop, key → message mapping

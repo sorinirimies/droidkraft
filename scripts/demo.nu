@@ -1,6 +1,6 @@
 #!/usr/bin/env nu
-# DroidTUI Demo Script
-# Demonstrates the features of the DroidTUI application interactively.
+# DroidKraft Demo Script
+# Demonstrates the features of the DroidKraft application interactively.
 #
 # Usage: nu scripts/demo.nu
 
@@ -48,9 +48,9 @@ def main [] {
     print "        Android Development TUI Demo"
     print $"($reset)"
 
-    print_header "🤖 Welcome to DroidTUI Demo"
+    print_header "🤖 Welcome to DroidKraft Demo"
 
-    print $"($blue)DroidTUI is a beautiful Terminal User Interface for Android development($reset)"
+    print $"($blue)DroidKraft is a beautiful Terminal User Interface for Android development($reset)"
     print $"($blue)that provides an intuitive interface for ADB commands with visual effects.($reset)"
     print ""
     wait_for_user
@@ -118,7 +118,7 @@ def main [] {
     }
     print_feature "Rust/Cargo is installed"
 
-    # Check that the ADB server is reachable (droidtui uses adb_client, not the CLI)
+    # Check that the ADB server is reachable (droidkraft uses adb_client, not the CLI)
     print_feature "ADB communication via adb_client (no CLI required)"
     print $"  ($cyan)Connects directly to ADB server on 127.0.0.1:5037($reset)"
     print $"  ($cyan)Make sure the ADB server is running: adb start-server($reset)"
@@ -126,7 +126,7 @@ def main [] {
     print ""
     wait_for_user
 
-    print_header "🎬 Starting DroidTUI"
+    print_header "🎬 Starting DroidKraft"
 
     print $"($blue)Building application...($reset)"
     let build = (do { run-external "cargo" "build" "--release" "--quiet" } | complete)
@@ -137,18 +137,18 @@ def main [] {
     print_feature "Build successful!"
 
     print ""
-    print $"($green)🚀 Launching DroidTUI...($reset)"
+    print $"($green)🚀 Launching DroidKraft...($reset)"
     print $"($yellow)   Use Ctrl+C or 'q' to exit($reset)"
     print $"($yellow)   Explore the menu and try different commands!($reset)"
     print ""
 
     sleep 2sec
 
-    run-external "./target/release/droidtui"
+    run-external "./target/release/droidkraft"
 
     print_header "🎉 Demo Complete"
 
-    print $"($green)Thank you for trying DroidTUI!($reset)"
+    print $"($green)Thank you for trying DroidKraft!($reset)"
     print ""
     print $"($blue)What's next?($reset)"
     print "• Customize the menu items in src/menu.rs"

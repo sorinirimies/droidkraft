@@ -1,5 +1,5 @@
 #!/usr/bin/env nu
-# Pre-publish readiness check for droidtui
+# Pre-publish readiness check for droidkraft
 # Usage: nu scripts/check_publish.nu
 # Run this before 'cargo publish' to catch problems early.
 
@@ -9,7 +9,7 @@ def main [] {
     let cyan   = (ansi cyan)
     let reset  = (ansi reset)
 
-    print "Checking droidtui for publish readiness..."
+    print "Checking droidkraft for publish readiness..."
     print ""
 
     mut errors = 0

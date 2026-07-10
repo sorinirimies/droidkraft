@@ -1,11 +1,11 @@
-# DroidTUI Quick Reference - adb_cli API
+# DroidKraft Quick Reference - adb_cli API
 
 ## 🚀 Quick Start
 
 ### Using ADB Commands
 
 ```rust
-use droidtui::adb::{AdbCommand, AdbManager, PackageFilter};
+use droidkraft_tui::adb::{AdbCommand, AdbManager, PackageFilter};
 
 // Create manager
 let mut manager = AdbManager::new();
@@ -166,7 +166,7 @@ pub enum PackageFilter {
 ## ⚠️ Error Handling
 
 ```rust
-use droidtui::adb::{AdbError, AdbResult};
+use droidkraft_tui::adb::{AdbError, AdbResult};
 
 match manager.execute(command) {
     Ok(output) => println!("Success: {}", output),
@@ -390,7 +390,7 @@ for _ in 0..100 {
 ### Full Example: Device Monitor
 
 ```rust
-use droidtui::adb::{AdbCommand, AdbManager};
+use droidkraft_tui::adb::{AdbCommand, AdbManager};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut manager = AdbManager::new();

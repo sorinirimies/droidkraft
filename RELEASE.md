@@ -1,6 +1,6 @@
 # Release Process Guide
 
-This document describes the automated and manual release process for DroidTUI.
+This document describes the automated and manual release process for DroidKraft.
 
 ## Quick Release (Automated)
 
@@ -127,7 +127,7 @@ Once you push a tag, GitHub Actions will automatically:
 
 ## Version Numbering
 
-DroidTUI follows [Semantic Versioning](https://semver.org/):
+DroidKraft follows [Semantic Versioning](https://semver.org/):
 
 - **MAJOR** (X.0.0) - Incompatible API changes
 - **MINOR** (0.X.0) - New features, backwards compatible

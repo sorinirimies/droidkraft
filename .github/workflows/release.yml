@@ -64,14 +64,14 @@ jobs:
 
       - name: Package binary
         run: |
-          tar -C target/release -czvf droidtui-${{ github.ref_name }}-linux-x86_64.tar.gz droidtui
+          tar -C target/release -czvf droidkraft-${{ github.ref_name }}-linux-x86_64.tar.gz droidkraft
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           body_path: RELEASE_CHANGELOG.md
           files: |
-            droidtui-${{ github.ref_name }}-linux-x86_64.tar.gz
+            droidkraft-${{ github.ref_name }}-linux-x86_64.tar.gz
             LICENSE
             README.md
             CHANGELOG.md
@@ -83,12 +83,12 @@ jobs:
         env:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
-          echo "Publishing droidtui-core to crates.io..."
-          cargo publish -p droidtui-core --token $CRATES_IO_TOKEN --allow-dirty
+          echo "Publishing droidkraft-core to crates.io..."
+          cargo publish -p droidkraft-core --token $CRATES_IO_TOKEN --allow-dirty
           echo "Waiting for the index to update..."
           sleep 30
-          echo "Publishing droidtui (TUI) to crates.io..."
-          cargo publish -p droidtui --token $CRATES_IO_TOKEN --allow-dirty
+          echo "Publishing droidkraft (TUI) to crates.io..."
+          cargo publish -p droidkraft --token $CRATES_IO_TOKEN --allow-dirty
 
       - name: Skip crates.io publish
         if: env.CRATES_IO_TOKEN == ''

@@ -1,5 +1,5 @@
 #!/usr/bin/env nu
-# Automated version bump script for droidtui
+# Automated version bump script for droidkraft
 # Usage: nu scripts/bump_version.nu [--yes] <new_version>
 # Example: nu scripts/bump_version.nu 0.2.0
 #          nu scripts/bump_version.nu --yes 0.2.0   # skip confirmation
@@ -21,7 +21,7 @@ Version must be in format: X.Y.Z or X.Y.Z-suffix \(e.g., 0.2.0 or 0.2.0-beta.1\)
     }
 
     print $"($cyan)════════════════════════════════════════($reset)"
-    print $"($cyan)  droidtui Version Bump($reset)"
+    print $"($cyan)  droidkraft Version Bump($reset)"
     print $"($cyan)════════════════════════════════════════($reset)"
     print ""
 
@@ -84,7 +84,7 @@ Version must be in format: X.Y.Z or X.Y.Z-suffix \(e.g., 0.2.0 or 0.2.0-beta.1\)
             if ($line =~ '^version\s*=\s*"[^"]*"') {
                 # Workspace/package version line.
                 $'version      = "($new_version)"'
-            } else if ($line =~ '^\s*droidtui-[a-z]+\s*=\s*\{.*version\s*=\s*"[^"]*"') {
+            } else if ($line =~ '^\s*droidkraft-[a-z]+\s*=\s*\{.*version\s*=\s*"[^"]*"') {
                 # Internal path-dependency version requirement (workspace.dependencies).
                 $line | str replace --regex 'version\s*=\s*"[^"]*"' $'version = "($new_version)"'
             } else {
@@ -134,7 +134,7 @@ Version must be in format: X.Y.Z or X.Y.Z-suffix \(e.g., 0.2.0 or 0.2.0-beta.1\)
     # ── Step 3: Update Cargo.lock ─────────────────────────────────────────────
     print ""
     print $"($cyan)Step 3/8: Updating Cargo.lock...($reset)"
-    run-external "cargo" "update" "-p" "droidtui"
+    run-external "cargo" "update" "-p" "droidkraft-tui"
     print $"($green)✓ Cargo.lock updated($reset)"
 
     # ── Step 4: cargo fmt ─────────────────────────────────────────────────────

@@ -1654,13 +1654,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "droidtui"
+name = "droidkraft-core"
+version = "0.6.0"
+dependencies = [
+ "adb_client",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "droidkraft-gui"
+version = "0.6.0"
+dependencies = [
+ "droidkraft-core",
+ "gpui",
+ "gpui_platform",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "droidkraft-tui"
 version = "0.6.0"
 dependencies = [
  "adb_client",
  "color-eyre",
  "crossterm 0.28.1",
- "droidtui-core",
+ "droidkraft-core",
  "futures",
  "ratatui 0.29.0",
  "ratatui-widgets 0.2.2",
@@ -1670,27 +1691,6 @@ dependencies = [
  "tachyonfx",
  "tokio",
  "tui-file-explorer",
-]
-
-[[package]]
-name = "droidtui-core"
-version = "0.6.0"
-dependencies = [
- "adb_client",
- "regex",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "droidtui-gui"
-version = "0.6.0"
-dependencies = [
- "droidtui-core",
- "gpui",
- "gpui_platform",
- "serde",
- "serde_json",
 ]
 
 [[package]]

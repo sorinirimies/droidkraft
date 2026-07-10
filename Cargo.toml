@@ -1,15 +1,15 @@
 [workspace]
 members = [
-    "crates/droidtui-core",
-    "crates/droidtui-tui",
-    "crates/droidtui-gui",
+    "crates/droidkraft-core",
+    "crates/droidkraft-tui",
+    "crates/droidkraft-gui",
 ]
 # The GUI depends on Zed's gpui, which requires the full Xcode Metal toolchain
 # (macOS) to build. Keep it out of the default set so `cargo build`/`cargo test`
-# stay green on machines without it; build it explicitly with `-p droidtui-gui`.
+# stay green on machines without it; build it explicitly with `-p droidkraft-gui`.
 default-members = [
-    "crates/droidtui-core",
-    "crates/droidtui-tui",
+    "crates/droidkraft-core",
+    "crates/droidkraft-tui",
 ]
 resolver = "2"
 
@@ -18,8 +18,8 @@ version      = "0.6.0"
 edition    = "2021"
 authors    = ["Sorin Albu-Irimies <mihaiirimies@gmail.com>"]
 license    = "MIT"
-repository = "https://github.com/sorinirimies/droidtui"
-homepage   = "https://github.com/sorinirimies/droidtui"
+repository = "https://github.com/sorinirimies/droidkraft"
+homepage   = "https://github.com/sorinirimies/droidkraft"
 
 # ── Shared dependency versions ─────────────────────────────────────────────────
 # Pin versions here once; each crate references them with `{ workspace = true }`
@@ -46,7 +46,7 @@ tachyonfx         = "0.7.0"
 tui-file-explorer = { version = "0.8.8", default-features = false }
 
 # Internal crates
-droidtui-core = { path = "crates/droidtui-core", version = "0.6.0" }
+droidkraft-core = { path = "crates/droidkraft-core", version = "0.6.0" }
 
 [profile.release]
 opt-level     = 3

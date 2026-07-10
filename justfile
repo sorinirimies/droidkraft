@@ -1,4 +1,4 @@
-# DroidTUI — task runner
+# DroidKraft — task runner
 #
 # Install just:     cargo install just
 # Install nushell:  https://www.nushell.sh
@@ -38,7 +38,7 @@ build-release:
 
 # Build the GPUI GUI (opt-in; needs the full Xcode/Metal toolchain on macOS)
 build-gui:
-    cargo build -p droidtui-gui
+    cargo build -p droidkraft-gui
 
 # Build everything including the GUI
 build-all:
@@ -74,7 +74,7 @@ test:
 
 # Run only the core library tests
 test-core:
-    cargo test -p droidtui-core
+    cargo test -p droidkraft-core
 
 # Run tests with all features
 test-all:
@@ -185,11 +185,11 @@ release-all version: check-all check-git-cliff check-nu
 
 # Run the TUI (cargo run, debug)
 run:
-    cargo run -p droidtui
+    cargo run -p droidkraft
 
 # Run the GPUI GUI (opt-in; needs the full Xcode/Metal toolchain on macOS)
 run-gui:
-    cargo run -p droidtui-gui
+    cargo run -p droidkraft-gui
 
 # Build release binary and launch it
 run-release: build-release
@@ -326,11 +326,11 @@ example-menu:
 
 # Show project info
 info:
-    @echo "Project:  DroidTUI"
+    @echo "Project:  DroidKraft"
     @echo "Version:  $(just version)"
     @echo "Author:   Sorin Albu-Irimies"
     @echo "License:  MIT"
-    @echo "Crate:    https://crates.io/crates/droidtui"
+    @echo "Crate:    https://crates.io/crates/droidkraft"
 
 # View changelog
 view-changelog:

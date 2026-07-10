@@ -13,7 +13,7 @@ use ./runner.nu *
 def make_cargo [version: string] {
     let tmp = (mktemp -d)
     let content = $'[package]
-name = "droidtui"
+name = "droidkraft-tui"
 version = "($version)"
 edition = "2021"
 '
@@ -129,14 +129,14 @@ def "test cargo toml non-version lines are preserved" [] {
     apply_version_update $tmp "1.0.1"
     let content = open --raw ($tmp | path join "Cargo.toml")
     rm -rf $tmp
-    assert str contains $content "name = \"droidtui\""
+    assert str contains $content "name = \"droidkraft\""
     assert str contains $content "edition = \"2021\""
 }
 
 def "test cargo toml dependency lines are not changed" [] {
     let tmp = (mktemp -d)
     let content = '[package]
-name = "droidtui"
+name = "droidkraft-tui"
 version = "1.0.0"
 edition = "2021"
 

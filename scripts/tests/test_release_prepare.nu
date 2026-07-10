@@ -13,7 +13,7 @@ use ./runner.nu *
 def make_cargo [version: string] {
     let tmp = (mktemp -d)
     let content = $'[package]
-name = "droidtui"
+name = "droidkraft-tui"
 version = "($version)"
 edition = "2021"
 '
@@ -57,7 +57,7 @@ def build_release_notes [version: string, cliff_changes: string, last_tag: strin
     }
 
     [
-        $"# droidtui ($version)"
+        $"# droidkraft ($version)"
         ""
         "## What's New"
         ""
@@ -68,14 +68,14 @@ def build_release_notes [version: string, cliff_changes: string, last_tag: strin
         "## Installation"
         ""
         "```bash"
-        "cargo install droidtui"
+        "cargo install droidkraft"
         "```"
         ""
         "## Quick Start"
         ""
         "```bash"
-        "# Run DroidTUI"
-        "droidtui"
+        "# Run DroidKraft"
+        "droidkraft-tui"
         ""
         "# Navigate with vim-style keys"
         "# Use j/k or arrow keys to navigate"
@@ -135,14 +135,14 @@ def "test cargo toml non-version lines survive update" [] {
     apply_version_update $tmp "1.0.1"
     let content = open --raw ($tmp | path join "Cargo.toml")
     rm -rf $tmp
-    assert str contains $content "name = \"droidtui\""
+    assert str contains $content "name = \"droidkraft\""
     assert str contains $content "edition = \"2021\""
 }
 
 def "test cargo toml dependency version lines are untouched" [] {
     let tmp = (mktemp -d)
     let content = '[package]
-name = "droidtui"
+name = "droidkraft-tui"
 version = "1.0.0"
 edition = "2021"
 
@@ -192,7 +192,7 @@ def "test last tag is trimmed" [] {
 
 def "test release notes contains version header" [] {
     let notes = build_release_notes "1.2.3" "- fix something" ""
-    assert str contains $notes "# droidtui 1.2.3"
+    assert str contains $notes "# droidkraft 1.2.3"
 }
 
 def "test release notes contains whats new section" [] {
@@ -222,13 +222,13 @@ def "test release notes contains cliff changes" [] {
 def "test release notes contains installation section" [] {
     let notes = build_release_notes "1.2.3" "- changes" ""
     assert str contains $notes "## Installation"
-    assert str contains $notes "cargo install droidtui"
+    assert str contains $notes "cargo install droidkraft"
 }
 
 def "test release notes contains quick start section" [] {
     let notes = build_release_notes "1.2.3" "- changes" ""
     assert str contains $notes "## Quick Start"
-    assert str contains $notes "droidtui"
+    assert str contains $notes "droidkraft"
 }
 
 def "test release notes does not contain library install instructions" [] {
@@ -258,7 +258,7 @@ def "test release changelog file content matches notes" [] {
     $notes | save --force ($tmp | path join "RELEASE_CHANGELOG.md")
     let content = open --raw ($tmp | path join "RELEASE_CHANGELOG.md")
     rm -rf $tmp
-    assert str contains $content "# droidtui 2.0.0"
+    assert str contains $content "# droidkraft 2.0.0"
     assert str contains $content "### Changes since v1.0.0:"
 }
 
@@ -268,7 +268,7 @@ def "test release changelog contains install command" [] {
     $notes | save --force ($tmp | path join "RELEASE_CHANGELOG.md")
     let content = open --raw ($tmp | path join "RELEASE_CHANGELOG.md")
     rm -rf $tmp
-    assert str contains $content "cargo install droidtui"
+    assert str contains $content "cargo install droidkraft"
 }
 
 # ── Runner ────────────────────────────────────────────────────────────────────

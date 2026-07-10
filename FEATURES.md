@@ -1,6 +1,6 @@
-# DroidTUI Features Documentation 🚀
+# DroidKraft Features Documentation 🚀
 
-A comprehensive guide to all features in DroidTUI v0.5.
+A comprehensive guide to all features in DroidKraft v0.5.
 
 ## 📺 Live Logcat Viewer
 
@@ -81,17 +81,17 @@ Designed for piping into Nushell, jq, or any JSON-aware tool.
 Non-TUI mode for scripting and piping:
 
 ```bash
-droidtui --query                    # Stream live logcat as JSONL
-droidtui --query --last 500         # Dump last 500 lines and exit
-droidtui --query --level E          # Filter: errors only
-droidtui --query --tag MyApp        # Filter: tag contains "MyApp"
-droidtui --query --grep "timeout"   # Filter: message contains "timeout"
-droidtui --help                     # Show all options
+droidkraft --query                    # Stream live logcat as JSONL
+droidkraft --query --last 500         # Dump last 500 lines and exit
+droidkraft --query --level E          # Filter: errors only
+droidkraft --query --tag MyApp        # Filter: tag contains "MyApp"
+droidkraft --query --grep "timeout"   # Filter: message contains "timeout"
+droidkraft --help                     # Show all options
 ```
 
 Combine with Nushell:
 ```bash
-droidtui --query | nu -c 'lines | each { from json } | where level == "Error" | group-by tag'
+droidkraft --query | nu -c 'lines | each { from json } | where level == "Error" | group-by tag'
 ```
 
 ## 📂 Nushell Recipe Scripts
