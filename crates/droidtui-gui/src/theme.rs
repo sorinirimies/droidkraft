@@ -38,8 +38,8 @@ pub fn tag_color(tag: &str) -> Rgba {
         hash = hash.wrapping_mul(33).wrapping_add(b as u32);
     }
     const PALETTE: &[u32] = &[
-        0x569cd6, 0x4ec9b0, 0xdcdcaa, 0xce9178, 0xb5cea8, 0xc882c8, 0x64c8dc, 0xdcb464,
-        0x82b4dc, 0xb48cb4, 0x96dc96, 0xdc9696,
+        0x569cd6, 0x4ec9b0, 0xdcdcaa, 0xce9178, 0xb5cea8, 0xc882c8, 0x64c8dc, 0xdcb464, 0x82b4dc,
+        0xb48cb4, 0x96dc96, 0xdc9696,
     ];
     rgb(PALETTE[(hash as usize) % PALETTE.len()])
 }

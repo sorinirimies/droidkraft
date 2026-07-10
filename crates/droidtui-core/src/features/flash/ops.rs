@@ -37,7 +37,11 @@ impl AdbManager {
         if let Ok(ver) = self.shell_command("su -c 'magisk -V' 2>/dev/null") {
             let ver = ver.trim();
             if !ver.is_empty()
-                && ver.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false)
+                && ver
+                    .chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
             {
                 return Ok(RootStatus {
                     is_rooted: true,

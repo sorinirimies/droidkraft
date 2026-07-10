@@ -108,7 +108,10 @@ mod tests {
 
     #[test]
     fn oem_unlock_args() {
-        assert_eq!(FastbootCommand::OemUnlock.args(), vec!["flashing", "unlock"]);
+        assert_eq!(
+            FastbootCommand::OemUnlock.args(),
+            vec!["flashing", "unlock"]
+        );
     }
 
     #[test]

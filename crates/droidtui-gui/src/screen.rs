@@ -85,7 +85,10 @@ fn capture_loop(serial: String, running: Arc<AtomicBool>, state: Arc<Mutex<Scree
     adb.select_device(serial);
 
     let dir = std::env::temp_dir();
-    let paths = [dir.join("droidtui_frame_a.png"), dir.join("droidtui_frame_b.png")];
+    let paths = [
+        dir.join("droidtui_frame_a.png"),
+        dir.join("droidtui_frame_b.png"),
+    ];
     let mut toggle = 0usize;
 
     let mut frames_since = 0u32;

@@ -92,8 +92,12 @@ jobs:
         env:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
-          echo "Publishing to crates.io..."
-          cargo publish --token $CRATES_IO_TOKEN --allow-dirty
+          echo "Publishing droidtui-core to crates.io..."
+          cargo publish -p droidtui-core --token $CRATES_IO_TOKEN --allow-dirty
+          echo "Waiting for the index to update..."
+          sleep 30
+          echo "Publishing droidtui (TUI) to crates.io..."
+          cargo publish -p droidtui --token $CRATES_IO_TOKEN --allow-dirty
 
       - name: Skip crates.io publish
         if: env.CRATES_IO_TOKEN == ''

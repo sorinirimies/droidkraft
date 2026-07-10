@@ -219,12 +219,7 @@ impl DroidGui {
                     .text_color(rgb(theme::TEXT_DIM))
                     .child(label.into()),
             )
-            .child(
-                div()
-                    .text_lg()
-                    .text_color(rgb(color))
-                    .child(value.into()),
-            )
+            .child(div().text_lg().text_color(rgb(color)).child(value.into()))
             .into_any_element()
     }
 
@@ -292,7 +287,11 @@ impl DroidGui {
         for panel in Panel::all() {
             let panel = *panel;
             let active = panel == self.active;
-            let bg = if active { theme::BG_ELEV } else { theme::BG_PANEL };
+            let bg = if active {
+                theme::BG_ELEV
+            } else {
+                theme::BG_PANEL
+            };
             let fg = if active { theme::TEXT } else { theme::TEXT_DIM };
             rail = rail.child(
                 div()
@@ -329,7 +328,12 @@ impl DroidGui {
                 .px_2()
                 .py_2()
                 .child(div().size_2().rounded_full().bg(rgb(dot)))
-                .child(div().text_xs().text_color(rgb(theme::TEXT_DIM)).child(label)),
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme::TEXT_DIM))
+                        .child(label),
+                ),
         );
 
         rail.into_any_element()
@@ -343,7 +347,12 @@ impl DroidGui {
             .flex()
             .items_center()
             .justify_between()
-            .child(div().text_xl().text_color(rgb(theme::TEXT)).child("Dashboard"))
+            .child(
+                div()
+                    .text_xl()
+                    .text_color(rgb(theme::TEXT))
+                    .child("Dashboard"),
+            )
             .child(self.button(
                 "refresh",
                 "Refresh",
@@ -364,7 +373,11 @@ impl DroidGui {
                         .flex_row()
                         .gap_3()
                         .flex_wrap()
-                        .child(Self::pill("Model", nonempty(&s.model, "unknown"), theme::TEXT))
+                        .child(Self::pill(
+                            "Model",
+                            nonempty(&s.model, "unknown"),
+                            theme::TEXT,
+                        ))
                         .child(Self::pill(
                             "Android",
                             nonempty(&s.android_version, "?"),
@@ -396,13 +409,22 @@ impl DroidGui {
                         .px_3()
                         .py_2()
                         .rounded_md()
-                        .bg(rgb(if active { theme::BG_ELEV } else { theme::BG_PANEL }))
+                        .bg(rgb(if active {
+                            theme::BG_ELEV
+                        } else {
+                            theme::BG_PANEL
+                        }))
                         .child(div().size_2().rounded_full().bg(rgb(if d.is_online() {
                             theme::OK
                         } else {
                             theme::WARN
                         })))
-                        .child(div().text_sm().text_color(rgb(theme::TEXT)).child(d.serial.clone()))
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(rgb(theme::TEXT))
+                                .child(d.serial.clone()),
+                        )
                         .child(
                             div()
                                 .text_xs()
@@ -413,15 +435,24 @@ impl DroidGui {
                 }))
                 .into_any_element()
         } else {
-            empty_state("No device connected", "Connect a device over USB with debugging enabled.")
+            empty_state(
+                "No device connected",
+                "Connect a device over USB with debugging enabled.",
+            )
         };
 
-        panel_container(Panel::Dashboard).child(header).child(body).into_any_element()
+        panel_container(Panel::Dashboard)
+            .child(header)
+            .child(body)
+            .into_any_element()
     }
 
     fn render_commands(&self, cx: &mut Context<Self>) -> AnyElement {
         let mut root = panel_container(Panel::Commands).child(
-            div().text_xl().text_color(rgb(theme::TEXT)).child("Commands"),
+            div()
+                .text_xl()
+                .text_color(rgb(theme::TEXT))
+                .child("Commands"),
         );
 
         for cat in CommandCategory::all() {
@@ -509,7 +540,11 @@ impl DroidGui {
                 } else {
                     (theme::WARN, "Not rooted".to_string())
                 };
-                div().text_sm().text_color(rgb(color)).child(text).into_any_element()
+                div()
+                    .text_sm()
+                    .text_color(rgb(color))
+                    .child(text)
+                    .into_any_element()
             }
         };
 
@@ -517,9 +552,14 @@ impl DroidGui {
             div().flex().flex_row().flex_wrap().gap_2(),
             |row, &target| {
                 let id: &'static str = target.label();
-                row.child(self.button(id, target.label(), theme::BG_ELEV, theme::TEXT, cx, move |this, _cx| {
-                    this.reboot(target)
-                }))
+                row.child(self.button(
+                    id,
+                    target.label(),
+                    theme::BG_ELEV,
+                    theme::TEXT,
+                    cx,
+                    move |this, _cx| this.reboot(target),
+                ))
             },
         );
 
@@ -545,24 +585,43 @@ impl DroidGui {
         }
 
         panel_container(Panel::Flash)
-            .child(div().text_xl().text_color(rgb(theme::TEXT)).child("Flash & Root"))
+            .child(
+                div()
+                    .text_xl()
+                    .text_color(rgb(theme::TEXT))
+                    .child("Flash & Root"),
+            )
             .child(
                 div()
                     .flex()
                     .items_center()
                     .gap_2()
-                    .child(self.button("root-check", "Check Root", theme::ACCENT_DIM, 0xffffff, cx, |this, _cx| {
-                        this.detect_root()
-                    }))
-                    .child(self.button("remount", "Remount RW", theme::BG_ELEV, theme::TEXT, cx, |this, _cx| {
-                        this.busy_label = Some("Remount".into());
-                        this.worker.send(WorkerRequest::Remount);
-                    }))
+                    .child(self.button(
+                        "root-check",
+                        "Check Root",
+                        theme::ACCENT_DIM,
+                        0xffffff,
+                        cx,
+                        |this, _cx| this.detect_root(),
+                    ))
+                    .child(self.button(
+                        "remount",
+                        "Remount RW",
+                        theme::BG_ELEV,
+                        theme::TEXT,
+                        cx,
+                        |this, _cx| {
+                            this.busy_label = Some("Remount".into());
+                            this.worker.send(WorkerRequest::Remount);
+                        },
+                    ))
                     .child(root_line),
             )
             .child(Self::section_title("Reboot into"))
             .child(reboots)
-            .child(Self::section_title("Fastboot (device must be in bootloader)"))
+            .child(Self::section_title(
+                "Fastboot (device must be in bootloader)",
+            ))
             .child(fb_row)
             .child(self.render_output())
             .into_any_element()
@@ -576,14 +635,23 @@ impl DroidGui {
             .child(self.button(
                 "log-toggle",
                 if self.log_streaming { "Stop" } else { "Start" },
-                if self.log_streaming { theme::DANGER } else { theme::ACCENT_DIM },
+                if self.log_streaming {
+                    theme::DANGER
+                } else {
+                    theme::ACCENT_DIM
+                },
                 0xffffff,
                 cx,
                 |this, _cx| this.toggle_log_stream(),
             ))
-            .child(self.button("log-clear", "Clear", theme::BG_ELEV, theme::TEXT, cx, |this, _cx| {
-                this.log_entries.clear()
-            }))
+            .child(self.button(
+                "log-clear",
+                "Clear",
+                theme::BG_ELEV,
+                theme::TEXT,
+                cx,
+                |this, _cx| this.log_entries.clear(),
+            ))
             .child(self.button(
                 "log-level",
                 format!("Level ≥ {}", self.log_filter.min_level.as_char()),
@@ -601,7 +669,11 @@ impl DroidGui {
 
         // Filtered, capped, newest-last.
         let mut rows: Vec<AnyElement> = Vec::new();
-        for entry in self.log_entries.iter().filter(|e| self.log_filter.matches(e)) {
+        for entry in self
+            .log_entries
+            .iter()
+            .filter(|e| self.log_filter.matches(e))
+        {
             rows.push(log_row(entry));
         }
         let start = rows.len().saturating_sub(MAX_VISIBLE_LOGS);
@@ -622,7 +694,12 @@ impl DroidGui {
             .children(visible);
 
         panel_container(Panel::Logs)
-            .child(div().text_xl().text_color(rgb(theme::TEXT)).child("Live Logs"))
+            .child(
+                div()
+                    .text_xl()
+                    .text_color(rgb(theme::TEXT))
+                    .child("Live Logs"),
+            )
             .child(toolbar)
             .child(list)
             .into_any_element()
@@ -638,8 +715,16 @@ impl DroidGui {
             .gap_2()
             .child(self.button(
                 "screen-toggle",
-                if running { "Stop Mirror" } else { "Start Mirror" },
-                if running { theme::DANGER } else { theme::ACCENT_DIM },
+                if running {
+                    "Stop Mirror"
+                } else {
+                    "Start Mirror"
+                },
+                if running {
+                    theme::DANGER
+                } else {
+                    theme::ACCENT_DIM
+                },
                 0xffffff,
                 cx,
                 |this, _cx| this.toggle_screen(),
@@ -658,7 +743,10 @@ impl DroidGui {
                 .into_any_element(),
             (None, Some(err)) => empty_state("Capture error", err),
             (None, None) if running => empty_state("Waiting for first frame…", ""),
-            _ => empty_state("Screen mirror stopped", "Start the mirror to stream the device screen."),
+            _ => empty_state(
+                "Screen mirror stopped",
+                "Start the mirror to stream the device screen.",
+            ),
         };
 
         panel_container(Panel::Screen)
@@ -720,7 +808,12 @@ fn empty_state(title: &str, subtitle: &str) -> AnyElement {
         .justify_center()
         .gap_2()
         .size_full()
-        .child(div().text_lg().text_color(rgb(theme::TEXT_DIM)).child(title.to_string()))
+        .child(
+            div()
+                .text_lg()
+                .text_color(rgb(theme::TEXT_DIM))
+                .child(title.to_string()),
+        )
         .child(
             div()
                 .text_sm()

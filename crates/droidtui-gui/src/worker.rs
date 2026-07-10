@@ -20,7 +20,10 @@ const STATUS_INTERVAL: Duration = Duration::from_secs(2);
 /// A request from the UI to the worker.
 pub enum WorkerRequest {
     /// Run a catalogue command, tagged with its button label.
-    Run { label: String, action: CommandAction },
+    Run {
+        label: String,
+        action: CommandAction,
+    },
     /// Run a raw shell command, tagged with a label.
     Shell { label: String, command: String },
     /// Detect root status.
@@ -28,7 +31,10 @@ pub enum WorkerRequest {
     /// Remount `/` read-write (requires root).
     Remount,
     /// Execute a fastboot command.
-    Fastboot { label: String, command: FastbootCommand },
+    Fastboot {
+        label: String,
+        command: FastbootCommand,
+    },
     /// Force an immediate device-status refresh.
     RefreshStatus,
 }
@@ -38,7 +44,10 @@ pub enum WorkerResponse {
     /// A fresh device status snapshot.
     Status(DeviceStatus),
     /// Output (or error) from a command, tagged with its label.
-    Output { label: String, result: Result<String, String> },
+    Output {
+        label: String,
+        result: Result<String, String>,
+    },
     /// The result of a root-detection request.
     Root(Result<RootStatus, String>),
 }

@@ -48,8 +48,8 @@ mod tests {
 
     #[test]
     fn parse_resolution() {
-        let r = ScreenResolution::parse("Physical size: 1080x2340", "Physical density: 440")
-            .unwrap();
+        let r =
+            ScreenResolution::parse("Physical size: 1080x2340", "Physical density: 440").unwrap();
         assert_eq!(r.width, 1080);
         assert_eq!(r.height, 2340);
         assert_eq!(r.density, 440);

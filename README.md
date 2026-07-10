@@ -7,6 +7,39 @@
 
 A beautiful Terminal User Interface (TUI) for Android development — ADB commands, live logcat viewer, device dashboard, and more. Built with Rust, Ratatui, and the pure-Rust `adb_client` crate (no Android SDK required).
 
+## Workspace layout 🏗️
+
+DroidTUI is a Cargo workspace with a reusable core library and two frontends:
+
+| Crate | Kind | Description |
+|-------|------|-------------|
+| [`droidtui-core`](crates/droidtui-core) | library (`droidtui_core`) | Framework-free ADB & fastboot API: device info, packages, system, logcat parsing + streaming engine, flash/root toolkit, screen capture. **No** GUI/TUI deps — publishable and reusable. |
+| [`droidtui`](crates/droidtui-tui) | binary (TUI) | The Ratatui terminal app, built on `droidtui-core`. |
+| [`droidtui-gui`](crates/droidtui-gui) | binary (GUI) | A [Zed GPUI](https://www.gpui.rs/) desktop app: device monitor, realtime logs, one-click commands, flash/root toolkit, and live screen mirroring. |
+
+```
+droidtui-core  ◄── droidtui (TUI, Ratatui)
+     ▲
+     └────────── droidtui-gui (GUI, GPUI)
+```
+
+The GUI is an **opt-in** member (it needs the full Xcode/Metal toolchain on
+macOS), so `cargo build` / `cargo test` build only the core + TUI. Build the GUI
+explicitly with `cargo build -p droidtui-gui` (see its
+[README](crates/droidtui-gui/README.md)).
+
+### Using the core library
+
+```rust,no_run
+use droidtui_core::AdbManager;
+
+let mut adb = AdbManager::new();
+let status = adb.fetch_device_status();
+if status.is_connected() {
+    println!("{} — Android {}", status.model, status.android_version);
+}
+```
+
 ## Features ✨
 
 ### 📺 Live Logcat Viewer

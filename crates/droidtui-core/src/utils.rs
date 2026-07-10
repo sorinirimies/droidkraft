@@ -8,10 +8,18 @@ pub fn parse_meminfo(s: &str) -> (u64, u64) {
         let mut parts = line.split_whitespace();
         match parts.next() {
             Some("MemTotal:") => {
-                total = parts.next().and_then(|v| v.parse::<u64>().ok()).unwrap_or(0) / 1024;
+                total = parts
+                    .next()
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .unwrap_or(0)
+                    / 1024;
             }
             Some("MemAvailable:") => {
-                avail = parts.next().and_then(|v| v.parse::<u64>().ok()).unwrap_or(0) / 1024;
+                avail = parts
+                    .next()
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .unwrap_or(0)
+                    / 1024;
             }
             _ => {}
         }

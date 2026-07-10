@@ -10,6 +10,4 @@ pub mod types;
 
 pub use filter::{FilterField, LogcatFilter};
 pub use stream::{ChannelWriter, DrainStatus, LogcatStream};
-pub use types::{
-    try_format_json, wrap_entry_message, LogEntry, LogLevel, LogStats, SaveFormat,
-};
+pub use types::{try_format_json, wrap_entry_message, LogEntry, LogLevel, LogStats, SaveFormat};

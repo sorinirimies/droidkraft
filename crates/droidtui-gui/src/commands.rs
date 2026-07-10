@@ -92,20 +92,44 @@ impl GuiCommand {
 pub fn catalog() -> Vec<GuiCommand> {
     vec![
         // Device
-        GuiCommand::adb("List Devices", CommandCategory::Device, AdbCommand::ListDevices),
-        GuiCommand::adb("Device State", CommandCategory::Device, AdbCommand::GetDeviceState),
-        GuiCommand::adb("ADB Version", CommandCategory::Device, AdbCommand::GetAdbVersion),
+        GuiCommand::adb(
+            "List Devices",
+            CommandCategory::Device,
+            AdbCommand::ListDevices,
+        ),
+        GuiCommand::adb(
+            "Device State",
+            CommandCategory::Device,
+            AdbCommand::GetDeviceState,
+        ),
+        GuiCommand::adb(
+            "ADB Version",
+            CommandCategory::Device,
+            AdbCommand::GetAdbVersion,
+        ),
         GuiCommand::adb(
             "Properties",
             CommandCategory::Device,
             AdbCommand::GetDeviceProperties,
         ),
         // System
-        GuiCommand::adb("Battery", CommandCategory::System, AdbCommand::GetBatteryInfo),
+        GuiCommand::adb(
+            "Battery",
+            CommandCategory::System,
+            AdbCommand::GetBatteryInfo,
+        ),
         GuiCommand::adb("Memory", CommandCategory::System, AdbCommand::GetMemoryInfo),
         GuiCommand::adb("CPU", CommandCategory::System, AdbCommand::GetCpuInfo),
-        GuiCommand::adb("Processes", CommandCategory::System, AdbCommand::ListProcesses),
-        GuiCommand::adb("Network", CommandCategory::System, AdbCommand::GetNetworkInfo),
+        GuiCommand::adb(
+            "Processes",
+            CommandCategory::System,
+            AdbCommand::ListProcesses,
+        ),
+        GuiCommand::adb(
+            "Network",
+            CommandCategory::System,
+            AdbCommand::GetNetworkInfo,
+        ),
         GuiCommand::adb("Wi-Fi", CommandCategory::System, AdbCommand::GetWifiStatus),
         // Packages
         GuiCommand::adb(
@@ -130,9 +154,21 @@ pub fn catalog() -> Vec<GuiCommand> {
             CommandCategory::Screen,
             AdbCommand::GetScreenResolution,
         ),
-        GuiCommand::adb("Screenshot", CommandCategory::Screen, AdbCommand::TakeScreenshot),
-        GuiCommand::shell("Wake", CommandCategory::Screen, "input keyevent KEYCODE_WAKEUP"),
-        GuiCommand::shell("Sleep", CommandCategory::Screen, "input keyevent KEYCODE_SLEEP"),
+        GuiCommand::adb(
+            "Screenshot",
+            CommandCategory::Screen,
+            AdbCommand::TakeScreenshot,
+        ),
+        GuiCommand::shell(
+            "Wake",
+            CommandCategory::Screen,
+            "input keyevent KEYCODE_WAKEUP",
+        ),
+        GuiCommand::shell(
+            "Sleep",
+            CommandCategory::Screen,
+            "input keyevent KEYCODE_SLEEP",
+        ),
         // Power
         GuiCommand::reboot("Reboot", RebootTarget::System),
         GuiCommand::reboot("Bootloader", RebootTarget::Bootloader),

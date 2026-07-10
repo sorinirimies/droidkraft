@@ -379,7 +379,10 @@ impl LogcatState {
 
     /// Save only filtered entries to a plain-text file.
     pub fn save_filtered_to_file(&self, path: &std::path::Path) -> std::io::Result<usize> {
-        let it = self.filtered_indices.iter().filter_map(|&i| self.entries.get(i));
+        let it = self
+            .filtered_indices
+            .iter()
+            .filter_map(|&i| self.entries.get(i));
         self.write_entries(path, it, false)
     }
 
@@ -390,7 +393,10 @@ impl LogcatState {
 
     /// Save filtered entries to a JSONL file.
     pub fn save_filtered_to_json_file(&self, path: &std::path::Path) -> std::io::Result<usize> {
-        let it = self.filtered_indices.iter().filter_map(|&i| self.entries.get(i));
+        let it = self
+            .filtered_indices
+            .iter()
+            .filter_map(|&i| self.entries.get(i));
         self.write_entries(path, it, true)
     }
 
@@ -615,12 +621,10 @@ mod tests {
     #[test]
     fn filter_rebuild_selects_matching() {
         let mut s = LogcatState::new();
-        s.entries.push(LogEntry::parse(
-            "01-15 12:34:56.789  1  2 I Tag: hello",
-        ));
-        s.entries.push(LogEntry::parse(
-            "01-15 12:34:56.789  1  2 E Tag: boom",
-        ));
+        s.entries
+            .push(LogEntry::parse("01-15 12:34:56.789  1  2 I Tag: hello"));
+        s.entries
+            .push(LogEntry::parse("01-15 12:34:56.789  1  2 E Tag: boom"));
         s.filter.min_level = LogLevel::Error;
         s.rebuild_filtered();
         assert_eq!(s.filtered_indices, vec![1]);

@@ -28,13 +28,21 @@ check-nu:
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 
-# Build (debug)
+# Build (debug) — core + TUI (default members)
 build:
     cargo build
 
-# Build (release)
+# Build (release) — core + TUI
 build-release:
     cargo build --release
+
+# Build the GPUI GUI (opt-in; needs the full Xcode/Metal toolchain on macOS)
+build-gui:
+    cargo build -p droidtui-gui
+
+# Build everything including the GUI
+build-all:
+    cargo build --workspace
 
 # ── Code quality ──────────────────────────────────────────────────────────────
 
@@ -60,9 +68,13 @@ check-all: fmt-check clippy test
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
-# Run tests
+# Run tests — core + TUI
 test:
     cargo test
+
+# Run only the core library tests
+test-core:
+    cargo test -p droidtui-core
 
 # Run tests with all features
 test-all:
@@ -171,9 +183,13 @@ release-all version: check-all check-git-cliff check-nu
 
 # ── Application ───────────────────────────────────────────────────────────────
 
-# Run the application (cargo run, debug)
+# Run the TUI (cargo run, debug)
 run:
-    cargo run
+    cargo run -p droidtui
+
+# Run the GPUI GUI (opt-in; needs the full Xcode/Metal toolchain on macOS)
+run-gui:
+    cargo run -p droidtui-gui
 
 # Build release binary and launch it
 run-release: build-release

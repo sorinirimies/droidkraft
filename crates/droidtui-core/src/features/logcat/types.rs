@@ -465,8 +465,12 @@ mod tests {
 
     #[test]
     fn continuation_detection() {
-        assert!(is_continuation_line("    at com.example.Foo.bar(Foo.java:42)"));
-        assert!(is_continuation_line("Caused by: java.lang.NullPointerException"));
+        assert!(is_continuation_line(
+            "    at com.example.Foo.bar(Foo.java:42)"
+        ));
+        assert!(is_continuation_line(
+            "Caused by: java.lang.NullPointerException"
+        ));
         assert!(!is_continuation_line("just a normal message"));
     }
 

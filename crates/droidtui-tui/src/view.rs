@@ -1615,13 +1615,10 @@ fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
                 let start = total.saturating_sub(visible_height);
                 start + entry_pos
             } else {
-                state.scroll_position.min(
-                    state
-                        .filtered_indices
-                        .len()
-                        .saturating_sub(visible_height)
-                        .max(0),
-                ) + entry_pos
+                state
+                    .scroll_position
+                    .min(state.filtered_indices.len().saturating_sub(visible_height))
+                    + entry_pos
             };
             filtered_pos == state.selected_line
         };
