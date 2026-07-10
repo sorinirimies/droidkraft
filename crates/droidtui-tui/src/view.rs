@@ -20,7 +20,7 @@
 
 use crate::adb::DeviceStatus;
 use crate::effects::{get_loading_spinner, RevealWidget};
-use crate::logcat::{tag_color, FilterField, LogcatState};
+use crate::logcat::{level_color, level_label_color, tag_color, FilterField, LogcatState};
 use crate::model::{AppState, Model};
 use crate::theme::Theme;
 use ratatui::{
@@ -1454,7 +1454,7 @@ fn render_logcat_filter_bar(state: &LogcatState, area: Rect, buf: &mut Buffer) {
     // ── Level badge ───────────────────────────────────────────────────────
     let lvl = &state.filter.min_level;
     let lvl_char = lvl.as_char();
-    let lvl_color = lvl.label_color();
+    let lvl_color = level_label_color(*lvl);
     let lvl_label = format!("  {}+", lvl_char);
     Paragraph::new(lvl_label)
         .block(
@@ -1605,8 +1605,8 @@ fn render_logcat_lines(state: &mut LogcatState, area: Rect, buf: &mut Buffer) {
         }
 
         let entry = &state.entries[idx];
-        let level_color = entry.level.color();
-        let level_label_color = entry.level.label_color();
+        let level_color = level_color(entry.level);
+        let level_label_color = level_label_color(entry.level);
 
         // Selected line highlight
         let is_selected = {
@@ -2053,7 +2053,7 @@ fn render_logcat_detail(state: &LogcatState, area: Rect, buf: &mut Buffer) {
         }
     };
 
-    let level_color = entry.level.label_color();
+    let level_badge_color = level_label_color(entry.level);
     let mut lines: Vec<Line<'static>> = vec![
         Line::from(""),
         Line::from(vec![
@@ -2061,7 +2061,7 @@ fn render_logcat_detail(state: &LogcatState, area: Rect, buf: &mut Buffer) {
             Span::styled(
                 format!("{}", entry.level.as_char()),
                 Style::default()
-                    .fg(level_color)
+                    .fg(level_badge_color)
                     .add_modifier(Modifier::BOLD),
             ),
         ]),
@@ -2121,7 +2121,7 @@ fn render_logcat_detail(state: &LogcatState, area: Rect, buf: &mut Buffer) {
         {
             Color::Rgb(180, 180, 180) // JSON brackets
         } else {
-            entry.level.color() // Regular text
+            level_color(entry.level) // Regular text
         };
 
         if msg_line.is_empty() {
@@ -2171,7 +2171,7 @@ fn render_logcat_detail(state: &LogcatState, area: Rect, buf: &mut Buffer) {
                 .title(title)
                 .title_alignment(Alignment::Left)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(level_color)),
+                .border_style(Style::default().fg(level_badge_color)),
         )
         .style(Style::default().bg(bg))
         .render(popup, buf);
