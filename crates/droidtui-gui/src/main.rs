@@ -1,5 +1,6 @@
 //! DroidTUI GUI entry point.
 
+use gpui::prelude::*;
 use gpui::{px, size, Bounds, WindowBounds, WindowOptions};
 use gpui_platform::application;
 

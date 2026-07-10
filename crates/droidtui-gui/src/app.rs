@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use gpui::{div, img, prelude::*, px, rgb, AnyElement, App, ClickEvent, Context, Window};
+use gpui::{div, img, prelude::*, px, rgb, AnyElement, ClickEvent, Context, Window};
 
 use droidtui_core::features::fastboot::FastbootCommand;
 use droidtui_core::features::flash::{RebootTarget, RootStatus};
@@ -504,6 +504,7 @@ impl DroidGui {
         };
 
         div()
+            .id("cmd-output")
             .mt_3()
             .p_3()
             .h(px(240.))
@@ -680,6 +681,7 @@ impl DroidGui {
         let visible = rows.split_off(start);
 
         let list = div()
+            .id("log-list")
             .flex()
             .flex_col()
             .w_full()
