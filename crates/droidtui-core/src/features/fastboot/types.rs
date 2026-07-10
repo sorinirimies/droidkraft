@@ -1,11 +1,6 @@
-//! Fastboot operations via the `fastboot` CLI tool.
-//!
-//! The fastboot protocol is completely separate from ADB and requires the `fastboot`
-//! binary (part of Android platform-tools). There is currently no pure-Rust fastboot
-//! library, so this module shells out to the `fastboot` binary.
+//! Fastboot domain types.
 
 use std::fmt;
-use std::process::Command;
 
 pub type FastbootResult<T> = Result<T, FastbootError>;
 
@@ -45,6 +40,8 @@ impl fmt::Display for FastbootError {
     }
 }
 
+impl std::error::Error for FastbootError {}
+
 impl From<std::io::Error> for FastbootError {
     fn from(e: std::io::Error) -> Self {
         FastbootError::Io(e)
@@ -72,7 +69,8 @@ pub enum FastbootCommand {
 }
 
 impl FastbootCommand {
-    fn args(&self) -> Vec<String> {
+    /// The argument vector passed to the `fastboot` binary.
+    pub fn args(&self) -> Vec<String> {
         match self {
             Self::OemUnlock => vec!["flashing".into(), "unlock".into()],
             Self::OemLock => vec!["flashing".into(), "lock".into()],
@@ -82,53 +80,25 @@ impl FastbootCommand {
             Self::FlashPartition {
                 partition,
                 image_path,
-            } => {
-                vec!["flash".into(), partition.clone(), image_path.clone()]
-            }
+            } => vec!["flash".into(), partition.clone(), image_path.clone()],
         }
     }
-}
 
-/// Executes fastboot operations by shelling out to the `fastboot` binary.
-#[derive(Debug, Default)]
-pub struct FastbootManager;
-
-impl FastbootManager {
-    pub fn new() -> Self {
-        Self
+    /// A short human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::OemUnlock => "Unlock Bootloader",
+            Self::OemLock => "Lock Bootloader",
+            Self::WipeData => "Wipe Data (Factory Reset)",
+            Self::FlashPartition { .. } => "Flash Partition",
+            Self::GetVarAll => "Get Device Variables",
+            Self::Reboot => "Reboot",
+        }
     }
 
-    /// Returns `true` when `fastboot` is available in `PATH`.
-    pub fn is_available() -> bool {
-        Command::new("fastboot").arg("--version").output().is_ok()
-    }
-
-    pub fn execute(&self, command: FastbootCommand) -> FastbootResult<String> {
-        if !Self::is_available() {
-            return Err(FastbootError::NotInstalled);
-        }
-
-        let output = Command::new("fastboot").args(command.args()).output()?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-
-        // fastboot writes most output to stderr even on success
-        let body = if stdout.trim().is_empty() {
-            stderr.clone()
-        } else {
-            stdout
-        };
-
-        if stderr.contains("no devices/emulators found") || stderr.contains("no fastboot devices") {
-            return Err(FastbootError::NoDevice);
-        }
-
-        if !output.status.success() && body.contains("FAILED") {
-            return Err(FastbootError::CommandFailed(body));
-        }
-
-        Ok(body)
+    /// Whether this command is destructive (wipes data / changes lock state).
+    pub fn is_destructive(&self) -> bool {
+        matches!(self, Self::OemUnlock | Self::OemLock | Self::WipeData)
     }
 }
 
@@ -137,39 +107,42 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_oem_unlock_args() {
-        assert_eq!(
-            FastbootCommand::OemUnlock.args(),
-            vec!["flashing", "unlock"]
-        );
+    fn oem_unlock_args() {
+        assert_eq!(FastbootCommand::OemUnlock.args(), vec!["flashing", "unlock"]);
     }
 
     #[test]
-    fn test_oem_lock_args() {
+    fn oem_lock_args() {
         assert_eq!(FastbootCommand::OemLock.args(), vec!["flashing", "lock"]);
     }
 
     #[test]
-    fn test_wipe_data_args() {
+    fn wipe_data_args() {
         assert_eq!(FastbootCommand::WipeData.args(), vec!["-w"]);
     }
 
     #[test]
-    fn test_get_var_all_args() {
+    fn get_var_all_args() {
         assert_eq!(FastbootCommand::GetVarAll.args(), vec!["getvar", "all"]);
     }
 
     #[test]
-    fn test_reboot_args() {
+    fn reboot_args() {
         assert_eq!(FastbootCommand::Reboot.args(), vec!["reboot"]);
     }
 
     #[test]
-    fn test_flash_partition_args() {
+    fn flash_partition_args() {
         let cmd = FastbootCommand::FlashPartition {
             partition: "boot".into(),
             image_path: "/tmp/boot.img".into(),
         };
         assert_eq!(cmd.args(), vec!["flash", "boot", "/tmp/boot.img"]);
+    }
+
+    #[test]
+    fn destructive_classification() {
+        assert!(FastbootCommand::WipeData.is_destructive());
+        assert!(!FastbootCommand::Reboot.is_destructive());
     }
 }

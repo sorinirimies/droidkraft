@@ -618,6 +618,7 @@ dependencies = [
  "adb_client",
  "color-eyre",
  "crossterm 0.28.1",
+ "droidtui-core",
  "futures",
  "ratatui 0.29.0",
  "ratatui-widgets 0.2.2",
@@ -627,6 +628,16 @@ dependencies = [
  "tachyonfx",
  "tokio",
  "tui-file-explorer",
+]
+
+[[package]]
+name = "droidtui-core"
+version = "0.5.3"
+dependencies = [
+ "adb_client",
+ "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
