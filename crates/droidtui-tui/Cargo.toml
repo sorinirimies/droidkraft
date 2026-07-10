@@ -10,7 +10,7 @@ description = "A beautiful Terminal User Interface (TUI) for Android development
 documentation = "https://docs.rs/droidtui"
 keywords = ["android", "adb", "tui", "terminal", "cli"]
 categories = ["command-line-utilities", "development-tools"]
-readme = "../../README.md"
+readme = "README.md"
 
 [lib]
 name = "droidtui"

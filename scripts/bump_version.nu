@@ -82,7 +82,11 @@ Version must be in format: X.Y.Z or X.Y.Z-suffix \(e.g., 0.2.0 or 0.2.0-beta.1\)
         $cargo_lines
         | each { |line|
             if ($line =~ '^version\s*=\s*"[^"]*"') {
+                # Workspace/package version line.
                 $'version      = "($new_version)"'
+            } else if ($line =~ '^\s*droidtui-[a-z]+\s*=\s*\{.*version\s*=\s*"[^"]*"') {
+                # Internal path-dependency version requirement (workspace.dependencies).
+                $line | str replace --regex 'version\s*=\s*"[^"]*"' $'version = "($new_version)"'
             } else {
                 $line
             }
