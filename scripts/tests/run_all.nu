@@ -11,12 +11,12 @@ def main [] {
     let bold   = (ansi --escape {attr: b})
     let reset  = (ansi reset)
 
-    let tests_dir = ($env.CURRENT_FILE | path dirname)
+    # `$env.FILE_PWD` is the directory of this script and is stable across
+    # Nushell versions (unlike `ls $dir | where …`, whose typing changed).
+    let tests_dir = $env.FILE_PWD
 
     let suites = (
-        ls $tests_dir
-        | where { |f| ($f.name | path basename) =~ '^test_.*\.nu$' }
-        | get name
+        glob ($tests_dir | path join "test_*.nu")
         | sort
     )
 
