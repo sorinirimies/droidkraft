@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-07-10
+
+### ⚙️ Miscellaneous Tasks
+
+- Workspace-aware release tooling + publishable TUI crate - ([d2a34cd](https://github.com/sorinirimies/droidtui/commit/d2a34cd15e2941c9e38f3f6a121929fb9b1ac09c))
+
+
+### 🐛 Bug Fixes
+
+- **gui:** Compile against gpui — stateful scroll ids, AppContext prelude - ([3c5ce20](https://github.com/sorinirimies/droidtui/commit/3c5ce20b9368c8580709153605c01e9d14df7768))
+
+
+### 🚀 Features
+
+- **gui:** New droidtui-gui — Zed GPUI device monitor & toolkit - ([7c5f3bf](https://github.com/sorinirimies/droidtui/commit/7c5f3bf0ae5ca1593609ea7bf02fd3cb43075dd3))
+
+
+### 🚜 Refactor
+
+- Convert to Cargo workspace, extract droidtui-core library - ([48a3ba2](https://github.com/sorinirimies/droidtui/commit/48a3ba2153b1b20fadcb9a9fb2f7a1cd0258d857))
+
+- **tui:** Consume droidtui-core logcat engine, drop duplicated domain - ([6add84c](https://github.com/sorinirimies/droidtui/commit/6add84c5c85a4a95c0b9610168f6b3463197276f))
+
+
+### 🧪 Testing
+
+- Workspace tooling, core API integration tests, macros polish - ([c0bcff8](https://github.com/sorinirimies/droidtui/commit/c0bcff81ca161fe5012ad48c55310aab43c61d2f))
+
+
+## [0.5.3] - 2026-04-06
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 0.5.3 - ([24244eb](https://github.com/sorinirimies/droidtui/commit/24244eb2b5490d419d458e78c4686353345f2130))
+
+
 ## [0.5.2] - 2026-03-27
 
 ### ⚙️ Miscellaneous Tasks

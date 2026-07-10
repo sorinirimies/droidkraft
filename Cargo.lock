@@ -1655,7 +1655,7 @@ dependencies = [
 
 [[package]]
 name = "droidtui"
-version = "0.5.3"
+version = "0.6.0"
 dependencies = [
  "adb_client",
  "color-eyre",
@@ -1674,7 +1674,7 @@ dependencies = [
 
 [[package]]
 name = "droidtui-core"
-version = "0.5.3"
+version = "0.6.0"
 dependencies = [
  "adb_client",
  "regex",
@@ -1684,7 +1684,7 @@ dependencies = [
 
 [[package]]
 name = "droidtui-gui"
-version = "0.5.3"
+version = "0.6.0"
 dependencies = [
  "droidtui-core",
  "gpui",
