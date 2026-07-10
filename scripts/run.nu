@@ -42,5 +42,5 @@ def main [] {
     print $"($yellow)   Press Ctrl+C or 'q' to exit($reset)"
     print ""
 
-    run-external "./target/release/droidkraft"
+    run-external "./target/release/droidkraft-tui"
 }

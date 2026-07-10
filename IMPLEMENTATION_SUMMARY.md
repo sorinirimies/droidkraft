@@ -363,7 +363,7 @@ pub enum AdbError {
 ### Compilation
 ```bash
 $ cargo build
-   Compiling droidkraft v0.3.0
+   Compiling droidkraft-tui v0.3.0
     Finished `dev` profile [unoptimized + debuginfo]
 ```
 ✅ Zero warnings

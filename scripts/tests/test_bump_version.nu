@@ -21,6 +21,22 @@ edition = "2021"
     $tmp
 }
 
+# Write a Cargo.toml that also declares an internal path dependency, to test
+# that its version requirement is bumped in lock-step.
+def make_cargo_with_dep [version: string] {
+    let tmp = (mktemp -d)
+    let content = $'[package]
+name = "droidkraft-tui"
+version = "($version)"
+edition = "2021"
+
+[dependencies]
+droidkraft-core = { path = "../droidkraft-core", version = "($version)" }
+'
+    $content | save --force ($tmp | path join "Cargo.toml")
+    $tmp
+}
+
 # Read back the version string from a Cargo.toml file.
 def read_version [cargo_path: string] {
     open --raw $cargo_path
@@ -40,6 +56,8 @@ def apply_version_update [dir: string, new_version: string] {
         | each { |line|
             if ($line =~ '^version\s*=\s*"[^"]*"') {
                 $'version      = "($new_version)"'
+            } else if ($line =~ '^\s*droidkraft-[a-z]+\s*=\s*\{.*version\s*=\s*"[^"]*"') {
+                $line | str replace --regex 'version\s*=\s*"[^"]*"' $'version = "($new_version)"'
             } else {
                 $line
             }
@@ -92,6 +110,17 @@ def "test cargo toml version line is updated" [] {
     assert equal $got "2.0.0"
 }
 
+def "test internal path dependency version is bumped in lockstep" [] {
+    let tmp = make_cargo_with_dep "0.6.0"
+    apply_version_update $tmp "0.6.1"
+    let content = (open --raw ($tmp | path join "Cargo.toml"))
+    rm -rf $tmp
+    # Both the package version and the internal dep requirement must be bumped.
+    assert str contains $content "version      = \"0.6.1\""
+    assert str contains $content "droidkraft-core = { path = \"../droidkraft-core\", version = \"0.6.1\" }"
+    assert (not ($content | str contains "0.6.0"))
+}
+
 def "test cargo toml patch bump is correct" [] {
     let tmp = make_cargo "0.5.3"
     apply_version_update $tmp "0.5.4"
@@ -129,7 +158,7 @@ def "test cargo toml non-version lines are preserved" [] {
     apply_version_update $tmp "1.0.1"
     let content = open --raw ($tmp | path join "Cargo.toml")
     rm -rf $tmp
-    assert str contains $content "name = \"droidkraft\""
+    assert str contains $content "name = \"droidkraft-tui\""
     assert str contains $content "edition = \"2021\""
 }
 

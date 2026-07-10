@@ -81,17 +81,17 @@ Designed for piping into Nushell, jq, or any JSON-aware tool.
 Non-TUI mode for scripting and piping:
 
 ```bash
-droidkraft --query                    # Stream live logcat as JSONL
-droidkraft --query --last 500         # Dump last 500 lines and exit
-droidkraft --query --level E          # Filter: errors only
-droidkraft --query --tag MyApp        # Filter: tag contains "MyApp"
-droidkraft --query --grep "timeout"   # Filter: message contains "timeout"
-droidkraft --help                     # Show all options
+droidkraft-tui --query                    # Stream live logcat as JSONL
+droidkraft-tui --query --last 500         # Dump last 500 lines and exit
+droidkraft-tui --query --level E          # Filter: errors only
+droidkraft-tui --query --tag MyApp        # Filter: tag contains "MyApp"
+droidkraft-tui --query --grep "timeout"   # Filter: message contains "timeout"
+droidkraft-tui --help                     # Show all options
 ```
 
 Combine with Nushell:
 ```bash
-droidkraft --query | nu -c 'lines | each { from json } | where level == "Error" | group-by tag'
+droidkraft-tui --query | nu -c 'lines | each { from json } | where level == "Error" | group-by tag'
 ```
 
 ## 📂 Nushell Recipe Scripts

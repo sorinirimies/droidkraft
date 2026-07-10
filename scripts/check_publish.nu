@@ -68,12 +68,15 @@ def main [] {
     }
 
     # ── 6. Dry run ────────────────────────────────────────────────────────────
-    print -n "Cargo publish dry-run... "
-    let dry_run = (do { cargo publish --dry-run } | complete)
+    # In a workspace, publish is per-crate. droidkraft-core is self-contained so
+    # it can be dry-run directly; droidkraft-tui depends on it and can only be
+    # dry-run once core is published, so we validate core here.
+    print -n "Cargo publish dry-run (droidkraft-core)... "
+    let dry_run = (do { cargo publish -p droidkraft-core --dry-run } | complete)
     if $dry_run.exit_code == 0 {
         print $"($green)✓($reset)"
     } else {
-        print $"($red)✗  (run: cargo publish --dry-run for details)($reset)"
+        print $"($red)✗  (run: cargo publish -p droidkraft-core --dry-run for details)($reset)"
         $errors = $errors + 1
     }
 
@@ -82,7 +85,7 @@ def main [] {
     if $errors == 0 {
         print $"($green)✓ All checks passed! Ready to publish.($reset)"
         print ""
-        print "Run: cargo publish"
+        print "Run: cargo publish -p droidkraft-core, then cargo publish -p droidkraft-tui"
     } else {
         let plural = if $errors == 1 { "check" } else { "checks" }
         print $"($red)✗ ($errors) ($plural) failed. Please fix before publishing.($reset)"

@@ -185,7 +185,7 @@ release-all version: check-all check-git-cliff check-nu
 
 # Run the TUI (cargo run, debug)
 run:
-    cargo run -p droidkraft
+    cargo run -p droidkraft-tui
 
 # Run the GPUI GUI (opt-in; needs the full Xcode/Metal toolchain on macOS)
 run-gui:

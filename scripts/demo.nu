@@ -144,7 +144,7 @@ def main [] {
 
     sleep 2sec
 
-    run-external "./target/release/droidkraft"
+    run-external "./target/release/droidkraft-tui"
 
     print_header "🎉 Demo Complete"
 

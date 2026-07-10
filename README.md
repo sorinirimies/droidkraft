@@ -83,12 +83,12 @@ Full-screen, real-time logcat streaming with professional-grade tooling:
 Stream logcat as JSON lines to stdout — designed for piping into Nushell, jq, or grep:
 
 ```bash
-droidkraft --query                          # Stream live logcat as JSONL
-droidkraft --query --last 500               # Dump last 500 lines
-droidkraft --query --level E                # Only errors
-droidkraft --query --tag MyApp              # Filter by tag
-droidkraft --query --grep "timeout"         # Filter by message
-droidkraft --query | nu -c 'lines | each { from json } | where level == "Error"'
+droidkraft-tui --query                          # Stream live logcat as JSONL
+droidkraft-tui --query --last 500               # Dump last 500 lines
+droidkraft-tui --query --level E                # Only errors
+droidkraft-tui --query --tag MyApp              # Filter by tag
+droidkraft-tui --query --grep "timeout"         # Filter by message
+droidkraft-tui --query | nu -c 'lines | each { from json } | where level == "Error"'
 ```
 
 ### 📂 Nushell Recipe Scripts
@@ -103,7 +103,7 @@ Pre-built analysis scripts in `scripts/logcat/`:
 | `filter_json.nu` | Extract and pretty-print JSON payloads from messages |
 
 ```bash
-droidkraft --query --last 5000 > logcat.jsonl
+droidkraft-tui --query --last 5000 > logcat.jsonl
 nu scripts/logcat/top_tags.nu logcat.jsonl
 ```
 
@@ -112,7 +112,7 @@ nu scripts/logcat/top_tags.nu logcat.jsonl
 ### From crates.io
 
 ```bash
-cargo install droidkraft
+cargo install droidkraft-tui
 ```
 
 ### From source
@@ -131,9 +131,9 @@ cargo install --path .
 ## Usage 🎮
 
 ```bash
-droidkraft          # Launch the TUI
-droidkraft --query   # CLI mode — stream logcat as JSON
-droidkraft --help    # Show all options
+droidkraft-tui          # Launch the TUI
+droidkraft-tui --query   # CLI mode — stream logcat as JSON
+droidkraft-tui --help    # Show all options
 ```
 
 ### Key Bindings — Main Menu

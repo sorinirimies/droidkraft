@@ -68,7 +68,7 @@ def build_release_notes [version: string, cliff_changes: string, last_tag: strin
         "## Installation"
         ""
         "```bash"
-        "cargo install droidkraft"
+        "cargo install droidkraft-tui"
         "```"
         ""
         "## Quick Start"
@@ -135,7 +135,7 @@ def "test cargo toml non-version lines survive update" [] {
     apply_version_update $tmp "1.0.1"
     let content = open --raw ($tmp | path join "Cargo.toml")
     rm -rf $tmp
-    assert str contains $content "name = \"droidkraft\""
+    assert str contains $content "name = \"droidkraft-tui\""
     assert str contains $content "edition = \"2021\""
 }
 
@@ -222,7 +222,7 @@ def "test release notes contains cliff changes" [] {
 def "test release notes contains installation section" [] {
     let notes = build_release_notes "1.2.3" "- changes" ""
     assert str contains $notes "## Installation"
-    assert str contains $notes "cargo install droidkraft"
+    assert str contains $notes "cargo install droidkraft-tui"
 }
 
 def "test release notes contains quick start section" [] {
@@ -268,7 +268,7 @@ def "test release changelog contains install command" [] {
     $notes | save --force ($tmp | path join "RELEASE_CHANGELOG.md")
     let content = open --raw ($tmp | path join "RELEASE_CHANGELOG.md")
     rm -rf $tmp
-    assert str contains $content "cargo install droidkraft"
+    assert str contains $content "cargo install droidkraft-tui"
 }
 
 # ── Runner ────────────────────────────────────────────────────────────────────
