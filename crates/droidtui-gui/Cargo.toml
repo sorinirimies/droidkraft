@@ -1,0 +1,25 @@
+[package]
+name = "droidtui-gui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "DroidTUI GUI — Android device monitor, live logs, command & flash/root toolkit, screen mirroring (Zed GPUI)"
+publish = false
+
+[[bin]]
+name = "droidtui-gui"
+path = "src/main.rs"
+
+[lib]
+name = "droidtui_gui"
+path = "src/lib.rs"
+
+[dependencies]
+droidtui-core = { workspace = true }
+gpui = { git = "https://github.com/zed-industries/zed", rev = "60314a7" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "60314a7", features = ["font-kit"] }
+serde      = { workspace = true }
+serde_json = { workspace = true }
