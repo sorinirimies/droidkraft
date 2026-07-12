@@ -20,6 +20,6 @@ path = "src/lib.rs"
 [dependencies]
 droidkraft-core = { workspace = true }
 gpui = { git = "https://github.com/zed-industries/zed", rev = "60314a7" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "60314a7", features = ["font-kit"] }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "60314a7", features = ["font-kit", "wayland", "x11"] }
 serde      = { workspace = true }
 serde_json = { workspace = true }
