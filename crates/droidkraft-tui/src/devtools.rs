@@ -241,15 +241,6 @@ impl DevToolsState {
     }
 
     /// Set the project directory and re-detect Gradle.
-    pub fn set_project_dir(&mut self, dir: PathBuf) {
-        let (gradle_root, _) = find_gradle_root(&dir);
-        self.project_dir = gradle_root.unwrap_or_else(|| dir.clone());
-        self.has_gradle = self.resolve_gradle().is_some();
-        self.file_explorer = Some(tui_file_explorer::FileExplorer::new(dir, vec![]));
-        self.discover_app_modules();
-        self.rebuild_variants();
-    }
-
     /// Called after the file browser navigates to a new directory.
     /// If the browser is now inside a Gradle project that differs from the
     /// current `project_dir`, update the project root and re-discover modules.

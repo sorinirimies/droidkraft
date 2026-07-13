@@ -18,28 +18,12 @@ pub const WARN: u32 = 0xe5c07b;
 pub const ERR: u32 = 0xe06c75;
 pub const DANGER: u32 = 0xc0392b;
 
-/// Message-text colour for a log level.
+/// Message-text colour for a log level (shared with the TUI via core).
 pub fn level_color(level: LogLevel) -> Rgba {
-    match level {
-        LogLevel::Verbose => rgb(0x6b7080),
-        LogLevel::Debug => rgb(0x56b6c2),
-        LogLevel::Info => rgb(0x98c379),
-        LogLevel::Warn => rgb(0xe5c07b),
-        LogLevel::Error => rgb(0xe06c75),
-        LogLevel::Fatal => rgb(0xff5f87),
-        LogLevel::Unknown => rgb(0x8b90a0),
-    }
+    rgb(droidkraft_core::level_text_color(level).hex())
 }
 
-/// Stable, distinct colour for a tag string.
+/// Stable, distinct colour for a tag string (shared palette via core).
 pub fn tag_color(tag: &str) -> Rgba {
-    let mut hash: u32 = 5381;
-    for b in tag.bytes() {
-        hash = hash.wrapping_mul(33).wrapping_add(b as u32);
-    }
-    const PALETTE: &[u32] = &[
-        0x569cd6, 0x4ec9b0, 0xdcdcaa, 0xce9178, 0xb5cea8, 0xc882c8, 0x64c8dc, 0xdcb464, 0x82b4dc,
-        0xb48cb4, 0x96dc96, 0xdc9696,
-    ];
-    rgb(PALETTE[(hash as usize) % PALETTE.len()])
+    rgb(droidkraft_core::tag_color(tag).hex())
 }

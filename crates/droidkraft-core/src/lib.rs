@@ -18,7 +18,8 @@
 //! | [`features::fastboot`] | Bootloader / fastboot operations |
 //! | [`features::flash`] | Reboot targets and root detection toolkit |
 //! | [`features::shell`] | The typed [`AdbCommand`] enum |
-//! | [`utils`] | Framework-free helpers |
+//! | [`color`] | Framework-neutral [`Rgb`] + tag/level colour helpers |
+//! | [`utils`] | Framework-free helpers (text wrap, shell quoting, clipboard) |
 //!
 //! ## Example
 //!
@@ -36,12 +37,14 @@
 pub mod macros;
 
 pub mod client;
+pub mod color;
 pub mod error;
 pub mod features;
 pub mod utils;
 
 // ── Convenience re-exports ─────────────────────────────────────────────────
 pub use client::{AdbManager, ADB_PORT};
+pub use color::{hash_tag, level_text_color, tag_color, Rgb, TAG_PALETTE};
 pub use error::{AdbError, AdbResult};
 
 pub use features::device::{AdbDeviceEntry, DeviceInfo, DeviceStatus};

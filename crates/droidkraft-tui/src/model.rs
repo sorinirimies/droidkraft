@@ -244,64 +244,7 @@ impl Model {
         self.wrapped_lines = self
             .result_lines
             .iter()
-            .flat_map(|line| wrap_line(line, max_width))
+            .flat_map(|line| droidkraft_core::utils::wrap_text(line, max_width))
             .collect();
-    }
-}
-
-/// Helper function to wrap a single line at word boundaries.
-/// Tabs are expanded to 4 spaces before processing so ratatui renders them correctly.
-fn wrap_line(line: &str, max_width: usize) -> Vec<String> {
-    // Expand tabs — ratatui treats \t as zero-width, causing text to overlap.
-    let line = line.replace('\t', "    ");
-    let line = line.as_str();
-
-    // Guard: if max_width is too small to be useful, return the line as-is.
-    if max_width < 4 {
-        return vec![line.to_string()];
-    }
-
-    if line.len() <= max_width {
-        return vec![line.to_string()];
-    }
-
-    let mut chunks = Vec::new();
-    let mut current_chunk = String::new();
-    let mut current_length = 0;
-
-    for word in line.split_whitespace() {
-        if current_length + word.len() < max_width {
-            if !current_chunk.is_empty() {
-                current_chunk.push(' ');
-                current_length += 1;
-            }
-            current_chunk.push_str(word);
-            current_length += word.len();
-        } else {
-            if !current_chunk.is_empty() {
-                chunks.push(current_chunk);
-            }
-            if word.len() > max_width {
-                // Word is too long, break it
-                for chunk in word.chars().collect::<Vec<char>>().chunks(max_width) {
-                    chunks.push(chunk.iter().collect::<String>());
-                }
-                current_chunk = String::new();
-                current_length = 0;
-            } else {
-                current_chunk = word.to_string();
-                current_length = word.len();
-            }
-        }
-    }
-
-    if !current_chunk.is_empty() {
-        chunks.push(current_chunk);
-    }
-
-    if chunks.is_empty() {
-        vec![line.to_string()]
-    } else {
-        chunks
     }
 }

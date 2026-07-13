@@ -42,37 +42,12 @@ impl EffectsManager {
         self.fade_in_start = Some(Instant::now());
     }
 
-    pub fn get_fade_in_progress(&self) -> f32 {
-        if let Some(start) = self.fade_in_start {
-            let elapsed = start.elapsed();
-            if elapsed >= self.fade_in_duration {
-                1.0
-            } else {
-                elapsed.as_millis() as f32 / self.fade_in_duration.as_millis() as f32
-            }
-        } else {
-            1.0
-        }
-    }
-
-    pub fn is_fade_in_complete(&self) -> bool {
-        if let Some(start) = self.fade_in_start {
-            start.elapsed() >= self.fade_in_duration
-        } else {
-            true
-        }
-    }
-
     pub fn is_startup_complete(&self) -> bool {
         self.start_time.elapsed() >= self.startup_duration
     }
 
     pub fn start_slide_in(&mut self) {
         self.slide_in_start = Some(Instant::now());
-    }
-
-    pub fn start_slide_out(&mut self) {
-        self.slide_out_start = Some(Instant::now());
     }
 
     pub fn get_slide_in_progress(&self) -> f32 {
@@ -88,38 +63,6 @@ impl EffectsManager {
             }
         } else {
             1.0
-        }
-    }
-
-    pub fn get_slide_out_progress(&self) -> f32 {
-        if let Some(start) = self.slide_out_start {
-            let elapsed = start.elapsed();
-            if elapsed >= self.slide_out_duration {
-                1.0
-            } else {
-                let progress =
-                    elapsed.as_millis() as f32 / self.slide_out_duration.as_millis() as f32;
-                // Ease in cubic for smooth acceleration
-                progress.powi(3)
-            }
-        } else {
-            0.0
-        }
-    }
-
-    pub fn is_slide_in_complete(&self) -> bool {
-        if let Some(start) = self.slide_in_start {
-            start.elapsed() >= self.slide_in_duration
-        } else {
-            true
-        }
-    }
-
-    pub fn is_slide_out_complete(&self) -> bool {
-        if let Some(start) = self.slide_out_start {
-            start.elapsed() >= self.slide_out_duration
-        } else {
-            false
         }
     }
 
@@ -292,147 +235,9 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
-// Menu highlight effects with consistent green color
-pub fn get_selection_color(_tick_count: u64, _position: usize) -> Color {
-    // Consistent green color for all selections
-    Color::Green
-}
-
-// Loading animation characters
+/// Loading spinner frame for the given tick.
 pub fn get_loading_spinner(tick_count: u64) -> &'static str {
     let spinner_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     let index = (tick_count / 8) % spinner_chars.len() as u64;
     spinner_chars[index as usize]
-}
-
-// Loading dots animation
-pub fn get_loading_dots(tick_count: u64) -> String {
-    let dots_count = ((tick_count / 20) % 4) as usize;
-    let dots = ".".repeat(dots_count);
-    format!("Loading{:<3}", dots)
-}
-
-// Progress bar animation
-pub fn get_progress_bar(tick_count: u64, width: usize) -> String {
-    let progress = ((tick_count / 5) % width as u64) as usize;
-    let filled = "█".repeat(progress);
-    let empty = "░".repeat(width.saturating_sub(progress));
-    format!("[{}{}]", filled, empty)
-}
-
-// Enhanced selection effect with consistent green color
-pub fn get_selection_color_with_boost(_tick_count: u64, _position: usize, _boost: u64) -> Color {
-    // Always return consistent green color, no boost effects for line selection
-    Color::Green
-}
-
-// Orbital spinner animation (circles around)
-pub fn get_orbital_spinner(tick_count: u64) -> &'static str {
-    let orbital_chars = ["◐", "◓", "◑", "◒"];
-    let index = (tick_count / 5) % orbital_chars.len() as u64;
-    orbital_chars[index as usize]
-}
-
-// Wave animation for loading screen
-pub fn get_wave_animation(tick_count: u64) -> String {
-    let wave_chars = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
-    let wave_length = 15;
-    let mut wave = String::new();
-
-    for i in 0..wave_length {
-        let offset = (tick_count as i32 + i * 2) % (wave_chars.len() as i32 * 2);
-        let index = if offset >= wave_chars.len() as i32 {
-            (wave_chars.len() as i32 * 2 - offset - 1).max(0)
-        } else {
-            offset
-        } as usize;
-
-        wave.push_str(wave_chars[index.min(wave_chars.len() - 1)]);
-    }
-
-    wave
-}
-
-// Circular progress indicator
-pub fn get_circular_progress(tick_count: u64) -> String {
-    let segments = ["◜", "◝", "◞", "◟"];
-    let index = (tick_count / 3) % segments.len() as u64;
-    segments[index as usize].to_string()
-}
-
-// Dots orbit animation (dots rotating in a circle)
-pub fn get_dots_orbit(tick_count: u64) -> String {
-    let positions = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-    let index = (tick_count / 4) % positions.len() as u64;
-    positions[index as usize].to_string()
-}
-
-// Particle effect - expanding dots
-pub fn get_particle_effect(tick_count: u64) -> String {
-    let cycle = (tick_count / 6) % 8;
-    match cycle {
-        0 => "·  ·  ·".to_string(),
-        1 => " · · · ".to_string(),
-        2 => "  ···  ".to_string(),
-        3 => "  ███  ".to_string(),
-        4 => " █████ ".to_string(),
-        5 => "  ███  ".to_string(),
-        6 => " · · · ".to_string(),
-        _ => "·  ·  ·".to_string(),
-    }
-}
-
-// Bouncing ball animation
-pub fn get_bouncing_ball(tick_count: u64) -> String {
-    let positions = [
-        "●       ",
-        " ●      ",
-        "  ●     ",
-        "   ●    ",
-        "    ●   ",
-        "   ●    ",
-        "  ●     ",
-        " ●      ",
-    ];
-    let index = (tick_count / 5) % positions.len() as u64;
-    positions[index as usize].to_string()
-}
-
-// Shimmer effect for selected items
-pub fn get_shimmer_intensity(tick_count: u64) -> f32 {
-    let phase = (tick_count as f32 * 0.15).sin();
-    (phase + 1.0) / 2.0 // Normalize to 0.0-1.0
-}
-
-// Get shimmer color for menu item highlight
-pub fn get_shimmer_color(tick_count: u64, base_color: Color) -> Color {
-    let intensity = get_shimmer_intensity(tick_count);
-    let brightness = (200.0 + intensity * 55.0) as u8;
-
-    match base_color {
-        Color::Green => Color::Rgb(0, brightness, 0),
-        Color::Yellow => Color::Rgb(brightness, brightness, 0),
-        _ => base_color,
-    }
-}
-
-// Slide animation easing function (ease out cubic)
-pub fn ease_out_cubic(t: f32) -> f32 {
-    1.0 - (1.0 - t).powi(3)
-}
-
-// Slide animation easing function (ease in cubic)
-pub fn ease_in_cubic(t: f32) -> f32 {
-    t.powi(3)
-}
-
-// Bounce effect for emphasis
-pub fn get_bounce_offset(tick_count: u64, duration_ticks: u64) -> f32 {
-    if tick_count >= duration_ticks {
-        return 0.0;
-    }
-
-    let progress = tick_count as f32 / duration_ticks as f32;
-    let bounce = (progress * std::f32::consts::PI * 2.0).sin() * (1.0 - progress);
-    bounce * 3.0 // Scale the bounce effect
 }

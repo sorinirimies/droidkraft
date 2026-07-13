@@ -49,31 +49,10 @@ pub fn level_label_color(level: LogLevel) -> Color {
     }
 }
 
-/// Hash a tag string to a stable, visually distinct colour.
+/// Hash a tag string to a stable, visually distinct colour (shared palette).
 pub fn tag_color(tag: &str) -> Color {
-    let mut hash: u32 = 5381;
-    for b in tag.bytes() {
-        hash = hash.wrapping_mul(33).wrapping_add(b as u32);
-    }
-    const PALETTE: &[Color] = &[
-        Color::Rgb(86, 156, 214),  // blue
-        Color::Rgb(78, 201, 176),  // teal
-        Color::Rgb(220, 220, 170), // light yellow
-        Color::Rgb(206, 145, 120), // salmon
-        Color::Rgb(181, 206, 168), // light green
-        Color::Rgb(200, 130, 200), // purple
-        Color::Rgb(100, 200, 220), // cyan
-        Color::Rgb(220, 180, 100), // gold
-        Color::Rgb(130, 180, 220), // periwinkle
-        Color::Rgb(180, 140, 180), // mauve
-        Color::Rgb(150, 220, 150), // mint
-        Color::Rgb(220, 150, 150), // rose
-        Color::Rgb(170, 200, 130), // olive
-        Color::Rgb(140, 180, 200), // steel blue
-        Color::Rgb(200, 170, 140), // tan
-        Color::Rgb(160, 200, 200), // powder blue
-    ];
-    PALETTE[(hash as usize) % PALETTE.len()]
+    let (r, g, b) = droidkraft_core::tag_color(tag).tuple();
+    Color::Rgb(r, g, b)
 }
 
 // ---------------------------------------------------------------------------

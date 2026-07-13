@@ -72,6 +72,7 @@ impl AdbManager {
 
     /// Run an arbitrary command as root via `su -c`.
     pub fn run_as_root(&mut self, command: &str) -> AdbResult<String> {
-        self.shell_command(&format!("su -c '{}'", command.replace('\'', "'\\''")))
+        let quoted = crate::utils::shell_single_quote(command);
+        self.shell_command(&format!("su -c '{}'", quoted))
     }
 }

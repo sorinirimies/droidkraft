@@ -7,7 +7,7 @@ use gpui::{div, img, prelude::*, px, rgb, AnyElement, ClickEvent, Context, Windo
 
 use droidkraft_core::features::fastboot::FastbootCommand;
 use droidkraft_core::features::flash::{RebootTarget, RootStatus};
-use droidkraft_core::{DeviceStatus, LogEntry, LogLevel, LogcatFilter, LogcatStream};
+use droidkraft_core::{DeviceStatus, LogEntry, LogcatFilter, LogcatStream};
 
 use crate::commands::{by_category, CommandCategory, GuiCommand};
 use crate::screen::ScreenStream;
@@ -883,11 +883,4 @@ fn truncate(s: &str, max: usize) -> String {
     } else {
         format!("{}…\n[truncated]", &s[..max])
     }
-}
-
-/// Suppress an unused-import warning for `LogLevel` when compiled without the
-/// `all()` helper; used by the level filter.
-#[allow(dead_code)]
-fn _levels() -> &'static [LogLevel] {
-    LogLevel::all()
 }

@@ -678,15 +678,6 @@ impl ThemeSelector {
         let presets = Theme::all_presets();
         presets[self.active].2.clone()
     }
-
-    /// Get the currently active theme.
-    pub fn current_theme(&self) -> Theme {
-        let presets = Theme::all_presets();
-        presets
-            .get(self.active)
-            .map(|(_, _, t)| t.clone())
-            .unwrap_or_default()
-    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
