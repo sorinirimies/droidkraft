@@ -1,11 +1,34 @@
 # DroidKraft 🤖
 
-[![Crates.io](https://img.shields.io/crates/v/droidkraft.svg)](https://crates.io/crates/droidkraft)
+[![Crates.io](https://img.shields.io/crates/v/droidkraft-tui.svg)](https://crates.io/crates/droidkraft-tui)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Release](https://github.com/sorinirimies/droidkraft/actions/workflows/release.yml/badge.svg)](https://github.com/sorinirimies/droidkraft/actions/workflows/release.yml)
 [![CI](https://github.com/sorinirimies/droidkraft/actions/workflows/ci.yml/badge.svg)](https://github.com/sorinirimies/droidkraft/actions/workflows/ci.yml)
 
-A beautiful Terminal User Interface (TUI) for Android development — ADB commands, live logcat viewer, device dashboard, and more. Built with Rust, Ratatui, and the pure-Rust `adb_client` crate (no Android SDK required).
+A toolkit for Android development over the embedded ADB — a full-featured
+**terminal UI**, a **GPUI desktop app**, and a reusable **core library**. Live
+logcat, device dashboard, one-click ADB commands, a flash/root toolkit, and
+live screen mirroring. Built with Rust and the pure-Rust `adb_client` crate
+(no Android SDK required).
+
+## Previews 🎬
+
+> Preview GIFs are stored with **[Git LFS](https://git-lfs.com/)**. Run
+> `git lfs install` before cloning (or `git lfs pull` afterwards) to fetch them.
+
+![Quick demo](docs/previews/quickstart.gif)
+
+| Main menu | Navigation |
+|-----------|------------|
+| ![Main menu](docs/previews/main_menu.gif) | ![Navigation](docs/previews/navigation_showcase.gif) |
+
+<details><summary>More previews</summary>
+
+![Full demo](docs/previews/full_demo.gif)
+
+![Features](docs/previews/features_highlight.gif)
+
+</details>
 
 ## Workspace layout 🏗️
 
@@ -13,8 +36,8 @@ DroidKraft is a Cargo workspace with a reusable core library and two frontends:
 
 | Crate | Kind | Description |
 |-------|------|-------------|
-| [`droidkraft-core`](crates/droidkraft-core) | library (`droidkraft_core`) | Framework-free ADB & fastboot API: device info, packages, system, logcat parsing + streaming engine, flash/root toolkit, screen capture. **No** GUI/TUI deps — publishable and reusable. |
-| [`droidkraft`](crates/droidkraft-tui) | binary (TUI) | The Ratatui terminal app, built on `droidkraft-core`. |
+| [`droidkraft-core`](crates/droidkraft-core) | library (`droidkraft_core`) | Framework-free ADB & fastboot API: device info, packages, system, logcat parsing + streaming engine, flash/root toolkit, screen capture, and shared colour/text helpers. **No** GUI/TUI deps — publishable and reusable. |
+| [`droidkraft-tui`](crates/droidkraft-tui) | binary (TUI) | The Ratatui terminal app, built on `droidkraft-core`. |
 | [`droidkraft-gui`](crates/droidkraft-gui) | binary (GUI) | A [Zed GPUI](https://www.gpui.rs/) desktop app: device monitor, realtime logs, one-click commands, flash/root toolkit, and live screen mirroring. |
 
 ```

@@ -2,6 +2,17 @@
 
 This directory contains [VHS](https://github.com/charmbracelet/vhs) tape files for generating animated demos of droidkraft.
 
+## Previews & Git LFS
+
+Curated preview GIFs live in [`docs/previews/`](../../../../docs/previews) and are
+stored with **[Git LFS](https://git-lfs.com/)** (run `git lfs install` before
+cloning, or `git lfs pull` afterwards, to fetch them). The raw generated GIFs in
+*this* directory are git-ignored — regenerate them with `./generate_all.sh`,
+which also refreshes the curated set in `docs/previews/`.
+
+> The tapes launch the `droidkraft-tui` binary, so it must be on your `PATH`
+> (or run `generate_all.sh`, which builds it and adds `target/release` to PATH).
+
 ## What is VHS?
 
 VHS is a tool for generating terminal GIFs. It allows you to script terminal sessions and produce high-quality animated demos automatically.

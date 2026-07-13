@@ -18,6 +18,9 @@ frontends.
 - **`features::fastboot`** — bootloader / fastboot operations
 - **`features::flash`** — reboot targets and root-detection toolkit
 - **`features::shell`** — the typed `AdbCommand` enum
+- **`color`** — framework-neutral `Rgb`, stable tag-colour hashing, and log-level
+  colours shared by both frontends
+- **`utils`** — text wrapping, POSIX shell single-quoting, clipboard, `/proc` parsing
 
 ## Example
 

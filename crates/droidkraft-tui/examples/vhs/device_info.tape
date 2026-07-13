@@ -24,7 +24,7 @@ Sleep 500ms
 Type "clear"
 Enter
 Sleep 500ms
-Type "cargo run --example device_info"
+Type "cargo run -p droidkraft-tui --example device_info"
 Enter
 
 # Wait for application to load

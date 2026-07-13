@@ -24,8 +24,15 @@ fi
 echo -e "${BLUE}🎬 Generating all VHS demos for droidkraft...${NC}"
 echo ""
 
-# Change to project root directory
+# Change to the TUI crate directory (tapes use paths relative to it)
 cd "$(dirname "$0")/../.."
+
+# Ensure the droidkraft-tui binary is on PATH for the tapes that launch it.
+if ! command -v droidkraft-tui &> /dev/null; then
+    echo -e "${BLUE}🔨 Building release binary...${NC}"
+    cargo build --release -p droidkraft-tui
+    export PATH="$(cd ../.. && pwd)/target/release:$PATH"
+fi
 
 # Array of tape files to generate
 TAPES=(
@@ -62,12 +69,21 @@ done
 
 echo -e "${GREEN}🎉 All demos generated!${NC}"
 echo ""
-echo "Generated files:"
-for tape in "${TAPES[@]}"; do
+
+# Copy a curated subset into the repo's Git-LFS-tracked previews directory.
+PREVIEWS=("quickstart" "main_menu" "full_demo" "navigation_showcase" "features_highlight")
+DEST="../../docs/previews"
+mkdir -p "$DEST"
+echo "Updating Git LFS previews in docs/previews/ ..."
+for tape in "${PREVIEWS[@]}"; do
     if [ -f "examples/vhs/${tape}.gif" ]; then
-        echo "  • examples/vhs/${tape}.gif"
+        cp "examples/vhs/${tape}.gif" "$DEST/${tape}.gif"
+        echo "  • docs/previews/${tape}.gif"
     fi
 done
+echo ""
+echo "Preview GIFs are stored with Git LFS. Commit them with:"
+echo "  git add docs/previews/*.gif && git commit"
 echo ""
 echo "To view a demo:"
 echo "  open examples/vhs/quickstart.gif"

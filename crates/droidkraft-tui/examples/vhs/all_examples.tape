@@ -27,7 +27,7 @@ Sleep 500ms
 Type "# 📱 Example 1: Main Menu"
 Sleep 1s
 Enter
-Type "cargo run --example main_menu"
+Type "cargo run -p droidkraft-tui --example main_menu"
 Enter
 Sleep 2.5s
 
@@ -58,7 +58,7 @@ Sleep 500ms
 Type "# 📱 Example 2: Device Information"
 Sleep 1s
 Enter
-Type "cargo run --example device_info"
+Type "cargo run -p droidkraft-tui --example device_info"
 Enter
 Sleep 2.5s
 
@@ -89,7 +89,7 @@ Sleep 500ms
 Type "# 📦 Example 3: Package Manager"
 Sleep 1s
 Enter
-Type "cargo run --example package_manager"
+Type "cargo run -p droidkraft-tui --example package_manager"
 Enter
 Sleep 2.5s
 
@@ -120,7 +120,7 @@ Sleep 500ms
 Type "# 📺 Example 4: Screen Streaming"
 Sleep 1s
 Enter
-Type "cargo run --example streaming"
+Type "cargo run -p droidkraft-tui --example streaming"
 Enter
 Sleep 2.5s
 
@@ -151,7 +151,7 @@ Sleep 500ms
 Type "# 🚀 Bonus: Full Application"
 Sleep 1s
 Enter
-Type "droidkraft"
+Type "droidkraft-tui"
 Enter
 Sleep 3s
 

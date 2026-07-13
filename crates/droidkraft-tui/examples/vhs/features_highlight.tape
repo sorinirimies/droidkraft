@@ -54,7 +54,7 @@ Sleep 500ms
 Type "# Feature 1: Beautiful Startup Animation 🎬"
 Sleep 1.5s
 Enter
-Type "droidkraft"
+Type "droidkraft-tui"
 Enter
 
 # Wait for full startup animation

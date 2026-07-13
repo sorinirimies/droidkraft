@@ -24,7 +24,7 @@ Sleep 500ms
 Type "clear"
 Enter
 Sleep 500ms
-Type "cargo run --example streaming"
+Type "cargo run -p droidkraft-tui --example streaming"
 Enter
 
 # Wait for application to load

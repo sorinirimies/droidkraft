@@ -20,7 +20,7 @@ Enter
 Sleep 500ms
 
 # Launch
-Type "droidkraft"
+Type "droidkraft-tui"
 Enter
 
 # Wait for startup animation

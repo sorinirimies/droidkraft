@@ -24,7 +24,7 @@ Sleep 500ms
 Type "clear"
 Enter
 Sleep 500ms
-Type "cargo run --example package_manager"
+Type "cargo run -p droidkraft-tui --example package_manager"
 Enter
 
 # Wait for application to load
