@@ -54,11 +54,3 @@ macro_rules! shell_arg_ops {
         )*
     };
 }
-
-/// Map any `Display` error into an `AdbError::CommandFailed`.
-#[macro_export]
-macro_rules! cmd_err {
-    ($e:expr) => {
-        $crate::error::AdbError::CommandFailed($e.to_string())
-    };
-}

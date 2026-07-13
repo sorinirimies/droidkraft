@@ -14,6 +14,20 @@ use droidkraft_core::{AdbManager, DeviceStatus};
 
 use crate::commands::CommandAction;
 
+/// Convenience extension: map any `Display` error to `String`.
+///
+/// A trait (not a macro) is the right tool here because it chains onto a
+/// `Result` — `foo().str_err()` reads better than a wrapping macro.
+trait StringErr<T> {
+    fn str_err(self) -> Result<T, String>;
+}
+
+impl<T, E: std::fmt::Display> StringErr<T> for Result<T, E> {
+    fn str_err(self) -> Result<T, String> {
+        self.map_err(|e| e.to_string())
+    }
+}
+
 /// How often the worker refreshes device status while idle.
 const STATUS_INTERVAL: Duration = Duration::from_secs(2);
 
@@ -109,24 +123,22 @@ fn handle_request(adb: &mut AdbManager, res_tx: &Sender<WorkerResponse>, req: Wo
             let _ = res_tx.send(WorkerResponse::Output { label, result });
         }
         WorkerRequest::Shell { label, command } => {
-            let result = adb.shell_command(&command).map_err(|e| e.to_string());
+            let result = adb.shell_command(&command).str_err();
             let _ = res_tx.send(WorkerResponse::Output { label, result });
         }
         WorkerRequest::DetectRoot => {
-            let result = adb.detect_root().map_err(|e| e.to_string());
+            let result = adb.detect_root().str_err();
             let _ = res_tx.send(WorkerResponse::Root(result));
         }
         WorkerRequest::Remount => {
-            let result = adb.remount().map_err(|e| e.to_string());
+            let result = adb.remount().str_err();
             let _ = res_tx.send(WorkerResponse::Output {
                 label: "Remount".into(),
                 result,
             });
         }
         WorkerRequest::Fastboot { label, command } => {
-            let result = FastbootManager::new()
-                .execute(command)
-                .map_err(|e| e.to_string());
+            let result = FastbootManager::new().execute(command).str_err();
             let _ = res_tx.send(WorkerResponse::Output { label, result });
         }
     }
@@ -134,12 +146,12 @@ fn handle_request(adb: &mut AdbManager, res_tx: &Sender<WorkerResponse>, req: Wo
 
 fn run_action(adb: &mut AdbManager, action: CommandAction) -> Result<String, String> {
     match action {
-        CommandAction::Adb(cmd) => adb.execute(cmd).map_err(|e| e.to_string()),
-        CommandAction::Shell(cmd) => adb.shell_command(&cmd).map_err(|e| e.to_string()),
+        CommandAction::Adb(cmd) => adb.execute(cmd).str_err(),
+        CommandAction::Shell(cmd) => adb.shell_command(&cmd).str_err(),
         CommandAction::Reboot(target) => reboot(adb, target),
     }
 }
 
 fn reboot(adb: &mut AdbManager, target: RebootTarget) -> Result<String, String> {
-    adb.reboot(target).map_err(|e| e.to_string())
+    adb.reboot(target).str_err()
 }
