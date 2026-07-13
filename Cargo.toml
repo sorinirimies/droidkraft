@@ -14,7 +14,7 @@ default-members = [
 resolver = "2"
 
 [workspace.package]
-version      = "0.6.1"
+version      = "1.0.0"
 edition    = "2021"
 authors    = ["Sorin Albu-Irimies <mihaiirimies@gmail.com>"]
 license    = "MIT"
@@ -46,7 +46,7 @@ tachyonfx         = "0.7.0"
 tui-file-explorer = { version = "0.8.8", default-features = false }
 
 # Internal crates
-droidkraft-core = { path = "crates/droidkraft-core", version = "0.6.1" }
+droidkraft-core = { path = "crates/droidkraft-core", version = "1.0.0" }
 
 [profile.release]
 opt-level     = 3

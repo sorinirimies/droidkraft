@@ -2,11 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-07-13
+
+### ⚙️ Miscellaneous Tasks
+
+- Pin Nushell to 0.111.0 in CI and release workflows - ([2486bbb](https://github.com/sorinirimies/droidkraft/commit/2486bbba0e414944983dcb3f692ac1d8f291ec00))
+
+
+### 🐛 Bug Fixes
+
+- **ci:** Make nu test runner portable across Nushell versions - ([451638c](https://github.com/sorinirimies/droidkraft/commit/451638c8f67ed3867af5900148fe16b88ec20d8e))
+
+
+### 📚 Documentation
+
+- Regenerate VHS previews (Git LFS), refresh all READMEs - ([881b94c](https://github.com/sorinirimies/droidkraft/commit/881b94cc9cfa54525c707509771bb20ee8809aa5))
+
+
+### 🚜 Refactor
+
+- Prune dead macro, DRY GUI error mapping via str_err trait - ([7ad55cf](https://github.com/sorinirimies/droidkraft/commit/7ad55cf6fc8f969c943dfe08559bccf3c818084e))
+
+- Deep scan — remove dead code, share logic via core public API - ([9cc4616](https://github.com/sorinirimies/droidkraft/commit/9cc4616204eb86fe833839030beb1934b3c28415))
+
+
 ## [0.6.1] - 2026-07-10
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 0.6.1 - ([6bb08ab](https://github.com/sorinirimies/droidkraft/commit/6bb08ab6a377bc8565ae5e91d82be43fcf5de3f3))
+
 
 ### 🐛 Bug Fixes
 
 - Clean up rename fallout (BSD sed \b misses) + workspace-aware scripts - ([b74e85e](https://github.com/sorinirimies/droidkraft/commit/b74e85ea25fdb2cb97d30541f744754165deacd8))
+
+- **clippy:** Remove redundant references in format args (rust 1.97) - ([6aa5ea7](https://github.com/sorinirimies/droidkraft/commit/6aa5ea778f28ee4ec957333f20b0206a143016b0))
 
 
 ### 🚜 Refactor
