@@ -38,18 +38,18 @@ DroidKraft is a Cargo workspace with a reusable core library and two frontends:
 |-------|------|-------------|
 | [`droidkraft-core`](crates/droidkraft-core) | library (`droidkraft_core`) | Framework-free ADB & fastboot API: device info, packages, system, logcat parsing + streaming engine, flash/root toolkit, screen capture, and shared colour/text helpers. **No** GUI/TUI deps — publishable and reusable. |
 | [`droidkraft-tui`](crates/droidkraft-tui) | binary (TUI) | The Ratatui terminal app, built on `droidkraft-core`. |
-| [`droidkraft-gui`](crates/droidkraft-gui) | binary (GUI) | A [Zed GPUI](https://www.gpui.rs/) desktop app: device monitor, realtime logs, one-click commands, flash/root toolkit, and live screen mirroring. |
+| [`droidkraft`](crates/droidkraft-gui) | binary (GUI) | A [Zed GPUI](https://www.gpui.rs/) desktop app: device monitor, realtime logs, one-click commands, flash/root toolkit, and live screen mirroring. |
 
 ```
 droidkraft-core  ◄── droidkraft (TUI, Ratatui)
      ▲
-     └────────── droidkraft-gui (GUI, GPUI)
+     └────────── droidkraft (GUI, GPUI)
 ```
 
-The GUI is an **opt-in** member (it needs the full Xcode/Metal toolchain on
-macOS), so `cargo build` / `cargo test` build only the core + TUI. Build the GUI
-explicitly with `cargo build -p droidkraft-gui` (see its
-[README](crates/droidkraft-gui/README.md)).
+The GUI is an **opt-in** member (it needs the platform GPU toolchain — Xcode's
+Metal on macOS, or Wayland/X11/Vulkan libs on Linux), so `cargo build` /
+`cargo test` build only the core + TUI. Build the GUI explicitly with
+`cargo build -p droidkraft` (see its [README](crates/droidkraft-gui/README.md)).
 
 ### Using the core library
 

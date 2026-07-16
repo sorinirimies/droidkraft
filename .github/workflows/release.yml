@@ -89,6 +89,12 @@ jobs:
           sleep 30
           echo "Publishing droidkraft-tui (TUI) to crates.io..."
           cargo publish -p droidkraft-tui --token $CRATES_IO_TOKEN --allow-dirty
+          echo "Waiting for the index to update..."
+          sleep 30
+          echo "Publishing droidkraft (GUI) to crates.io..."
+          # --no-verify: the GUI needs the GPU toolchain to build (verified on
+          # macOS); skip the Linux verify build here. crates.io still stores it.
+          cargo publish -p droidkraft --no-verify --token $CRATES_IO_TOKEN --allow-dirty
 
       - name: Skip crates.io publish
         if: env.CRATES_IO_TOKEN == ''

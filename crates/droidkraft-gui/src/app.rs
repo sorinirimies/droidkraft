@@ -320,7 +320,7 @@ impl DroidGui {
         } else {
             (theme::ERR, "no device".to_string())
         };
-        rail = rail.child(div().flex_grow_1()).child(
+        rail = rail.child(div().flex_grow()).child(
             div()
                 .flex()
                 .items_center()
@@ -685,7 +685,7 @@ impl DroidGui {
             .flex()
             .flex_col()
             .w_full()
-            .flex_grow_1()
+            .flex_grow()
             .mt_2()
             .p_2()
             .rounded_md()
@@ -760,7 +760,7 @@ impl DroidGui {
                     .justify_center()
                     .items_center()
                     .w_full()
-                    .flex_grow_1()
+                    .flex_grow()
                     .mt_2()
                     .child(view),
             )
@@ -850,7 +850,7 @@ fn log_row(entry: &LogEntry) -> AnyElement {
 
     row.child(
         div()
-            .flex_grow_1()
+            .flex_grow()
             .font_family("monospace")
             .text_xs()
             .text_color(theme::level_color(entry.level))

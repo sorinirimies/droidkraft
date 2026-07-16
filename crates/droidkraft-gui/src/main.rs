@@ -1,13 +1,12 @@
 //! DroidKraft GUI entry point.
 
 use gpui::prelude::*;
-use gpui::{px, size, Bounds, WindowBounds, WindowOptions};
-use gpui_platform::application;
+use gpui::{px, size, Application, Bounds, WindowBounds, WindowOptions};
 
 use droidkraft_gui::DroidGui;
 
 fn main() {
-    application().run(|cx| {
+    Application::new().run(|cx| {
         let bounds = Bounds::centered(None, size(px(1100.), px(760.)), cx);
         cx.open_window(
             WindowOptions {

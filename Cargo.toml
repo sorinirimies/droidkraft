@@ -6,7 +6,7 @@ members = [
 ]
 # The GUI depends on Zed's gpui, which requires the full Xcode Metal toolchain
 # (macOS) to build. Keep it out of the default set so `cargo build`/`cargo test`
-# stay green on machines without it; build it explicitly with `-p droidkraft-gui`.
+# stay green on machines without it; build it explicitly with `-p droidkraft`.
 default-members = [
     "crates/droidkraft-core",
     "crates/droidkraft-tui",

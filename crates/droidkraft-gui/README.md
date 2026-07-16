@@ -1,7 +1,8 @@
-# droidkraft-gui
+# droidkraft
 
-A [Zed GPUI](https://www.gpui.rs/) desktop frontend for DroidKraft, built on the
-shared [`droidkraft-core`](../droidkraft-core) library.
+The **DroidKraft** desktop GUI — an Android device monitor built with
+[Zed GPUI](https://www.gpui.rs/), on top of the shared
+[`droidkraft-core`](https://crates.io/crates/droidkraft-core) library.
 
 ## Features
 
@@ -20,6 +21,29 @@ shared [`droidkraft-core`](../droidkraft-core) library.
 All device I/O runs on background threads (a command worker + the logcat and
 screen capture threads), so the UI thread never blocks.
 
+## Install
+
+```sh
+cargo install droidkraft
+```
+
+> **Build prerequisites.** GPUI renders with the GPU, so building requires the
+> platform graphics toolchain:
+> - **macOS** — the full **Xcode** toolchain with the Metal compiler
+>   (`xcodebuild -downloadComponent MetalToolchain`), not just the Command Line
+>   Tools.
+> - **Linux** — the usual GPUI system libraries (Wayland/X11, `libxkbcommon`,
+>   Vulkan, `fontconfig`, …).
+>
+> The GUI is an **opt-in** workspace member, so the repo's default
+> `cargo build` / `cargo test` (core + TUI) don't require this toolchain.
+
+## Run
+
+```sh
+droidkraft
+```
+
 ## Architecture
 
 | Module | Responsibility |
@@ -28,35 +52,11 @@ screen capture threads), so the UI thread never blocks.
 | `worker` | Background thread owning an `AdbManager`; request/response channels |
 | `screen` | Background screen-capture backend (framework-free, unit-tested) |
 | `commands` | Framework-free catalogue of button commands (unit-tested) |
-| `theme` | Colour palette + log-level / tag colours |
+| `theme` | Colour palette (log-level / tag colours shared via `droidkraft-core`) |
 
-`commands` and `screen` have **no** gpui dependency and are covered by unit
-tests; `worker` depends only on `droidkraft-core`.
+`commands` and `screen` have no gpui dependency and are covered by unit tests;
+`worker` depends only on `droidkraft-core`.
 
-## Building
+## License
 
-GPUI is consumed as a **git dependency** pinned to the Zed repository
-(`rev = "60314a7"`) — it is not published on crates.io. The GUI is an **opt-in**
-workspace member, so the default `cargo build` / `cargo test` (core + TUI) do
-**not** require the gpui toolchain. Build it explicitly:
-
-```sh
-cargo build -p droidkraft-gui
-cargo run  -p droidkraft-gui
-```
-
-### macOS prerequisite
-
-GPUI renders with Metal, so its build compiles `.metal` shaders using the
-**full Xcode** toolchain (the Command Line Tools alone are not enough). One-time
-setup:
-
-```sh
-# Point the toolchain at a full Xcode install and accept its licence:
-sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-sudo xcodebuild -license accept
-```
-
-Without this you will see `xcrun: error: unable to find utility "metal"` or an
-Xcode-licence error during the `gpui_macos` build. (This is an environment
-requirement of gpui, independent of DroidKraft.)
+MIT

@@ -38,7 +38,7 @@ build-release:
 
 # Build the GPUI GUI (opt-in; needs the full Xcode/Metal toolchain on macOS)
 build-gui:
-    cargo build -p droidkraft-gui
+    cargo build -p droidkraft
 
 # Build everything including the GUI
 build-all:
@@ -189,7 +189,7 @@ run:
 
 # Run the GPUI GUI (opt-in; needs the full Xcode/Metal toolchain on macOS)
 run-gui:
-    cargo run -p droidkraft-gui
+    cargo run -p droidkraft
 
 # Build release binary and launch it
 run-release: build-release

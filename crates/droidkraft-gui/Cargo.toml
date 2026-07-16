@@ -1,16 +1,19 @@
 [package]
-name = "droidkraft-gui"
+name = "droidkraft"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "DroidKraft GUI — Android device monitor, live logs, command & flash/root toolkit, screen mirroring (Zed GPUI)"
-publish = false
+description = "DroidKraft — Android device monitor GUI: live logs, one-click commands, flash/root toolkit, and screen mirroring (Zed GPUI)"
+documentation = "https://docs.rs/droidkraft"
+readme = "README.md"
+categories = ["gui", "development-tools"]
+keywords = ["android", "adb", "gui", "gpui", "logcat"]
 
 [[bin]]
-name = "droidkraft-gui"
+name = "droidkraft"
 path = "src/main.rs"
 
 [lib]
@@ -19,7 +22,6 @@ path = "src/lib.rs"
 
 [dependencies]
 droidkraft-core = { workspace = true }
-gpui = { git = "https://github.com/zed-industries/zed", rev = "60314a7" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "60314a7", features = ["font-kit", "wayland", "x11"] }
+gpui = "0.2.2"
 serde      = { workspace = true }
 serde_json = { workspace = true }
