@@ -2,11 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2026-07-16
+
+### 🚀 Features
+
+- **gui:** Make GUI publishable to crates.io as `droidkraft` - ([e40cba4](https://github.com/sorinirimies/droidkraft/commit/e40cba406af1886a6409d1bacb0187ff64bd1285))
+
+
 ## [1.0.0] - 2026-07-13
 
 ### ⚙️ Miscellaneous Tasks
 
 - Pin Nushell to 0.111.0 in CI and release workflows - ([2486bbb](https://github.com/sorinirimies/droidkraft/commit/2486bbba0e414944983dcb3f692ac1d8f291ec00))
+
+- Bump version to 1.0.0 - ([c576c77](https://github.com/sorinirimies/droidkraft/commit/c576c775a7966e8580c6b3eaba415177e40dc909))
 
 
 ### 🐛 Bug Fixes
