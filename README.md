@@ -97,6 +97,25 @@ Full-screen, real-time logcat streaming with professional-grade tooling:
 - **Fastboot support** — OEM unlock/lock, wipe data, device info
 - **Type-safe execution** — compile-time guarantees via `adb_client` crate
 
+### 🚀 One-stop custom-ROM flasher (TUI + GUI)
+A guided, consent-gated flow to install a custom ROM entirely from the app:
+- **Device-aware catalog** — detects the connected device's codename and shows
+  only compatible ROMs (LineageOS, /e/OS, crDroid, Pixel Experience, …)
+- **Live build resolution** — real downloadable builds via the official
+  **LineageOS download API**
+- **Verified downloads** — streamed with progress and **SHA-256** integrity checks
+- **Automated flash orchestration** — reboot to bootloader → (unlock) → wipe →
+  flash recovery → reboot recovery → `adb sideload` the ROM → reboot, driven end
+  to end from Rust
+- **Safety first** — every destructive step is gated behind an explicit
+  confirmation (a red "⚠ Confirm & run" button in the GUI / `Shift+F` in the TUI);
+  requires an unlocked bootloader and the `fastboot`/`adb` platform-tools.
+  ⚠ Flashing erases all data and can brick a device — use at your own risk.
+
+> Shared engine: all of the above lives in
+> [`droidkraft-core::features::rom`](crates/droidkraft-core) so the TUI and GUI
+> behave identically.
+
 ### 🎨 Theme System
 - **12 named presets** — Default, Dracula, Nord, Gruvbox Dark, Catppuccin Mocha, Tokyo Night, Solarized Dark, Moonfly, Oxocarbon, Forest, Neon, Mono
 - **Global selector** (`Shift+T`) — works from any screen

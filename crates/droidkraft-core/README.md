@@ -17,6 +17,9 @@ frontends.
 - **`features::logcat`** — log parsing, filtering, stats, and a background streaming engine
 - **`features::fastboot`** — bootloader / fastboot operations
 - **`features::flash`** — reboot targets and root-detection toolkit
+- **`features::rom`** — custom-ROM catalog, device-compatibility filtering,
+  LineageOS build resolution, verified downloads, and a consent-gated flash
+  orchestrator (`FlashPlan`/`FlashSession`)
 - **`features::shell`** — the typed `AdbCommand` enum
 - **`color`** — framework-neutral `Rgb`, stable tag-colour hashing, and log-level
   colours shared by both frontends

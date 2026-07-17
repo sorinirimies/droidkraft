@@ -17,6 +17,10 @@ The **DroidKraft** desktop GUI — an Android device monitor built with
   wipe / reboot / getvar) with destructive-action styling.
 - **Screen** — live screen mirroring: a background thread captures `screencap`
   PNG frames which are rendered in the window, with an fps / frame counter.
+- **Custom ROM flasher** — device-aware ROM catalog (LineageOS live API + seed
+  catalog for others), verified downloads (SHA-256, progress), and a
+  consent-gated flash orchestrator (unlock → wipe → flash recovery → sideload →
+  reboot). Destructive steps require an explicit "⚠ Confirm & run" click.
 
 All device I/O runs on background threads (a command worker + the logcat and
 screen capture threads), so the UI thread never blocks.
