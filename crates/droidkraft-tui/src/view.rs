@@ -41,12 +41,166 @@ pub fn render(model: &mut Model, area: Rect, buf: &mut Buffer) {
         AppState::ShowResult => render_result(model, area, buf),
         AppState::Logcat => render_logcat(model, area, buf),
         AppState::DevMode => render_devmode(model, area, buf),
+        AppState::RomFlash => render_rom_flash(model, area, buf),
     }
 
     // ── Global overlays ───────────────────────────────────────────────
     if model.theme_selector.open {
         render_theme_selector(model, area, buf);
     }
+}
+
+// ── Custom-ROM flasher ────────────────────────────────────────────────────────
+
+fn render_rom_flash(model: &mut Model, area: Rect, buf: &mut Buffer) {
+    use droidkraft_core::features::rom::StepStatus;
+    let theme = model.theme.clone();
+    let rf = &model.rom_flash;
+
+    let outer = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // header
+            Constraint::Min(1),    // body
+            Constraint::Length(3), // footer
+        ])
+        .split(area);
+
+    // ── Header ──
+    Paragraph::new(Line::from(vec![
+        Span::styled(
+            " 🚀 Custom ROM Flasher ",
+            Style::default()
+                .fg(theme.brand)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("— one-stop guided install", Style::default().fg(theme.dim)),
+    ]))
+    .block(
+        Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(theme.border)),
+    )
+    .render(outer[0], buf);
+
+    // ── Body ──
+    let mut lines: Vec<Line> = Vec::new();
+
+    let device_line = match &rf.profile {
+        Some(p) => format!(
+            "Device: {}   ·   bootloader: {}",
+            p.display(),
+            match p.bootloader_unlocked {
+                Some(true) => "unlocked",
+                Some(false) => "LOCKED",
+                None => "unknown",
+            }
+        ),
+        None => "Device: not scanned yet".to_string(),
+    };
+    lines.push(Line::from(Span::styled(
+        device_line,
+        Style::default().fg(theme.fg),
+    )));
+    lines.push(Line::from(Span::styled(
+        rf.status.clone(),
+        Style::default().fg(theme.accent),
+    )));
+    if let Some(p) = &rf.download_progress {
+        let pct = p
+            .fraction()
+            .map(|f| format!("{:.0}%", f * 100.0))
+            .unwrap_or_else(|| format!("{} bytes", p.downloaded));
+        lines.push(Line::from(Span::styled(
+            format!("⬇ Downloading… {pct}"),
+            Style::default().fg(theme.warn),
+        )));
+    }
+    lines.push(Line::from(""));
+
+    if let Some(session) = &rf.session {
+        let (done, total) = session.progress();
+        lines.push(Line::from(Span::styled(
+            format!("Flash plan — {done}/{total} steps complete:"),
+            Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
+        )));
+        for (i, step) in session.plan.steps.iter().enumerate() {
+            let (icon, color) = match &session.statuses[i] {
+                StepStatus::Pending => ("○", theme.dim),
+                StepStatus::Running => ("◐", theme.warn),
+                StepStatus::Done => ("✔", theme.success),
+                StepStatus::Failed(_) => ("✗", theme.error),
+            };
+            lines.push(Line::from(vec![
+                Span::styled(format!("  {icon} "), Style::default().fg(color)),
+                Span::styled(step.label().to_string(), Style::default().fg(theme.fg)),
+                Span::styled(
+                    format!("  — {}", step.description()),
+                    Style::default().fg(theme.dim),
+                ),
+            ]));
+        }
+    } else if rf.builds.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "Press 'd' to detect this device and list compatible ROMs.",
+            Style::default().fg(theme.dim),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "Compatible builds (↑/↓ to select, Enter to download):",
+            Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
+        )));
+        for (i, build) in rf.builds.iter().take(20).enumerate() {
+            let selected = i == rf.selected;
+            let marker = if selected { "▶ " } else { "  " };
+            let text = format!(
+                "{}{} {}  ·  Android {}  ·  {}{}",
+                marker,
+                build.os.label(),
+                build.version,
+                build.android_version,
+                build.build_date.clone().unwrap_or_default(),
+                build
+                    .size_bytes
+                    .map(|b| format!("  ·  {} MB", b / 1_000_000))
+                    .unwrap_or_default(),
+            );
+            let style = if selected {
+                Style::default()
+                    .fg(theme.brand)
+                    .bg(theme.sel_bg)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(theme.fg)
+            };
+            lines.push(Line::from(Span::styled(text, style)));
+        }
+    }
+
+    Paragraph::new(lines)
+        .block(
+            Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(theme.border)),
+        )
+        .render(outer[1], buf);
+
+    // ── Footer key hints ──
+    let hint = if rf.session.is_some() {
+        " f  run next step    F  CONFIRM destructive step    q  back "
+    } else {
+        " d  detect    ↑/↓  select    Enter  download    q  back "
+    };
+    Paragraph::new(Line::from(Span::styled(
+        hint,
+        Style::default().fg(theme.key_hint),
+    )))
+    .block(
+        Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(theme.border)),
+    )
+    .render(outer[2], buf);
 }
 
 // ── Startup ───────────────────────────────────────────────────────────────────

@@ -28,6 +28,7 @@ pub enum MenuCommand {
     Fastboot(FastbootCommand),
     OpenLogcat,
     OpenDevMode,
+    OpenRomFlash,
 }
 
 // ── Entry types ───────────────────────────────────────────────────────────────
@@ -569,6 +570,9 @@ fn build_entries() -> Vec<MenuEntry> {
 
         // ── Bootloader & Flash ───────────────────────────────────────────────
         MenuEntry::Section("BOOTLOADER & FLASH"),
+        item("🚀  Custom ROM Flasher",
+             "One-stop guided install: detect device, download a compatible ROM, and flash it  ⚠ WIPES ALL DATA",
+             MenuCommand::OpenRomFlash, true),
         item("🔃  Reboot to Recovery",
              "Reboot device into recovery mode (e.g. TWRP) via ADB",
              sh("reboot recovery"), false),

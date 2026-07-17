@@ -99,6 +99,9 @@ pub struct Model {
     /// Dev Tools state.
     pub devtools: DevToolsState,
 
+    /// Custom-ROM flasher state.
+    pub rom_flash: crate::rom_flash::RomFlashState,
+
     /// Current active colour theme.
     pub theme: Theme,
     /// Theme selector overlay state.
@@ -125,6 +128,9 @@ pub enum AppState {
 
     /// Dev Tools workstation
     DevMode,
+
+    /// Custom-ROM flasher
+    RomFlash,
 }
 
 impl Default for Model {
@@ -164,6 +170,7 @@ impl Model {
             logcat_save_mode: LogcatSaveMode::PathInput,
             logcat_file_explorer: None,
             devtools: DevToolsState::new(),
+            rom_flash: crate::rom_flash::RomFlashState::new(),
             theme: Theme::default(),
             theme_selector: ThemeSelector::default(),
         }

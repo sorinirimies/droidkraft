@@ -34,6 +34,18 @@ pub enum Message {
     ScrollToTop,
     ScrollToBottom,
 
+    // Custom-ROM flasher messages
+    OpenRomFlash,
+    CloseRomFlash,
+    RomDetect,
+    RomSelectUp,
+    RomSelectDown,
+    RomDownload,
+    /// Run the next flash step (non-destructive; destructive needs RomConfirmStep).
+    RomRunStep,
+    /// Explicitly confirm and run a destructive flash step.
+    RomConfirmStep,
+
     // Logcat messages
     OpenLogcat,
     LogcatScrollUp,

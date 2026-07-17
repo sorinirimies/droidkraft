@@ -92,6 +92,11 @@ pub async fn update(model: &mut Model, message: Message) {
                 return;
             }
 
+            if matches!(command, MenuCommand::OpenRomFlash) {
+                model.state = AppState::RomFlash;
+                return;
+            }
+
             model.last_command_label = Some(model.menu.get_selected_label().to_string());
             model.state = AppState::Loading;
             model.clear_results();
@@ -686,6 +691,28 @@ pub async fn update(model: &mut Model, message: Message) {
             model.needs_device_refresh = true;
         }
 
+        // ── Custom-ROM flasher ────────────────────────────────────────────
+        Message::OpenRomFlash => {
+            model.state = AppState::RomFlash;
+        }
+        Message::CloseRomFlash => {
+            model.state = AppState::Menu;
+            model.needs_device_refresh = true;
+        }
+        Message::RomDetect => model.rom_flash.detect(),
+        Message::RomSelectUp => model.rom_flash.select_up(),
+        Message::RomSelectDown => model.rom_flash.select_down(),
+        Message::RomDownload => model.rom_flash.download_selected(),
+        Message::RomRunStep => {
+            if model.rom_flash.next_step_needs_confirmation() {
+                model.rom_flash.status =
+                    "⚠ This step is destructive — press Shift+F to CONFIRM.".to_string();
+            } else {
+                model.rom_flash.run_next_step();
+            }
+        }
+        Message::RomConfirmStep => model.rom_flash.run_next_step(),
+
         Message::DevBuild => {
             model.devtools.start_build();
         }
@@ -903,6 +930,11 @@ async fn tick(model: &mut Model) {
         model.devtools.poll_build_output();
     }
 
+    // Poll the ROM flasher worker (detect/download/flash results)
+    if model.state == AppState::RomFlash {
+        model.rom_flash.poll();
+    }
+
     // Check if startup is complete
     if model.state == AppState::Startup && model.effects.is_startup_complete() {
         model.state = AppState::Menu;
@@ -935,6 +967,11 @@ async fn execute_adb_command(model: &mut Model, command: MenuCommand) -> Command
         MenuCommand::OpenDevMode => {
             return CommandResult::Error(
                 "Dev Mode should be opened via OpenDevMode message".into(),
+            );
+        }
+        MenuCommand::OpenRomFlash => {
+            return CommandResult::Error(
+                "ROM Flasher should be opened via OpenRomFlash message".into(),
             );
         }
     };

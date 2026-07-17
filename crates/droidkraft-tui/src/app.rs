@@ -209,6 +209,17 @@ impl App {
                 }
             }
 
+            AppState::RomFlash => match key {
+                KeyCode::Esc | KeyCode::Char('q') => Some(Message::CloseRomFlash),
+                KeyCode::Char('d') => Some(Message::RomDetect),
+                KeyCode::Up | KeyCode::Char('k') => Some(Message::RomSelectUp),
+                KeyCode::Down | KeyCode::Char('j') => Some(Message::RomSelectDown),
+                KeyCode::Enter => Some(Message::RomDownload),
+                KeyCode::Char('f') => Some(Message::RomRunStep),
+                KeyCode::Char('F') => Some(Message::RomConfirmStep),
+                _ => None,
+            },
+
             AppState::Logcat => {
                 use crate::logcat::FilterField;
                 use crate::model::LogcatSaveMode;
