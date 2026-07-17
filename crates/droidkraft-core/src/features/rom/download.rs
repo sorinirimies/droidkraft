@@ -71,7 +71,8 @@ pub fn download_to(
         if n == 0 {
             break;
         }
-        out.write_all(&buf[..n]).map_err(|e| format!("write: {e}"))?;
+        out.write_all(&buf[..n])
+            .map_err(|e| format!("write: {e}"))?;
         downloaded += n as u64;
         on_progress(DownloadProgress { downloaded, total });
     }

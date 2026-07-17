@@ -28,7 +28,9 @@ pub fn fetch_builds(codename: &str) -> Result<Vec<RomBuild>, String> {
 
 /// Whether LineageOS officially supports a device (has at least one build).
 pub fn is_supported(codename: &str) -> bool {
-    fetch_builds(codename).map(|b| !b.is_empty()).unwrap_or(false)
+    fetch_builds(codename)
+        .map(|b| !b.is_empty())
+        .unwrap_or(false)
 }
 
 /// Map a LineageOS major version to its Android release.

@@ -4,12 +4,14 @@
 //! Communication is over `std::sync::mpsc` channels:
 //! the UI sends [`WorkerRequest`]s and drains [`WorkerResponse`]s each tick.
 
+use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::thread;
 use std::time::Duration;
 
 use droidkraft_core::features::fastboot::{FastbootCommand, FastbootManager};
 use droidkraft_core::features::flash::{RebootTarget, RootStatus};
+use droidkraft_core::features::rom::{self, DeviceProfile, DownloadProgress, FlashStep, RomBuild};
 use droidkraft_core::{AdbManager, DeviceStatus};
 
 use crate::commands::CommandAction;
@@ -51,6 +53,18 @@ pub enum WorkerRequest {
     },
     /// Force an immediate device-status refresh.
     RefreshStatus,
+    /// Detect the connected device profile (codename, bootloader state).
+    DetectProfile,
+    /// Resolve downloadable custom-ROM builds for a device codename.
+    FetchRoms { codename: String },
+    /// Download a ROM/recovery build to `dest` (streams progress).
+    Download { build: RomBuild, dest: PathBuf },
+    /// Run a single flash step, tracked by the UI's session at `idx`.
+    RunFlashStep {
+        idx: usize,
+        step: FlashStep,
+        serial: String,
+    },
 }
 
 /// A response from the worker to the UI.
@@ -64,6 +78,19 @@ pub enum WorkerResponse {
     },
     /// The result of a root-detection request.
     Root(Result<RootStatus, String>),
+    /// The detected device profile.
+    Profile(DeviceProfile),
+    /// Resolved downloadable ROM builds for the device.
+    Roms(Result<Vec<RomBuild>, String>),
+    /// Progress of an in-flight download.
+    DownloadProgress(DownloadProgress),
+    /// A finished download (path on success).
+    Downloaded(Result<PathBuf, String>),
+    /// Result of a single flash step, keyed by the UI session index.
+    FlashStepDone {
+        idx: usize,
+        result: Result<String, String>,
+    },
 }
 
 /// Handle to the background worker.
@@ -141,7 +168,44 @@ fn handle_request(adb: &mut AdbManager, res_tx: &Sender<WorkerResponse>, req: Wo
             let result = FastbootManager::new().execute(command).str_err();
             let _ = res_tx.send(WorkerResponse::Output { label, result });
         }
+        WorkerRequest::DetectProfile => {
+            if let Ok(profile) = adb.detect_device_profile() {
+                let _ = res_tx.send(WorkerResponse::Profile(profile));
+            }
+        }
+        WorkerRequest::FetchRoms { codename } => {
+            let _ = res_tx.send(WorkerResponse::Roms(fetch_roms(&codename)));
+        }
+        WorkerRequest::Download { build, dest } => {
+            // Download on a dedicated thread so the worker loop keeps serving
+            // status/flash requests; progress streams back over the channel.
+            let tx = res_tx.clone();
+            thread::spawn(move || {
+                let result = rom::download_and_verify(
+                    &build.download_url,
+                    &dest,
+                    build.sha256.as_deref(),
+                    |p| {
+                        let _ = tx.send(WorkerResponse::DownloadProgress(p));
+                    },
+                );
+                let _ = tx.send(WorkerResponse::Downloaded(result));
+            });
+        }
+        WorkerRequest::RunFlashStep { idx, step, serial } => {
+            let fastboot = FastbootManager::new();
+            let result = rom::run_flash_step(&step, &serial, adb, &fastboot);
+            let _ = res_tx.send(WorkerResponse::FlashStepDone { idx, result });
+        }
     }
+}
+
+/// Resolve downloadable ROM builds for a device codename.
+///
+/// Only projects with a live download API (LineageOS) yield directly
+/// downloadable builds; other catalog ROMs are informational.
+fn fetch_roms(codename: &str) -> Result<Vec<RomBuild>, String> {
+    droidkraft_core::features::rom::lineage::fetch_builds(codename)
 }
 
 fn run_action(adb: &mut AdbManager, action: CommandAction) -> Result<String, String> {

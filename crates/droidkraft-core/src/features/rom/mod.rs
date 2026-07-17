@@ -12,7 +12,8 @@ pub mod types;
 pub use catalog::{catalog, roms_for_device, supported_roms};
 pub use download::{download_and_verify, download_to, sha256_file, sha256_hex, verify_sha256};
 pub use flash::{
-    build_plan, preflight, FlashOptions, FlashPlan, FlashSession, FlashStep, StepStatus,
+    build_plan, preflight, run_flash_step, FlashOptions, FlashPlan, FlashSession, FlashStep,
+    StepStatus,
 };
 pub use types::{
     ArtifactKind, CustomRom, DeviceProfile, DownloadProgress, InstallMethod, RomBuild, RomOs,

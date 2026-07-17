@@ -92,7 +92,9 @@ pub struct CustomRom {
 impl CustomRom {
     /// Whether this ROM is known to support the given device codename.
     pub fn supports(&self, codename: &str) -> bool {
-        self.devices.iter().any(|d| d.eq_ignore_ascii_case(codename))
+        self.devices
+            .iter()
+            .any(|d| d.eq_ignore_ascii_case(codename))
     }
 }
 

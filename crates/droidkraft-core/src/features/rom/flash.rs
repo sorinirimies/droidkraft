@@ -161,18 +161,14 @@ pub fn preflight(profile: &DeviceProfile) -> Vec<String> {
         warnings.push("Device codename could not be detected.".to_string());
     }
     if profile.bootloader_unlocked == Some(false) {
-        warnings
-            .push("Bootloader is locked — it must be unlocked (this wipes data).".to_string());
+        warnings.push("Bootloader is locked — it must be unlocked (this wipes data).".to_string());
     }
     if !FastbootManager::is_available() {
-        warnings.push(
-            "`fastboot` not found in PATH — install Android platform-tools.".to_string(),
-        );
+        warnings.push("`fastboot` not found in PATH — install Android platform-tools.".to_string());
     }
     if !adb_binary_available() {
-        warnings.push(
-            "`adb` binary not found in PATH — required for the sideload step.".to_string(),
-        );
+        warnings
+            .push("`adb` binary not found in PATH — required for the sideload step.".to_string());
     }
     warnings
 }
@@ -254,6 +250,17 @@ impl FlashSession {
     }
 }
 
+/// Execute a single flash step against the device (public entry point used by
+/// frontends that track their own [`FlashSession`] status).
+pub fn run_flash_step(
+    step: &FlashStep,
+    serial: &str,
+    adb: &mut AdbManager,
+    fastboot: &FastbootManager,
+) -> Result<String, String> {
+    execute_step(step, serial, adb, fastboot)
+}
+
 /// Execute a single flash step against the device.
 fn execute_step(
     step: &FlashStep,
@@ -280,9 +287,7 @@ fn execute_step(
         FlashStep::RebootToBootloader => adb
             .reboot(RebootTarget::Bootloader)
             .map_err(|e| e.to_string()),
-        FlashStep::RebootToSystem => {
-            adb.reboot(RebootTarget::System).map_err(|e| e.to_string())
-        }
+        FlashStep::RebootToSystem => adb.reboot(RebootTarget::System).map_err(|e| e.to_string()),
         FlashStep::Sideload { zip } => adb_sideload(serial, &zip.to_string_lossy()),
     }
 }

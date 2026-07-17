@@ -7,6 +7,9 @@ use gpui::{div, img, prelude::*, px, rgb, AnyElement, ClickEvent, Context, Windo
 
 use droidkraft_core::features::fastboot::FastbootCommand;
 use droidkraft_core::features::flash::{RebootTarget, RootStatus};
+use droidkraft_core::features::rom::{
+    build_plan, DeviceProfile, DownloadProgress, FlashOptions, FlashSession, RomBuild, StepStatus,
+};
 use droidkraft_core::{DeviceStatus, LogEntry, LogcatFilter, LogcatStream};
 
 use crate::commands::{by_category, CommandCategory, GuiCommand};
@@ -77,6 +80,15 @@ pub struct DroidGui {
     last_output: Option<(String, Result<String, String>)>,
     root_status: Option<RootStatus>,
     busy_label: Option<String>,
+
+    // ── Custom-ROM flashing ──────────────────────────────────────────────
+    profile: Option<DeviceProfile>,
+    rom_builds: Vec<RomBuild>,
+    rom_status: Option<String>,
+    download_progress: Option<DownloadProgress>,
+    downloaded_path: Option<std::path::PathBuf>,
+    flash_session: Option<FlashSession>,
+    flash_busy: bool,
 }
 
 impl DroidGui {
@@ -108,6 +120,13 @@ impl DroidGui {
             last_output: None,
             root_status: None,
             busy_label: None,
+            profile: None,
+            rom_builds: Vec::new(),
+            rom_status: None,
+            download_progress: None,
+            downloaded_path: None,
+            flash_session: None,
+            flash_busy: false,
         }
     }
 
@@ -132,6 +151,50 @@ impl DroidGui {
                     match result {
                         Ok(status) => self.root_status = Some(status),
                         Err(e) => self.last_output = Some(("Root check".into(), Err(e))),
+                    }
+                }
+                WorkerResponse::Profile(p) => {
+                    // Once we know the codename, resolve downloadable ROM builds.
+                    if !p.codename.is_empty() {
+                        self.rom_status = Some(format!("Searching ROMs for {}…", p.codename));
+                        self.worker.send(WorkerRequest::FetchRoms {
+                            codename: p.codename.clone(),
+                        });
+                    } else {
+                        self.rom_status = Some("Could not detect device codename.".into());
+                    }
+                    self.profile = Some(p);
+                }
+                WorkerResponse::Roms(result) => match result {
+                    Ok(builds) => {
+                        self.rom_status = if builds.is_empty() {
+                            Some("No downloadable builds found for this device.".into())
+                        } else {
+                            None
+                        };
+                        self.rom_builds = builds;
+                    }
+                    Err(e) => self.rom_status = Some(format!("ROM lookup failed: {e}")),
+                },
+                WorkerResponse::DownloadProgress(p) => self.download_progress = Some(p),
+                WorkerResponse::Downloaded(result) => {
+                    self.download_progress = None;
+                    match result {
+                        Ok(path) => {
+                            self.rom_status = Some(format!("Downloaded {}", path.display()));
+                            self.downloaded_path = Some(path.clone());
+                            self.build_flash_session(path);
+                        }
+                        Err(e) => self.rom_status = Some(format!("Download failed: {e}")),
+                    }
+                }
+                WorkerResponse::FlashStepDone { idx, result } => {
+                    self.flash_busy = false;
+                    if let Some(session) = &mut self.flash_session {
+                        session.statuses[idx] = match result {
+                            Ok(_) => droidkraft_core::features::rom::StepStatus::Done,
+                            Err(e) => droidkraft_core::features::rom::StepStatus::Failed(e),
+                        };
                     }
                 }
             }
@@ -199,6 +262,64 @@ impl DroidGui {
         self.worker.send(WorkerRequest::Fastboot { label, command });
     }
 
+    // ── custom-ROM flashing ─────────────────────────────────────────
+
+    /// Detect the device and search for compatible downloadable ROMs.
+    fn detect_roms(&mut self) {
+        self.rom_builds.clear();
+        self.flash_session = None;
+        self.downloaded_path = None;
+        self.rom_status = Some("Detecting device…".into());
+        self.worker.send(WorkerRequest::DetectProfile);
+    }
+
+    /// Start downloading a ROM build to a temp file.
+    fn download_build(&mut self, build: &RomBuild) {
+        let dest = std::env::temp_dir()
+            .join("droidkraft-roms")
+            .join(build.file_name());
+        self.rom_status = Some(format!("Downloading {}…", build.file_name()));
+        self.download_progress = Some(DownloadProgress {
+            downloaded: 0,
+            total: build.size_bytes,
+        });
+        self.worker.send(WorkerRequest::Download {
+            build: build.clone(),
+            dest,
+        });
+    }
+
+    /// Build a flash session for a downloaded ROM zip, honouring the detected
+    /// bootloader-lock state.
+    fn build_flash_session(&mut self, rom_zip: std::path::PathBuf) {
+        let serial = self.active_serial().unwrap_or_default();
+        let mut opts = FlashOptions::new(rom_zip);
+        // If we know the bootloader is locked, include the unlock step.
+        if self.profile.as_ref().and_then(|p| p.bootloader_unlocked) == Some(false) {
+            opts.unlock_bootloader = true;
+        }
+        let plan = build_plan(&opts);
+        self.flash_session = Some(FlashSession::new(plan, serial));
+    }
+
+    /// Run the next pending flash step (the caller has already consented).
+    fn run_next_flash_step(&mut self) {
+        if self.flash_busy {
+            return;
+        }
+        let serial = self.active_serial().unwrap_or_default();
+        if let Some(session) = &self.flash_session {
+            if let Some((idx, step)) = session.next_step() {
+                self.flash_busy = true;
+                self.worker.send(WorkerRequest::RunFlashStep {
+                    idx,
+                    step: step.clone(),
+                    serial,
+                });
+            }
+        }
+    }
+
     // ── shared widgets ────────────────────────────────────────────────────
 
     fn pill(label: impl Into<String>, value: impl Into<String>, color: u32) -> AnyElement {
@@ -225,7 +346,7 @@ impl DroidGui {
 
     fn button(
         &self,
-        id: &'static str,
+        id: impl Into<gpui::ElementId>,
         label: impl Into<String>,
         bg: u32,
         fg: u32,
@@ -624,8 +745,173 @@ impl DroidGui {
                 "Fastboot (device must be in bootloader)",
             ))
             .child(fb_row)
+            .child(Self::section_title("Custom ROM (one-stop flash)"))
+            .child(self.render_rom_flash(cx))
             .child(self.render_output())
             .into_any_element()
+    }
+
+    /// The custom-ROM catalog + download + guided flash UI.
+    fn render_rom_flash(&self, cx: &mut Context<Self>) -> AnyElement {
+        let mut col = div().flex().flex_col().gap_2();
+
+        // Detect / status row.
+        let device_line = match &self.profile {
+            Some(p) => format!(
+                "{}  •  bootloader {}",
+                p.display(),
+                match p.bootloader_unlocked {
+                    Some(true) => "unlocked",
+                    Some(false) => "LOCKED",
+                    None => "unknown",
+                }
+            ),
+            None => "No device scanned yet.".to_string(),
+        };
+        col = col.child(
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .child(self.button(
+                    "rom-detect",
+                    "Find ROMs for this device",
+                    theme::ACCENT_DIM,
+                    0xffffff,
+                    cx,
+                    |this, _cx| this.detect_roms(),
+                ))
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(rgb(theme::TEXT_DIM))
+                        .child(device_line),
+                ),
+        );
+
+        if let Some(s) = &self.rom_status {
+            col = col.child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(theme::TEXT_DIM))
+                    .child(s.clone()),
+            );
+        }
+
+        // Download progress.
+        if let Some(p) = &self.download_progress {
+            let pct = p
+                .fraction()
+                .map(|f| format!("{:.0}%", f * 100.0))
+                .unwrap_or_else(|| format!("{} bytes", p.downloaded));
+            col = col.child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(theme::ACCENT))
+                    .child(format!("Downloading… {pct}")),
+            );
+        }
+
+        // ROM build list (only shown until a flash session exists).
+        if self.flash_session.is_none() {
+            for (i, build) in self.rom_builds.iter().take(12).enumerate() {
+                let label = format!(
+                    "{} {}  •  Android {}  •  {}{}",
+                    build.os.label(),
+                    build.version,
+                    build.android_version,
+                    build.build_date.clone().unwrap_or_default(),
+                    build
+                        .size_bytes
+                        .map(|b| format!("  •  {} MB", b / 1_000_000))
+                        .unwrap_or_default(),
+                );
+                let build_clone = build.clone();
+                col = col.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .gap_2()
+                        .px_2()
+                        .py_1()
+                        .rounded_md()
+                        .bg(rgb(theme::BG_ELEV))
+                        .child(div().text_sm().text_color(rgb(theme::TEXT)).child(label))
+                        .child(self.button(
+                            ("rom-dl", i),
+                            "Download",
+                            theme::ACCENT_DIM,
+                            0xffffff,
+                            cx,
+                            move |this, _cx| this.download_build(&build_clone),
+                        )),
+                );
+            }
+        }
+
+        // Flash session (plan + guided execution).
+        if let Some(session) = &self.flash_session {
+            let (done, total) = session.progress();
+            col = col.child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(theme::TEXT))
+                    .child(format!("Flash plan — {done}/{total} steps done")),
+            );
+            for (i, step) in session.plan.steps.iter().enumerate() {
+                let (icon, color) = match &session.statuses[i] {
+                    StepStatus::Pending => ("○", theme::TEXT_FAINT),
+                    StepStatus::Running => ("◐", theme::WARN),
+                    StepStatus::Done => ("✔", theme::OK),
+                    StepStatus::Failed(_) => ("✗", theme::ERR),
+                };
+                col = col.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(div().text_sm().text_color(rgb(color)).child(icon))
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(rgb(theme::TEXT))
+                                .child(step.label()),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb(theme::TEXT_FAINT))
+                                .child(step.description()),
+                        ),
+                );
+            }
+
+            // Next-step action, with consent styling for destructive steps.
+            if let Some((_, step)) = session.next_step() {
+                let destructive = step.requires_confirmation();
+                let (bg, fg, verb) = if destructive {
+                    (theme::DANGER, 0xffffff, "⚠ Confirm & run")
+                } else {
+                    (theme::ACCENT_DIM, 0xffffff, "Run")
+                };
+                let label = format!("{verb}: {}", step.label());
+                col = col.child(
+                    self.button("rom-flash-next", label, bg, fg, cx, |this, _cx| {
+                        this.run_next_flash_step()
+                    }),
+                );
+            } else if session.is_complete() {
+                col = col.child(
+                    div()
+                        .text_sm()
+                        .text_color(rgb(theme::OK))
+                        .child("✅ Flash complete — device rebooting into the new ROM."),
+                );
+            }
+        }
+
+        col.into_any_element()
     }
 
     fn render_logs(&self, cx: &mut Context<Self>) -> AnyElement {

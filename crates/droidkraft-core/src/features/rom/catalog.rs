@@ -13,18 +13,40 @@ pub fn catalog() -> Vec<CustomRom> {
             os: RomOs::LineageOs,
             // A small seed; the live API is authoritative (see `lineage`).
             devices: &[
-                "sunfish", "bramble", "redfin", "barbet", "davinci", "cheeseburger",
-                "dumpling", "enchilada", "fajita", "guacamole", "lmi", "alioth", "raven",
-                "oriole", "bluejay",
+                "sunfish",
+                "bramble",
+                "redfin",
+                "barbet",
+                "davinci",
+                "cheeseburger",
+                "dumpling",
+                "enchilada",
+                "fajita",
+                "guacamole",
+                "lmi",
+                "alioth",
+                "raven",
+                "oriole",
+                "bluejay",
             ],
         },
         CustomRom {
             os: RomOs::PixelExperience,
-            devices: &["sunfish", "davinci", "lmi", "alioth", "cheeseburger", "raven", "oriole"],
+            devices: &[
+                "sunfish",
+                "davinci",
+                "lmi",
+                "alioth",
+                "cheeseburger",
+                "raven",
+                "oriole",
+            ],
         },
         CustomRom {
             os: RomOs::CrDroid,
-            devices: &["davinci", "lmi", "alioth", "sunfish", "raven", "oriole", "miatoll"],
+            devices: &[
+                "davinci", "lmi", "alioth", "sunfish", "raven", "oriole", "miatoll",
+            ],
         },
         CustomRom {
             os: RomOs::EvolutionX,
@@ -32,7 +54,14 @@ pub fn catalog() -> Vec<CustomRom> {
         },
         CustomRom {
             os: RomOs::EOs,
-            devices: &["sunfish", "bramble", "redfin", "cheeseburger", "enchilada", "davinci"],
+            devices: &[
+                "sunfish",
+                "bramble",
+                "redfin",
+                "cheeseburger",
+                "enchilada",
+                "davinci",
+            ],
         },
         CustomRom {
             os: RomOs::ParanoidAndroid,
