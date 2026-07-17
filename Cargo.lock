@@ -1799,7 +1799,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
 name = "droidkraft"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "droidkraft-core",
  "gpui",
@@ -1809,7 +1809,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-core"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "adb_client",
  "regex",
@@ -1821,7 +1821,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-tui"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "adb_client",
  "color-eyre",

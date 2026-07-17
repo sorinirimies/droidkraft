@@ -2,7 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-07-17
+
+### 📚 Documentation
+
+- Document one-stop custom-ROM flasher across READMEs - ([a18519c](https://github.com/sorinirimies/droidkraft/commit/a18519c366bf490efe142920023cfa47a333da5f))
+
+
+### 🚀 Features
+
+- **core:** Custom-ROM flashing engine (features::rom) - ([c3f6dbb](https://github.com/sorinirimies/droidkraft/commit/c3f6dbb9cb69c257453d7b194a6efb967d9f52ed))
+
+- **gui:** One-stop custom-ROM flashing in Flash & Root panel - ([640568e](https://github.com/sorinirimies/droidkraft/commit/640568ef8f78ca4292843dbe88432b6faad1c153))
+
+- **tui:** One-stop custom-ROM flasher screen - ([9de0730](https://github.com/sorinirimies/droidkraft/commit/9de0730276e46013f673b1fa8b78dbaf3322572e))
+
+
 ## [1.0.1] - 2026-07-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 1.0.1 - ([4f224ce](https://github.com/sorinirimies/droidkraft/commit/4f224ce70e9b100fd8b6a66a945da3768f3803f3))
+
 
 ### 🚀 Features
 
