@@ -66,6 +66,8 @@ pub enum FastbootCommand {
     GetVarAll,
     /// Reboot the device normally from fastboot mode.
     Reboot,
+    /// Reboot directly into recovery from fastboot mode.
+    RebootRecovery,
 }
 
 impl FastbootCommand {
@@ -77,6 +79,7 @@ impl FastbootCommand {
             Self::WipeData => vec!["-w".into()],
             Self::GetVarAll => vec!["getvar".into(), "all".into()],
             Self::Reboot => vec!["reboot".into()],
+            Self::RebootRecovery => vec!["reboot".into(), "recovery".into()],
             Self::FlashPartition {
                 partition,
                 image_path,
@@ -93,6 +96,7 @@ impl FastbootCommand {
             Self::FlashPartition { .. } => "Flash Partition",
             Self::GetVarAll => "Get Device Variables",
             Self::Reboot => "Reboot",
+            Self::RebootRecovery => "Reboot to Recovery",
         }
     }
 

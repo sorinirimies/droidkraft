@@ -10,6 +10,7 @@ pub mod fastboot;
 pub mod flash;
 pub mod logcat;
 pub mod packages;
+pub mod rom;
 pub mod screen;
 pub mod shell;
 pub mod system;

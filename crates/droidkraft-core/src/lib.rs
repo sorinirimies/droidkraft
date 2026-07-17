@@ -17,6 +17,7 @@
 //! | [`features::logcat`] | Log parsing, filtering, stats, and streaming |
 //! | [`features::fastboot`] | Bootloader / fastboot operations |
 //! | [`features::flash`] | Reboot targets and root detection toolkit |
+//! | [`features::rom`] | Custom-ROM catalog, downloads, and flash orchestration |
 //! | [`features::shell`] | The typed [`AdbCommand`] enum |
 //! | [`color`] | Framework-neutral [`Rgb`] + tag/level colour helpers |
 //! | [`utils`] | Framework-free helpers (text wrap, shell quoting, clipboard) |
