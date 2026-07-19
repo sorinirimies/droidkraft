@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-07-19
+
+### 🚀 Features
+
+- **rom:** Big catalog + GrapheneOS + multi-source resolution - ([7fdcf85](https://github.com/sorinirimies/droidkraft/commit/7fdcf85253b0d55cb368c9eab17a2655e1af15e8))
+
+
 ## [1.1.0] - 2026-07-17
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 1.1.0 - ([661e17d](https://github.com/sorinirimies/droidkraft/commit/661e17db0d998c43e2564c3cc73bf7aff09162af))
+
 
 ### 📚 Documentation
 
