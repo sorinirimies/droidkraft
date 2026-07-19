@@ -100,13 +100,18 @@ Full-screen, real-time logcat streaming with professional-grade tooling:
 ### 🚀 One-stop custom-ROM flasher (TUI + GUI)
 A guided, consent-gated flow to install a custom ROM entirely from the app:
 - **Device-aware catalog** — detects the connected device's codename and shows
-  only compatible ROMs (LineageOS, /e/OS, crDroid, Pixel Experience, …)
+  only compatible ROMs from **7 projects**: LineageOS, **GrapheneOS**, /e/OS,
+  crDroid, Pixel Experience, Evolution X, Paranoid Android
 - **Live build resolution** — real downloadable builds via the official
-  **LineageOS download API**
+  **LineageOS** and **GrapheneOS** release APIs, plus OTA JSON for crDroid /
+  Evolution X
+- **Two install methods, auto-selected** — recovery **sideload** for most ROMs,
+  and fastboot **factory-image** flashing for GrapheneOS/Pixel (runs the signed
+  factory zip's official `flash-all` script)
 - **Verified downloads** — streamed with progress and **SHA-256** integrity checks
 - **Automated flash orchestration** — reboot to bootloader → (unlock) → wipe →
-  flash recovery → reboot recovery → `adb sideload` the ROM → reboot, driven end
-  to end from Rust
+  flash recovery → `adb sideload` (or factory flash) → (re-lock) → reboot,
+  driven end to end from Rust
 - **Safety first** — every destructive step is gated behind an explicit
   confirmation (a red "⚠ Confirm & run" button in the GUI / `Shift+F` in the TUI);
   requires an unlocked bootloader and the `fastboot`/`adb` platform-tools.

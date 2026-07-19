@@ -12,7 +12,7 @@ use std::thread;
 use droidkraft_core::features::fastboot::FastbootManager;
 use droidkraft_core::features::rom::{
     self, build_plan, DeviceProfile, DownloadProgress, FlashOptions, FlashSession, FlashStep,
-    RomBuild, StepStatus,
+    InstallMethod, RomBuild, StepStatus,
 };
 use droidkraft_core::AdbManager;
 
@@ -52,6 +52,7 @@ pub struct RomFlashState {
     pub status: String,
     pub download_progress: Option<DownloadProgress>,
     pub downloaded_path: Option<PathBuf>,
+    pending_method: Option<InstallMethod>,
     pub session: Option<FlashSession>,
     pub busy: bool,
 }
@@ -86,6 +87,7 @@ impl RomFlashState {
             status: "Press 'd' to detect this device and find compatible ROMs.".to_string(),
             download_progress: None,
             downloaded_path: None,
+            pending_method: None,
             session: None,
             busy: false,
         }
@@ -120,6 +122,7 @@ impl RomFlashState {
             let dest = std::env::temp_dir()
                 .join("droidkraft-roms")
                 .join(build.file_name());
+            self.pending_method = Some(build.os.install_method());
             self.status = format!("Downloading {}…", build.file_name());
             self.download_progress = Some(DownloadProgress {
                 downloaded: 0,
@@ -167,7 +170,10 @@ impl RomFlashState {
             .as_ref()
             .map(|p| p.serial.clone())
             .unwrap_or_default();
-        let mut opts = FlashOptions::new(rom_zip);
+        let mut opts = match self.pending_method {
+            Some(InstallMethod::FastbootFactory) => FlashOptions::factory(rom_zip),
+            _ => FlashOptions::new(rom_zip),
+        };
         if self.profile.as_ref().and_then(|p| p.bootloader_unlocked) == Some(false) {
             opts.unlock_bootloader = true;
         }
@@ -240,8 +246,8 @@ fn worker_loop(req_rx: Receiver<RomReq>, res_tx: Sender<RomRes>) {
                 if let Ok(profile) = adb.detect_device_profile() {
                     let codename = profile.codename.clone();
                     let _ = res_tx.send(RomRes::Profile(profile));
-                    let builds = rom::lineage::fetch_builds(&codename);
-                    let _ = res_tx.send(RomRes::Builds(builds));
+                    let builds = rom::resolve_all(&codename);
+                    let _ = res_tx.send(RomRes::Builds(Ok(builds)));
                 }
             }
             RomReq::Download { build, dest } => {

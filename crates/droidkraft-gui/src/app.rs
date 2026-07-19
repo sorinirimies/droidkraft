@@ -8,7 +8,8 @@ use gpui::{div, img, prelude::*, px, rgb, AnyElement, ClickEvent, Context, Windo
 use droidkraft_core::features::fastboot::FastbootCommand;
 use droidkraft_core::features::flash::{RebootTarget, RootStatus};
 use droidkraft_core::features::rom::{
-    build_plan, DeviceProfile, DownloadProgress, FlashOptions, FlashSession, RomBuild, StepStatus,
+    build_plan, DeviceProfile, DownloadProgress, FlashOptions, FlashSession, InstallMethod,
+    RomBuild, StepStatus,
 };
 use droidkraft_core::{DeviceStatus, LogEntry, LogcatFilter, LogcatStream};
 
@@ -87,6 +88,7 @@ pub struct DroidGui {
     rom_status: Option<String>,
     download_progress: Option<DownloadProgress>,
     downloaded_path: Option<std::path::PathBuf>,
+    pending_method: Option<InstallMethod>,
     flash_session: Option<FlashSession>,
     flash_busy: bool,
 }
@@ -125,6 +127,7 @@ impl DroidGui {
             rom_status: None,
             download_progress: None,
             downloaded_path: None,
+            pending_method: None,
             flash_session: None,
             flash_busy: false,
         }
@@ -278,6 +281,7 @@ impl DroidGui {
         let dest = std::env::temp_dir()
             .join("droidkraft-roms")
             .join(build.file_name());
+        self.pending_method = Some(build.os.install_method());
         self.rom_status = Some(format!("Downloading {}…", build.file_name()));
         self.download_progress = Some(DownloadProgress {
             downloaded: 0,
@@ -293,7 +297,10 @@ impl DroidGui {
     /// bootloader-lock state.
     fn build_flash_session(&mut self, rom_zip: std::path::PathBuf) {
         let serial = self.active_serial().unwrap_or_default();
-        let mut opts = FlashOptions::new(rom_zip);
+        let mut opts = match self.pending_method {
+            Some(InstallMethod::FastbootFactory) => FlashOptions::factory(rom_zip),
+            _ => FlashOptions::new(rom_zip),
+        };
         // If we know the bootloader is locked, include the unlock step.
         if self.profile.as_ref().and_then(|p| p.bootloader_unlocked) == Some(false) {
             opts.unlock_bootloader = true;

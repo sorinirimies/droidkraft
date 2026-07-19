@@ -16,7 +16,7 @@ use std::process::Command;
 use crate::client::AdbManager;
 use crate::features::fastboot::{FastbootCommand, FastbootManager};
 use crate::features::flash::RebootTarget;
-use crate::features::rom::types::DeviceProfile;
+use crate::features::rom::types::{DeviceProfile, InstallMethod};
 
 /// A single step in a custom-ROM install.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,6 +33,11 @@ pub enum FlashStep {
     RebootToRecovery,
     /// `adb sideload <zip>` — install the ROM from recovery sideload mode.
     Sideload { zip: PathBuf },
+    /// Extract a signed factory-image zip and run its `flash-all` script
+    /// (GrapheneOS / Pixel factory install).
+    FactoryFlash { zip: PathBuf },
+    /// `fastboot flashing lock` — re-lock the bootloader (verified boot).
+    LockBootloader,
     /// `adb reboot` — boot into the newly installed system.
     RebootToSystem,
 }
@@ -46,6 +51,8 @@ impl FlashStep {
             FlashStep::FlashRecovery { .. } => "Flash recovery",
             FlashStep::RebootToRecovery => "Reboot to recovery",
             FlashStep::Sideload { .. } => "Sideload ROM",
+            FlashStep::FactoryFlash { .. } => "Flash factory image",
+            FlashStep::LockBootloader => "Re-lock bootloader",
             FlashStep::RebootToSystem => "Reboot to system",
         }
     }
@@ -65,6 +72,12 @@ impl FlashStep {
             FlashStep::Sideload { .. } => {
                 "In recovery, choose 'Apply update' → 'Apply from ADB', then this sideloads the ROM zip.".into()
             }
+            FlashStep::FactoryFlash { .. } => {
+                "Extracts the signed factory image and runs its flash-all script (flashes bootloader, radio, and system, then reboots).".into()
+            }
+            FlashStep::LockBootloader => {
+                "Re-locks the bootloader to re-enable verified boot (recommended for GrapheneOS). ⚠ Only do this with a signed OS installed.".into()
+            }
             FlashStep::RebootToSystem => "Reboots into the newly installed ROM.".into(),
         }
     }
@@ -73,7 +86,11 @@ impl FlashStep {
     pub fn is_destructive(&self) -> bool {
         matches!(
             self,
-            FlashStep::UnlockBootloader | FlashStep::WipeData | FlashStep::Sideload { .. }
+            FlashStep::UnlockBootloader
+                | FlashStep::WipeData
+                | FlashStep::Sideload { .. }
+                | FlashStep::FactoryFlash { .. }
+                | FlashStep::LockBootloader
         )
     }
 
@@ -92,28 +109,47 @@ impl FlashStep {
 /// Options describing a full install, used to build a [`FlashPlan`].
 #[derive(Debug, Clone)]
 pub struct FlashOptions {
+    /// The installation strategy (sideload vs fastboot factory).
+    pub install_method: InstallMethod,
     /// Whether to unlock the bootloader first (needed if still locked).
     pub unlock_bootloader: bool,
-    /// Whether to factory-reset before installing.
+    /// Whether to factory-reset before installing (sideload path only).
     pub wipe_data: bool,
+    /// Whether to re-lock the bootloader after a factory install.
+    pub relock_after: bool,
     /// Recovery image to flash, if the ROM needs a custom recovery.
     pub recovery_image: Option<PathBuf>,
     /// Partition to flash the recovery to (`"boot"` for most A/B devices,
     /// `"recovery"` for legacy A-only devices).
     pub recovery_partition: String,
-    /// The ROM zip to sideload.
+    /// The ROM zip to sideload, or the factory-image zip to flash.
     pub rom_zip: PathBuf,
 }
 
 impl FlashOptions {
-    /// Sensible defaults for a modern A/B device that is already unlocked.
+    /// Sensible defaults for a modern A/B device installing a sideload ROM.
     pub fn new(rom_zip: PathBuf) -> Self {
         Self {
+            install_method: InstallMethod::RecoverySideload,
             unlock_bootloader: false,
             wipe_data: true,
+            relock_after: false,
             recovery_image: None,
             recovery_partition: "boot".to_string(),
             rom_zip,
+        }
+    }
+
+    /// Defaults for a GrapheneOS/Pixel fastboot **factory** install.
+    pub fn factory(factory_zip: PathBuf) -> Self {
+        Self {
+            install_method: InstallMethod::FastbootFactory,
+            unlock_bootloader: true,
+            wipe_data: false, // the factory flash wipes as part of flashing
+            relock_after: false,
+            recovery_image: None,
+            recovery_partition: "boot".to_string(),
+            rom_zip: factory_zip,
         }
     }
 }
@@ -126,16 +162,37 @@ pub struct FlashPlan {
 
 /// Build a flash plan from the given options.
 pub fn build_plan(opts: &FlashOptions) -> FlashPlan {
+    match opts.install_method {
+        InstallMethod::FastbootFactory => build_factory_plan(opts),
+        InstallMethod::RecoverySideload => build_sideload_plan(opts),
+    }
+}
+
+fn build_factory_plan(opts: &FlashOptions) -> FlashPlan {
+    let mut steps = vec![FlashStep::RebootToBootloader];
+    if opts.unlock_bootloader {
+        steps.push(FlashStep::UnlockBootloader);
+    }
+    steps.push(FlashStep::FactoryFlash {
+        zip: opts.rom_zip.clone(),
+    });
+    if opts.relock_after {
+        steps.push(FlashStep::LockBootloader);
+    }
+    // flash-all reboots the device itself; no explicit reboot step needed.
+    FlashPlan { steps }
+}
+
+fn build_sideload_plan(opts: &FlashOptions) -> FlashPlan {
     let mut steps = Vec::new();
     if opts.unlock_bootloader {
         steps.push(FlashStep::RebootToBootloader);
         steps.push(FlashStep::UnlockBootloader);
     }
-    if opts.recovery_image.is_some() || opts.wipe_data {
-        // Ensure we are in the bootloader for fastboot operations.
-        if !steps.contains(&FlashStep::RebootToBootloader) {
-            steps.push(FlashStep::RebootToBootloader);
-        }
+    if (opts.recovery_image.is_some() || opts.wipe_data)
+        && !steps.contains(&FlashStep::RebootToBootloader)
+    {
+        steps.push(FlashStep::RebootToBootloader);
     }
     if opts.wipe_data {
         steps.push(FlashStep::WipeData);
@@ -289,6 +346,10 @@ fn execute_step(
             .map_err(|e| e.to_string()),
         FlashStep::RebootToSystem => adb.reboot(RebootTarget::System).map_err(|e| e.to_string()),
         FlashStep::Sideload { zip } => adb_sideload(serial, &zip.to_string_lossy()),
+        FlashStep::LockBootloader => fastboot
+            .execute(FastbootCommand::OemLock)
+            .map_err(|e| e.to_string()),
+        FlashStep::FactoryFlash { zip } => factory_flash(zip),
     }
 }
 
@@ -319,6 +380,105 @@ fn adb_sideload(serial: &str, zip: &str) -> Result<String, String> {
     } else {
         Err(format!("sideload failed: {}", stderr.trim()))
     }
+}
+
+/// Extract a factory-image zip and run its bundled `flash-all` script.
+///
+/// GrapheneOS/Pixel factory zips ship the officially-maintained flashing
+/// sequence as `flash-all.sh` (Unix) / `flash-all.bat` (Windows); running it is
+/// the recommended CLI install method. Requires `fastboot` in `PATH`.
+fn factory_flash(zip: &std::path::Path) -> Result<String, String> {
+    if !FastbootManager::is_available() {
+        return Err("`fastboot` not found in PATH (required for factory flashing)".into());
+    }
+    let dir = zip.with_file_name(format!(
+        "{}-extracted",
+        zip.file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("factory")
+    ));
+    extract_zip(zip, &dir)?;
+
+    let script = find_flash_all(&dir)
+        .ok_or_else(|| "flash-all script not found in factory image".to_string())?;
+    let script_dir = script.parent().unwrap_or(&dir).to_path_buf();
+
+    #[cfg(windows)]
+    let mut cmd = {
+        let mut c = Command::new("cmd");
+        c.arg("/C").arg(&script);
+        c
+    };
+    #[cfg(not(windows))]
+    let mut cmd = {
+        let mut c = Command::new("bash");
+        c.arg(&script);
+        c
+    };
+    cmd.current_dir(&script_dir);
+
+    let output = cmd
+        .output()
+        .map_err(|e| format!("failed to run flash-all script: {e}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if output.status.success() {
+        Ok(format!("{stdout}\n{stderr}").trim().to_string())
+    } else {
+        Err(format!("factory flash failed:\n{}", stderr.trim()))
+    }
+}
+
+/// Extract a zip archive into `dest` (creating it).
+fn extract_zip(zip_path: &std::path::Path, dest: &std::path::Path) -> Result<(), String> {
+    let file = std::fs::File::open(zip_path).map_err(|e| format!("open zip: {e}"))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("read zip: {e}"))?;
+    std::fs::create_dir_all(dest).map_err(|e| format!("create dir: {e}"))?;
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).map_err(|e| format!("zip entry: {e}"))?;
+        let out_path = match entry.enclosed_name() {
+            Some(p) => dest.join(p),
+            None => continue,
+        };
+        if entry.is_dir() {
+            std::fs::create_dir_all(&out_path).map_err(|e| format!("mkdir: {e}"))?;
+        } else {
+            if let Some(parent) = out_path.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {e}"))?;
+            }
+            let mut out = std::fs::File::create(&out_path).map_err(|e| format!("create: {e}"))?;
+            std::io::copy(&mut entry, &mut out).map_err(|e| format!("extract: {e}"))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Some(mode) = entry.unix_mode() {
+                    let _ =
+                        std::fs::set_permissions(&out_path, std::fs::Permissions::from_mode(mode));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Recursively locate the `flash-all` script within an extracted factory image.
+fn find_flash_all(dir: &std::path::Path) -> Option<PathBuf> {
+    let script_name = if cfg!(windows) {
+        "flash-all.bat"
+    } else {
+        "flash-all.sh"
+    };
+    for entry in std::fs::read_dir(dir).ok()?.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(found) = find_flash_all(&path) {
+                return Some(found);
+            }
+        } else if path.file_name().and_then(|n| n.to_str()) == Some(script_name) {
+            return Some(path);
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -387,6 +547,25 @@ mod tests {
         session.statuses[0] = StepStatus::Done;
         assert_eq!(session.progress().0, 1);
         assert_eq!(session.next_pending(), Some(1));
+    }
+
+    #[test]
+    fn factory_plan_uses_fastboot_factory_flow() {
+        let mut o = FlashOptions::factory(PathBuf::from("/tmp/grapheneos-factory.zip"));
+        o.relock_after = true;
+        let plan = build_plan(&o);
+        assert_eq!(plan.steps[0], FlashStep::RebootToBootloader);
+        assert_eq!(plan.steps[1], FlashStep::UnlockBootloader);
+        assert!(plan
+            .steps
+            .iter()
+            .any(|s| matches!(s, FlashStep::FactoryFlash { .. })));
+        assert_eq!(*plan.steps.last().unwrap(), FlashStep::LockBootloader);
+        // No sideload/recovery steps in the factory flow.
+        assert!(!plan
+            .steps
+            .iter()
+            .any(|s| matches!(s, FlashStep::Sideload { .. })));
     }
 
     #[test]

@@ -4,9 +4,11 @@
 use serde::{Deserialize, Serialize};
 
 /// A supported custom-ROM operating system / project.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RomOs {
     LineageOs,
+    /// GrapheneOS (hardened, Pixel-only, fastboot factory install).
+    GrapheneOs,
     /// /e/OS (Murena).
     EOs,
     PixelExperience,
@@ -19,6 +21,7 @@ impl RomOs {
     pub fn label(&self) -> &'static str {
         match self {
             RomOs::LineageOs => "LineageOS",
+            RomOs::GrapheneOs => "GrapheneOS",
             RomOs::EOs => "/e/OS",
             RomOs::PixelExperience => "Pixel Experience",
             RomOs::CrDroid => "crDroid",
@@ -30,6 +33,7 @@ impl RomOs {
     pub fn homepage(&self) -> &'static str {
         match self {
             RomOs::LineageOs => "https://lineageos.org",
+            RomOs::GrapheneOs => "https://grapheneos.org",
             RomOs::EOs => "https://e.foundation",
             RomOs::PixelExperience => "https://pixelexperience.org",
             RomOs::CrDroid => "https://crdroid.net",
@@ -38,21 +42,52 @@ impl RomOs {
         }
     }
 
-    /// How this ROM is typically installed.
+    /// How this ROM is installed.
     pub fn install_method(&self) -> InstallMethod {
-        // Most modern custom ROMs ship a recovery image and are installed by
-        // sideloading the ROM zip from that recovery.
-        InstallMethod::RecoverySideload
+        match self {
+            // GrapheneOS ships signed factory images flashed with fastboot.
+            RomOs::GrapheneOs => InstallMethod::FastbootFactory,
+            // Most others ship a recovery and are installed by sideloading.
+            _ => InstallMethod::RecoverySideload,
+        }
     }
 
-    /// Whether device support for this ROM can be resolved live from an API.
+    /// Where downloadable builds are resolved from.
+    pub fn build_source(&self) -> BuildSource {
+        match self {
+            RomOs::LineageOs => BuildSource::LineageApi,
+            RomOs::GrapheneOs => BuildSource::GrapheneReleases,
+            // crDroid & Evolution X publish LineageOS-updater-style OTA JSON on
+            // GitHub; `{codename}` is substituted into the template.
+            RomOs::CrDroid => BuildSource::OtaJson(&[
+                "https://raw.githubusercontent.com/crdroidandroid/android_vendor_crDroidOTA/14.0/{codename}.json",
+                "https://raw.githubusercontent.com/crdroidandroid/android_vendor_crDroidOTA/13.0/{codename}.json",
+            ]),
+            RomOs::EvolutionX => BuildSource::OtaJson(&[
+                "https://raw.githubusercontent.com/Evolution-X/OTA/main/builds/{codename}.json",
+                "https://raw.githubusercontent.com/Evolution-X/OTA/udc/builds/{codename}.json",
+            ]),
+            // No stable machine-readable download API wired — catalog/info only.
+            RomOs::EOs | RomOs::PixelExperience | RomOs::ParanoidAndroid => {
+                BuildSource::WebsiteOnly
+            }
+        }
+    }
+
+    /// Whether builds for this ROM can be resolved and downloaded in-app.
+    pub fn is_downloadable(&self) -> bool {
+        !matches!(self.build_source(), BuildSource::WebsiteOnly)
+    }
+
+    /// Kept for API compatibility — whether device support is resolved live.
     pub fn has_live_api(&self) -> bool {
-        matches!(self, RomOs::LineageOs)
+        matches!(self, RomOs::LineageOs | RomOs::GrapheneOs)
     }
 
     pub fn all() -> &'static [RomOs] {
         &[
             RomOs::LineageOs,
+            RomOs::GrapheneOs,
             RomOs::EOs,
             RomOs::PixelExperience,
             RomOs::CrDroid,
@@ -62,13 +97,27 @@ impl RomOs {
     }
 }
 
+/// Where a ROM's downloadable builds come from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuildSource {
+    /// The LineageOS v2 download API.
+    LineageApi,
+    /// The GrapheneOS releases server (fastboot factory images).
+    GrapheneReleases,
+    /// A LineageOS-updater-style OTA JSON at one of these URL templates
+    /// (`{codename}` is substituted); the first that resolves wins.
+    OtaJson(&'static [&'static str]),
+    /// No machine-readable download source — shown for compatibility only.
+    WebsiteOnly,
+}
+
 /// The installation strategy for a ROM.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InstallMethod {
     /// Flash a recovery image, boot it, then `adb sideload` the ROM zip.
     RecoverySideload,
-    /// Flash factory images directly with fastboot (`fastboot flashall`).
-    FastbootFlashAll,
+    /// Flash signed factory images with fastboot (GrapheneOS / Pixel factory).
+    FastbootFactory,
 }
 
 /// The role a downloadable artifact plays.
@@ -78,6 +127,8 @@ pub enum ArtifactKind {
     Rom,
     /// A recovery image (flashed via fastboot).
     Recovery,
+    /// A signed factory-image zip (flashed via fastboot; GrapheneOS/Pixel).
+    Factory,
 }
 
 /// A catalog entry: a ROM project and the (seed) devices it is known to support.
@@ -194,8 +245,22 @@ mod tests {
     fn rom_os_labels_and_api() {
         assert_eq!(RomOs::LineageOs.label(), "LineageOS");
         assert!(RomOs::LineageOs.has_live_api());
-        assert!(!RomOs::CrDroid.has_live_api());
-        assert_eq!(RomOs::all().len(), 6);
+        assert!(RomOs::LineageOs.is_downloadable());
+        assert!(RomOs::GrapheneOs.is_downloadable());
+        assert!(!RomOs::PixelExperience.is_downloadable());
+        assert_eq!(RomOs::all().len(), 7);
+    }
+
+    #[test]
+    fn install_methods() {
+        assert_eq!(
+            RomOs::GrapheneOs.install_method(),
+            InstallMethod::FastbootFactory
+        );
+        assert_eq!(
+            RomOs::LineageOs.install_method(),
+            InstallMethod::RecoverySideload
+        );
     }
 
     #[test]

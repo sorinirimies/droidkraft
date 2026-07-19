@@ -5,8 +5,10 @@
 pub mod catalog;
 pub mod download;
 pub mod flash;
+pub mod graphene;
 pub mod lineage;
 pub mod ops;
+pub mod resolve;
 pub mod types;
 
 pub use catalog::{catalog, roms_for_device, supported_roms};
@@ -15,6 +17,8 @@ pub use flash::{
     build_plan, preflight, run_flash_step, FlashOptions, FlashPlan, FlashSession, FlashStep,
     StepStatus,
 };
+pub use resolve::{resolve_all, resolve_builds};
 pub use types::{
-    ArtifactKind, CustomRom, DeviceProfile, DownloadProgress, InstallMethod, RomBuild, RomOs,
+    ArtifactKind, BuildSource, CustomRom, DeviceProfile, DownloadProgress, InstallMethod, RomBuild,
+    RomOs,
 };

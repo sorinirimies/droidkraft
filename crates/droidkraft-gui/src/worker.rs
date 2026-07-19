@@ -205,7 +205,7 @@ fn handle_request(adb: &mut AdbManager, res_tx: &Sender<WorkerResponse>, req: Wo
 /// Only projects with a live download API (LineageOS) yield directly
 /// downloadable builds; other catalog ROMs are informational.
 fn fetch_roms(codename: &str) -> Result<Vec<RomBuild>, String> {
-    droidkraft_core::features::rom::lineage::fetch_builds(codename)
+    Ok(droidkraft_core::features::rom::resolve_all(codename))
 }
 
 fn run_action(adb: &mut AdbManager, action: CommandAction) -> Result<String, String> {
