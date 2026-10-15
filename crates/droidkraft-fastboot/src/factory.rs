@@ -36,6 +36,31 @@ pub struct FactoryOptions {
     pub settle_delay: Duration,
 }
 
+impl FactoryOptions {
+    /// Defaults: keep user data, reboot at the end.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Erase userdata/metadata at the end.
+    pub fn wipe(mut self, wipe: bool) -> Self {
+        self.wipe = wipe;
+        self
+    }
+
+    /// Leave the device in fastboot instead of rebooting.
+    pub fn skip_reboot(mut self, skip: bool) -> Self {
+        self.skip_reboot = skip;
+        self
+    }
+
+    /// Max time to wait for the device after each reboot.
+    pub fn reconnect_timeout(mut self, timeout: Duration) -> Self {
+        self.reconnect_timeout = timeout;
+        self
+    }
+}
+
 impl Default for FactoryOptions {
     fn default() -> Self {
         Self {

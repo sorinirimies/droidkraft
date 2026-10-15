@@ -230,13 +230,25 @@ pub fn kv(key: &str, value: impl Into<String>) -> AnyElement {
 pub fn sparkline(values: &[f64], max: f64, color: u32, height: f32, cols: usize) -> AnyElement {
     let hs = spark_heights(tail(values, cols), max, height);
     let mut row = div().flex().items_end().gap(px(1.)).h(px(height)).w_full();
-    for h in hs {
+    // Pad on the left so bars keep a constant width while history fills up.
+    for _ in hs.len()..cols {
+        row = row.child(
+            div()
+                .flex_1()
+                .h(px(1.))
+                .bg(Hsla::from(rgb(theme::TEXT_DIM)).opacity(0.25)),
+        );
+    }
+    let last = hs.len().saturating_sub(1);
+    for (i, h) in hs.into_iter().enumerate() {
+        // Older samples fade out; the newest is solid.
+        let age = (last - i) as f32 / cols.max(1) as f32;
         row = row.child(
             div()
                 .flex_1()
                 .h(px(h))
                 .rounded_sm()
-                .bg(Hsla::from(rgb(color)).opacity(0.85)),
+                .bg(Hsla::from(rgb(color)).opacity((0.95 - age * 0.55).max(0.35))),
         );
     }
     row.into_any_element()

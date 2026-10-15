@@ -33,7 +33,7 @@ impl fmt::Display for FastbootError {
                 "No device detected in fastboot mode.\n\n\
                  Steps:\n\
                  1. Connect the device via USB\n\
-                 2. Run 'Reboot to Bootloader' from the ROOT & FLASH menu\n\
+                 2. Reboot it into the bootloader (`adb reboot bootloader`)\n\
                  3. Retry this command"
             ),
             FastbootError::Usb(msg) => write!(f, "USB error: {msg}"),
@@ -43,7 +43,14 @@ impl fmt::Display for FastbootError {
     }
 }
 
-impl std::error::Error for FastbootError {}
+impl std::error::Error for FastbootError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            FastbootError::Io(e) => Some(e),
+            _ => None,
+        }
+    }
+}
 
 impl From<std::io::Error> for FastbootError {
     fn from(e: std::io::Error) -> Self {
@@ -52,6 +59,8 @@ impl From<std::io::Error> for FastbootError {
 }
 
 /// High-level fastboot operations.
+///
+/// Run them with [`FastbootManager::execute`](crate::FastbootManager::execute).
 #[derive(Debug, Clone)]
 pub enum FastbootCommand {
     /// Unlock the bootloader — enables custom ROM flashing. ⚠ Wipes device data.
@@ -86,6 +95,14 @@ pub enum FastbootCommand {
 }
 
 impl FastbootCommand {
+    /// Flash `image` onto `partition`.
+    pub fn flash(partition: impl Into<String>, image: impl AsRef<std::path::Path>) -> Self {
+        Self::FlashPartition {
+            partition: partition.into(),
+            image_path: image.as_ref().to_string_lossy().into_owned(),
+        }
+    }
+
     /// The argument vector passed to the `fastboot` binary.
     pub fn args(&self) -> Vec<String> {
         match self {
@@ -134,6 +151,27 @@ impl FastbootCommand {
             Self::OemUnlock | Self::OemLock | Self::WipeData | Self::Erase { .. } | Self::Raw(_)
         )
     }
+}
+
+/// Parse `getvar all` output (or a single `getvar`) into a map.
+///
+/// Accepts `key: value` lines with an optional `(bootloader) ` prefix, as
+/// printed by both the binary and the native backend. Lines without a colon
+/// (e.g. `Finished. Total time: ...`) are skipped.
+pub fn parse_variables(output: &str) -> std::collections::BTreeMap<String, String> {
+    let mut map = std::collections::BTreeMap::new();
+    for line in output.lines() {
+        let line = line.trim().trim_start_matches("(bootloader)").trim();
+        // Keys may contain ':' (`partition-size:boot_a`): split at ": ".
+        let Some((k, v)) = line.split_once(": ") else {
+            continue;
+        };
+        if k.is_empty() || k.contains(' ') || k == "Finished" {
+            continue;
+        }
+        map.insert(k.to_string(), v.trim().to_string());
+    }
+    map
 }
 
 #[cfg(test)]
@@ -220,5 +258,24 @@ mod tests {
         }
         .is_destructive());
         assert!(!FastbootCommand::GetVar { name: "x".into() }.is_destructive());
+    }
+
+    #[test]
+    fn parses_variables() {
+        let m = parse_variables(
+            "(bootloader) product: husky\n(bootloader) partition-size:boot_a: 0x4000000\nmax-download-size: 0x10000000\nFinished. Total time: 0.001s\n",
+        );
+        assert_eq!(m["product"], "husky");
+        assert_eq!(m["partition-size:boot_a"], "0x4000000");
+        assert_eq!(m["max-download-size"], "0x10000000");
+        assert_eq!(m.len(), 3);
+    }
+
+    #[test]
+    fn flash_constructor() {
+        assert_eq!(
+            FastbootCommand::flash("boot", "/tmp/b.img").args(),
+            vec!["flash", "boot", "/tmp/b.img"]
+        );
     }
 }
