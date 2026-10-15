@@ -11,11 +11,11 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
     let t = &m.themes;
     let text = if m.active.is_some() {
         format!(
-            " {} Tab tabs · alt-o/l/c/f/s · [ ] device · d home · 1-9 device · t theme · ? help · q quit",
+            " {} Tab tabs · alt-o/l/c/f/s · [ ] device · d home · 1-9 device · t theme · </> speed · ? help · q quit",
             super::hints(m.panel)
         )
     } else {
-        " ←→↑↓ select · Enter open · o/l/c/m/R/f card actions · 1-9 device · [ ] · t theme · r refresh · ? help · q quit"
+        " ←→↑↓ select · Enter open · o/l/c/m/R/f card actions · 1-9 device · [ ] · t theme · </> speed · r refresh · ? help · q quit"
             .to_string()
     };
     let mut spans = vec![Span::styled(text, t.muted())];

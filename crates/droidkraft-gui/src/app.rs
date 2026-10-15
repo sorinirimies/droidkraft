@@ -28,6 +28,8 @@ pub struct DroidGui {
     pub(crate) worker: Worker,
     pub(crate) fleet: Fleet,
     pub(crate) route: Route,
+    /// Stats/graph polling speed.
+    pub(crate) rate: droidkraft_core::RefreshRate,
 }
 
 impl DroidGui {
@@ -65,7 +67,14 @@ impl DroidGui {
             worker: Worker::spawn(),
             fleet: Fleet::new(),
             route: Route::Devices,
+            rate: Default::default(),
         }
+    }
+
+    /// Poll stats faster/slower (graphs follow).
+    pub fn set_rate(&mut self, rate: droidkraft_core::RefreshRate) {
+        self.rate = rate;
+        self.worker.send(WorkerRequest::SetRate(rate));
     }
 
     // ── routing ───────────────────────────────────────────────────────────

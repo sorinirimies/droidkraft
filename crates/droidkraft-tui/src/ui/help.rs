@@ -13,6 +13,7 @@ pub const LINES: &[&str] = &[
     "Tab / Shift-Tab         cycle tabs in a workspace (or click the tab bar)",
     "o l c f s               Overview/Logs/Commands/Flash/Screen (alt-<key> always works)",
     "t                       cycle theme      r  refresh devices now",
+    "> / <                   graphs faster / slower (0.5s-10s; + / - too, except on Screen)",
     "?                       toggle this help q / Ctrl-C  quit",
     "",
     "Home:      arrows select card · Enter open · o l c m R f = open on that tab",

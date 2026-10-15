@@ -841,3 +841,99 @@ mod tests {
         assert_eq!(DeviceDetails::default().display_name(), "");
     }
 }
+
+/// How often the focused device's stats/graphs are polled.
+///
+/// Steps through fixed speeds so UIs can offer "faster / slower" controls.
+/// Background devices poll at twice this interval (at least 3 s).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RefreshRate(usize);
+
+impl RefreshRate {
+    /// Selectable intervals in milliseconds, fastest first.
+    pub const STEPS_MS: [u64; 7] = [500, 1000, 1500, 2000, 3000, 5000, 10_000];
+    /// Default (1.5 s).
+    pub const DEFAULT: RefreshRate = RefreshRate(2);
+
+    /// Interval of the focused device.
+    pub fn focused(self) -> std::time::Duration {
+        std::time::Duration::from_millis(Self::STEPS_MS[self.0])
+    }
+
+    /// Interval of devices that are not focused.
+    pub fn background(self) -> std::time::Duration {
+        (self.focused() * 2).max(std::time::Duration::from_secs(3))
+    }
+
+    /// One step faster (saturates at 0.5 s).
+    pub fn faster(self) -> Self {
+        Self(self.0.saturating_sub(1))
+    }
+
+    /// One step slower (saturates at 10 s).
+    pub fn slower(self) -> Self {
+        Self((self.0 + 1).min(Self::STEPS_MS.len() - 1))
+    }
+
+    pub fn is_fastest(self) -> bool {
+        self.0 == 0
+    }
+
+    pub fn is_slowest(self) -> bool {
+        self.0 == Self::STEPS_MS.len() - 1
+    }
+
+    /// Short label such as `1.5s` or `500ms`.
+    pub fn label(self) -> String {
+        let ms = Self::STEPS_MS[self.0];
+        if ms < 1000 {
+            format!("{ms}ms")
+        } else if ms % 1000 == 0 {
+            format!("{}s", ms / 1000)
+        } else {
+            format!("{:.1}s", ms as f64 / 1000.0)
+        }
+    }
+}
+
+impl Default for RefreshRate {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+#[cfg(test)]
+mod refresh_rate_tests {
+    use super::RefreshRate;
+
+    #[test]
+    fn steps_and_saturation() {
+        let mut r = RefreshRate::default();
+        assert_eq!(r.label(), "1.5s");
+        for _ in 0..10 {
+            r = r.faster();
+        }
+        assert!(r.is_fastest());
+        assert_eq!(r.label(), "500ms");
+        for _ in 0..10 {
+            r = r.slower();
+        }
+        assert!(r.is_slowest());
+        assert_eq!(r.label(), "10s");
+    }
+
+    #[test]
+    fn background_is_slower() {
+        let r = RefreshRate::default().faster().faster();
+        assert_eq!(r.focused().as_millis(), 500);
+        assert_eq!(r.background().as_secs(), 3);
+        assert_eq!(
+            RefreshRate::default()
+                .slower()
+                .slower()
+                .background()
+                .as_secs(),
+            6
+        );
+    }
+}

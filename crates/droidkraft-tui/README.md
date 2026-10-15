@@ -17,7 +17,7 @@ Everything is organised **per device**.
 
 ## Keys
 
-Global: `d` devices home · `1`–`9` open nth device · `[` / `]` previous/next device · `Tab` / `Shift-Tab` cycle tabs · `o l c f s` jump to tab · `t` theme · `r` refresh · `?` help · `q` / `Ctrl-C` quit.
+Global: `d` devices home · `1`–`9` open nth device · `[` / `]` previous/next device · `Tab` / `Shift-Tab` cycle tabs · `o l c f s` jump to tab · `t` theme · `r` refresh · `>` / `<` graphs faster / slower (0.5 s–10 s) · `?` help · `q` / `Ctrl-C` quit.
 
 | Tab | Keys |
 |---|---|

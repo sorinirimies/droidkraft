@@ -101,13 +101,15 @@ impl DroidGui {
             .flex()
             .gap_1()
             .overflow_hidden()
+            .justify_between()
             .border_b_1()
             .border_color(rgb(theme::BORDER));
+        let mut tab_row = div().flex().gap_1().overflow_hidden();
         for tab in Tab::all() {
             let tab = *tab;
             let active = tab == d.tab;
             let s = serial.to_string();
-            tabs = tabs.child(
+            tab_row = tab_row.child(
                 div()
                     .id(("tab", tab as usize))
                     .px(gpui::px(if lay.short_tabs() { 8. } else { 12. }))
@@ -133,6 +135,7 @@ impl DroidGui {
                     })),
             );
         }
+        tabs = tabs.child(tab_row).child(self.rate_control(cx));
 
         let banner: Option<AnyElement> = if d.is_online() {
             None
@@ -184,6 +187,52 @@ impl DroidGui {
             .children(banner)
             .child(tabs)
             .child(body)
+            .into_any_element()
+    }
+}
+
+impl DroidGui {
+    /// `Graphs  [−] 1.5s [+]` control: lower interval = faster graphs.
+    pub(crate) fn rate_control(&self, cx: &mut Context<Self>) -> AnyElement {
+        let r = self.rate;
+        let step = |id: &'static str,
+                    label: &'static str,
+                    faster: bool,
+                    off: bool,
+                    cx: &mut Context<Self>| {
+            let (bg, fg) = if off {
+                (theme::BG, theme::TEXT_DIM)
+            } else {
+                (theme::BG_ELEV, theme::TEXT)
+            };
+            crate::ui::widgets::button(id, label, bg, fg, cx, move |this, cx| {
+                let r = if faster {
+                    this.rate.faster()
+                } else {
+                    this.rate.slower()
+                };
+                this.set_rate(r);
+                cx.notify();
+            })
+        };
+        div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .flex_none()
+            .text_xs()
+            .text_color(rgb(theme::TEXT_DIM))
+            .child("Refresh")
+            .child(step("rate-slower", "−", false, r.is_slowest(), cx))
+            .child(
+                div()
+                    .min_w(gpui::px(40.))
+                    .flex()
+                    .justify_center()
+                    .text_color(rgb(theme::TEXT))
+                    .child(r.label()),
+            )
+            .child(step("rate-faster", "+", true, r.is_fastest(), cx))
             .into_any_element()
     }
 }

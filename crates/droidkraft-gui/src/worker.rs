@@ -35,10 +35,6 @@ impl<T, E: std::fmt::Display> StringErr<T> for Result<T, E> {
 
 /// How often the worker refreshes the `adb devices` list.
 const LIST_INTERVAL: Duration = Duration::from_secs(2);
-/// Detail polling cadence for background devices / the open workspace.
-const POLL_BACKGROUND: Duration = Duration::from_secs(3);
-const POLL_FOCUSED: Duration = Duration::from_millis(1500);
-
 /// A request from the UI to the worker. Every device-scoped request carries
 /// the serial it targets.
 pub enum WorkerRequest {
@@ -68,6 +64,8 @@ pub enum WorkerRequest {
     },
     /// Force an immediate device-list refresh.
     RefreshStatus,
+    /// Change how often device stats/graphs are polled.
+    SetRate(droidkraft_core::RefreshRate),
     /// Which device's workspace is open (polled faster).
     Focus(Option<String>),
     DetectProfile {
@@ -180,6 +178,7 @@ struct Poller {
     entries: HashMap<String, PollEntry>,
     online: Vec<String>,
     focus: Option<String>,
+    rate: droidkraft_core::RefreshRate,
     last_list: Option<Instant>,
 }
 
@@ -191,6 +190,7 @@ impl Poller {
             entries: HashMap::new(),
             online: Vec::new(),
             focus: None,
+            rate: Default::default(),
             last_list: None,
         }
     }
@@ -231,9 +231,9 @@ impl Poller {
         }
         for serial in self.online.clone() {
             let every = if self.focus.as_deref() == Some(serial.as_str()) {
-                POLL_FOCUSED
+                self.rate.focused()
             } else {
-                POLL_BACKGROUND
+                self.rate.background()
             };
             let entry = self
                 .entries
@@ -277,6 +277,12 @@ impl Poller {
         match req {
             WorkerRequest::RefreshStatus => {
                 self.last_list = None;
+                for e in self.entries.values_mut() {
+                    e.last = None;
+                }
+            }
+            WorkerRequest::SetRate(r) => {
+                self.rate = r;
                 for e in self.entries.values_mut() {
                     e.last = None;
                 }

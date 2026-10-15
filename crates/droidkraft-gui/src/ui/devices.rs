@@ -22,17 +22,24 @@ impl DroidGui {
             .items_center()
             .justify_between()
             .child(heading("Devices"))
-            .child(button(
-                "refresh",
-                "Refresh",
-                theme::BG_ELEV,
-                theme::TEXT,
-                cx,
-                |this, _cx| {
-                    this.worker
-                        .send(crate::worker::WorkerRequest::RefreshStatus)
-                },
-            ));
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_3()
+                    .child(self.rate_control(cx))
+                    .child(button(
+                        "refresh",
+                        "Refresh",
+                        theme::BG_ELEV,
+                        theme::TEXT,
+                        cx,
+                        |this, _cx| {
+                            this.worker
+                                .send(crate::worker::WorkerRequest::RefreshStatus)
+                        },
+                    )),
+            );
 
         let summary = div()
             .flex()

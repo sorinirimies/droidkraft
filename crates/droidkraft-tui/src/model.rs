@@ -212,6 +212,8 @@ pub struct Model {
     pub home_cols: usize,
     /// First visible row on the device Overview.
     pub ov_scroll: usize,
+    /// How often stats/graphs are polled (`+` / `-`).
+    pub refresh: droidkraft_core::RefreshRate,
     pub quit: bool,
     // Live panel state of the OPEN workspace (swapped in/out on switch).
     pub logs: crate::ui::logs::LogsUi,
@@ -237,6 +239,7 @@ impl Default for Model {
             card_rects: Vec::new(),
             home_cols: 1,
             ov_scroll: 0,
+            refresh: Default::default(),
             quit: false,
             logs: Default::default(),
             cmds: Default::default(),

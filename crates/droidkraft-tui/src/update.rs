@@ -75,6 +75,8 @@ fn on_key(m: &mut Model, k: KeyEvent) -> Vec<Cmd> {
             m.set_message("Refreshing…");
             vec![Cmd::Worker(Req::Refresh)]
         }
+        KeyCode::Char('>' | '+' | '=') => set_rate(m, true),
+        KeyCode::Char('<' | '-' | '_') => set_rate(m, false),
         KeyCode::Char('d') => m.go_home(),
         KeyCode::Char(c @ '1'..='9') => m.open_nth(c as usize - '1' as usize),
         KeyCode::Char('[') => m.step_device(-1),
@@ -93,6 +95,23 @@ fn on_key(m: &mut Model, k: KeyEvent) -> Vec<Cmd> {
         }
         _ => ui::devices::on_key(m, k),
     }
+}
+
+/// Make graphs update faster (`+`) or slower (`-`).
+fn set_rate(m: &mut Model, faster: bool) -> Vec<Cmd> {
+    let r = if faster {
+        m.refresh.faster()
+    } else {
+        m.refresh.slower()
+    };
+    if r == m.refresh {
+        let end = if faster { "fastest" } else { "slowest" };
+        m.set_message(format!("Refresh already {end} ({})", r.label()));
+        return vec![];
+    }
+    m.refresh = r;
+    m.set_message(format!("Refresh every {}", r.label()));
+    vec![Cmd::Worker(Req::SetRate(r))]
 }
 
 fn on_mouse(m: &mut Model, e: MouseEvent) -> Vec<Cmd> {

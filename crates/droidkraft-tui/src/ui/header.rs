@@ -18,7 +18,10 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
     let inner = block.inner(area);
     f.render_widget(block, area);
     let t = &m.themes;
-    let theme = Span::styled(format!("  theme: {}", t.name()), t.muted());
+    let theme = Span::styled(
+        format!("  theme: {}  ⟳ {}", t.name(), m.refresh.label()),
+        t.muted(),
+    );
     let line = if m.loading {
         Line::from(Span::styled("Connecting…", t.muted()))
     } else if let Some(ws) = m.active_ws() {

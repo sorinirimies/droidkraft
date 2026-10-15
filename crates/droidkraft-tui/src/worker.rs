@@ -17,10 +17,6 @@ use droidkraft_core::{collect_device_details, AdbCommand, AdbManager, CpuSample,
 
 use crate::commands::CmdAction;
 
-/// Poll interval for devices that are not focused.
-pub const POLL_INTERVAL: Duration = Duration::from_secs(3);
-/// Poll interval for the device whose workspace is open.
-pub const FOCUS_INTERVAL: Duration = Duration::from_millis(1500);
 /// How often the device list itself is refreshed.
 pub const LIST_INTERVAL: Duration = Duration::from_secs(2);
 
@@ -63,6 +59,8 @@ pub enum Req {
     Focus(Option<String>),
     /// Poll the list and all devices right now.
     Refresh,
+    /// Change how often device stats are polled.
+    SetRate(droidkraft_core::RefreshRate),
 }
 
 /// One entry of `adb devices`.
@@ -140,11 +138,15 @@ impl Worker {
 }
 
 /// Whether a device should be polled given time since its last poll.
-pub fn is_due(since_last: Option<Duration>, focused: bool) -> bool {
+pub fn is_due(
+    since_last: Option<Duration>,
+    focused: bool,
+    rate: droidkraft_core::RefreshRate,
+) -> bool {
     let iv = if focused {
-        FOCUS_INTERVAL
+        rate.focused()
     } else {
-        POLL_INTERVAL
+        rate.background()
     };
     since_last.is_none_or(|d| d >= iv)
 }
@@ -157,6 +159,7 @@ struct Poller {
     last_poll: HashMap<String, Instant>,
     prev_cpu: HashMap<String, CpuSample>,
     force: bool,
+    rate: droidkraft_core::RefreshRate,
 }
 
 fn list_devices() -> Option<Vec<ListedDevice>> {
@@ -212,7 +215,7 @@ fn poll(adb: &mut AdbManager, rx: &Receiver<Req>, tx: &Sender<Res>, p: &mut Poll
     for s in serials {
         let focused = p.focus.as_deref() == Some(s.as_str());
         let since = p.last_poll.get(&s).map(|t| now.duration_since(*t));
-        if !(p.force || is_due(since, focused)) {
+        if !(p.force || is_due(since, focused, p.rate)) {
             continue;
         }
         p.last_poll.insert(s.clone(), Instant::now());
@@ -250,6 +253,11 @@ fn s_err<T, E: std::fmt::Display>(r: Result<T, E>) -> Result<T, String> {
 fn handle(adb: &mut AdbManager, tx: &Sender<Res>, p: &mut Poller, req: Req) {
     match req {
         Req::Refresh => p.force = true,
+        Req::SetRate(r) => {
+            p.rate = r;
+            // Apply right away instead of waiting out the old interval.
+            p.last_poll.clear();
+        }
         Req::Focus(s) => {
             // Opening a workspace polls it immediately.
             if let Some(s) = &s {
@@ -382,11 +390,17 @@ mod tests {
 
     #[test]
     fn due_logic() {
-        assert!(is_due(None, false));
-        assert!(!is_due(Some(Duration::from_secs(2)), false));
-        assert!(is_due(Some(Duration::from_secs(3)), false));
-        assert!(is_due(Some(Duration::from_millis(1600)), true));
-        assert!(!is_due(Some(Duration::from_millis(500)), true));
+        let r = droidkraft_core::RefreshRate::default();
+        assert!(is_due(None, false, r));
+        assert!(!is_due(Some(Duration::from_secs(2)), false, r));
+        assert!(is_due(Some(Duration::from_secs(3)), false, r));
+        assert!(is_due(Some(Duration::from_millis(1600)), true, r));
+        assert!(!is_due(Some(Duration::from_millis(500)), true, r));
+        assert!(is_due(
+            Some(Duration::from_millis(600)),
+            true,
+            r.faster().faster()
+        ));
     }
 
     #[test]

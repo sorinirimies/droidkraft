@@ -50,8 +50,8 @@ pub use error::{AdbError, AdbResult};
 
 pub use features::device::{
     collect_device_details, list_all_details, BatteryInfo, BatteryStatus, CpuInfo, CpuSample,
-    DeviceDetails, DeviceHistory, DisplayInfo, MemoryInfo, NetworkInfo, PlugType, Ring,
-    StorageInfo, SystemInfo, ThermalInfo,
+    DeviceDetails, DeviceHistory, DisplayInfo, MemoryInfo, NetworkInfo, PlugType, RefreshRate,
+    Ring, StorageInfo, SystemInfo, ThermalInfo,
 };
 pub use features::device::{AdbDeviceEntry, DeviceInfo, DeviceStatus};
 pub use features::fastboot::{FastbootCommand, FastbootError, FastbootManager, FastbootResult};

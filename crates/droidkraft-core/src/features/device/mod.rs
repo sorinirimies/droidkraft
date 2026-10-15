@@ -7,7 +7,7 @@ pub mod types;
 
 pub use details::{
     collect_device_details, list_all_details, BatteryInfo, BatteryStatus, CpuInfo, CpuSample,
-    DeviceDetails, DeviceHistory, DisplayInfo, MemoryInfo, NetworkInfo, PlugType, Ring,
-    StorageInfo, SystemInfo, ThermalInfo,
+    DeviceDetails, DeviceHistory, DisplayInfo, MemoryInfo, NetworkInfo, PlugType, RefreshRate,
+    Ring, StorageInfo, SystemInfo, ThermalInfo,
 };
 pub use types::{AdbDeviceEntry, DeviceInfo, DeviceStatus};
