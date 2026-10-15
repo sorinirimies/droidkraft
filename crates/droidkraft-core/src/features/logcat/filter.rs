@@ -41,6 +41,8 @@ pub struct LogcatFilter {
     pub exclude_cursor: usize,
     /// Whether regex mode is enabled for search/exclude.
     pub use_regex: bool,
+    /// Fuzzy (in-order subsequence) matching for the search query.
+    pub fuzzy: bool,
     compiled_regex: Option<Regex>,
     compiled_exclude: Option<Regex>,
 }
@@ -55,6 +57,7 @@ impl fmt::Debug for LogcatFilter {
             .field("active_field", &self.active_field)
             .field("exclude_query", &self.exclude_query)
             .field("use_regex", &self.use_regex)
+            .field("fuzzy", &self.fuzzy)
             .finish()
     }
 }
@@ -73,6 +76,7 @@ impl Clone for LogcatFilter {
             exclude_query: self.exclude_query.clone(),
             exclude_cursor: self.exclude_cursor,
             use_regex: self.use_regex,
+            fuzzy: self.fuzzy,
             compiled_regex: None,
             compiled_exclude: None,
         };
@@ -95,10 +99,21 @@ impl Default for LogcatFilter {
             exclude_query: String::new(),
             exclude_cursor: 0,
             use_regex: false,
+            fuzzy: false,
             compiled_regex: None,
             compiled_exclude: None,
         }
     }
+}
+
+/// Fuzzy match: every whitespace-separated token of `query` must appear in
+/// `text` as an in-order (case-insensitive) subsequence of characters.
+pub fn fuzzy_match(query: &str, text: &str) -> bool {
+    let text: Vec<char> = text.to_lowercase().chars().collect();
+    query.to_lowercase().split_whitespace().all(|tok| {
+        let mut it = text.iter();
+        tok.chars().all(|c| it.any(|t| *t == c))
+    })
 }
 
 impl LogcatFilter {
@@ -114,6 +129,10 @@ impl LogcatFilter {
                     if !re.is_match(&entry.raw) {
                         return false;
                     }
+                }
+            } else if self.fuzzy {
+                if !fuzzy_match(&self.search_query, &entry.raw) {
+                    return false;
                 }
             } else if !entry
                 .raw
@@ -193,9 +212,45 @@ impl LogcatFilter {
         };
     }
 
-    /// Toggle regex mode on/off and recompile.
+    /// Cycle text → fuzzy → regex → text.
+    pub fn cycle_mode(&mut self) {
+        match self.mode_label() {
+            "text" => self.toggle_fuzzy(),
+            "fuzzy" => self.toggle_regex(),
+            _ => {
+                self.use_regex = false;
+                self.fuzzy = false;
+                self.recompile_regex();
+            }
+        }
+    }
+
+    /// Toggle fuzzy matching (turns regex off).
+    pub fn toggle_fuzzy(&mut self) {
+        self.fuzzy = !self.fuzzy;
+        if self.fuzzy {
+            self.use_regex = false;
+        }
+        self.recompile_regex();
+    }
+
+    /// Short label of the active search mode.
+    pub fn mode_label(&self) -> &'static str {
+        if self.use_regex {
+            "regex"
+        } else if self.fuzzy {
+            "fuzzy"
+        } else {
+            "text"
+        }
+    }
+
+    /// Toggle regex mode on/off and recompile (turns fuzzy off).
     pub fn toggle_regex(&mut self) {
         self.use_regex = !self.use_regex;
+        if self.use_regex {
+            self.fuzzy = false;
+        }
         self.recompile_regex();
     }
 
@@ -340,5 +395,24 @@ mod tests {
         f.min_level = LogLevel::Fatal;
         f.cycle_level();
         assert_eq!(f.min_level, LogLevel::Verbose);
+    }
+
+    #[test]
+    fn fuzzy_subsequence() {
+        assert!(fuzzy_match("actmgr", "ActivityManager: start"));
+        assert!(fuzzy_match("act mgr", "ActivityManager"));
+        assert!(!fuzzy_match("mgract", "ActivityManager"));
+        assert!(fuzzy_match("", "anything"));
+    }
+
+    #[test]
+    fn fuzzy_mode_filters_and_excludes_regex() {
+        let mut f = LogcatFilter::default();
+        f.use_regex = true;
+        f.toggle_fuzzy();
+        assert!(f.fuzzy && !f.use_regex);
+        assert_eq!(f.mode_label(), "fuzzy");
+        f.toggle_regex();
+        assert!(!f.fuzzy && f.use_regex);
     }
 }

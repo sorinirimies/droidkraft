@@ -30,6 +30,8 @@ pub struct DroidGui {
     pub(crate) route: Route,
     /// Stats/graph polling speed.
     pub(crate) rate: droidkraft_core::RefreshRate,
+    /// Focus for the log search box (receives typed keys).
+    pub(crate) log_focus: gpui::FocusHandle,
 }
 
 impl DroidGui {
@@ -68,6 +70,7 @@ impl DroidGui {
             fleet: Fleet::new(),
             route: Route::Devices,
             rate: Default::default(),
+            log_focus: cx.focus_handle(),
         }
     }
 

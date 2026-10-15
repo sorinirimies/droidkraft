@@ -15,7 +15,7 @@ use crate::message::Cmd;
 use crate::model::Model;
 
 pub const HINTS: &str =
-    "/ search  f tag  l level  space pause  c clear  s save  m fmt  j/k PgUp/PgDn G";
+    "/ search  z fuzzy  f tag  l level  space pause  c clear  s save  m fmt  j/k PgUp/PgDn G";
 
 /// Logs panel state.
 pub struct LogsUi {
@@ -143,7 +143,11 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
         m,
     ));
     spans.push(Span::styled(
-        format!("  fmt:{}", m.logs.fmt.label()),
+        format!(
+            "  mode:{} (z / ^F fuzzy · ^R regex)  fmt:{}",
+            fl.mode_label(),
+            m.logs.fmt.label()
+        ),
         m.themes.muted(),
     ));
     f.render_widget(Paragraph::new(Line::from(spans)), rows[0]);
@@ -260,6 +264,8 @@ pub fn on_key(m: &mut Model, k: KeyEvent) -> (Vec<Cmd>, bool) {
             KeyCode::Delete => f.delete_char_forward(),
             KeyCode::Left => f.move_cursor_left(),
             KeyCode::Right => f.move_cursor_right(),
+            KeyCode::Char('f') if k.modifiers.contains(KeyModifiers::CONTROL) => f.toggle_fuzzy(),
+            KeyCode::Char('r') if k.modifiers.contains(KeyModifiers::CONTROL) => f.toggle_regex(),
             KeyCode::Char(c) if !k.modifiers.contains(KeyModifiers::CONTROL) => f.insert_char(c),
             _ => {}
         }
@@ -269,6 +275,12 @@ pub fn on_key(m: &mut Model, k: KeyEvent) -> (Vec<Cmd>, bool) {
     let h = m.logs.state.viewport_height.max(1);
     match k.code {
         KeyCode::Char('/') => m.logs.state.filter.active_field = F::Search,
+        KeyCode::Char('z') => {
+            m.logs.state.filter.toggle_fuzzy();
+            refilter(m);
+            let l = m.logs.state.filter.mode_label();
+            m.set_message(format!("Search mode: {l}"));
+        }
         KeyCode::Char('f') => m.logs.state.filter.active_field = F::Tag,
         KeyCode::Char('l') => {
             m.logs.state.filter.cycle_level();
