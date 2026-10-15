@@ -56,6 +56,17 @@ impl Tab {
         }
     }
 
+    /// Single-letter label for very narrow windows.
+    pub fn initial(&self) -> &'static str {
+        match self {
+            Tab::Overview => "O",
+            Tab::Logs => "L",
+            Tab::Commands => "C",
+            Tab::Flash => "F",
+            Tab::Screen => "S",
+        }
+    }
+
     pub fn all() -> &'static [Tab] {
         &[
             Tab::Overview,

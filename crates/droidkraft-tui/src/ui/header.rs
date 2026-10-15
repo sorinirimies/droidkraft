@@ -18,10 +18,8 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
     let inner = block.inner(area);
     f.render_widget(block, area);
     let t = &m.themes;
-    let theme = Span::styled(
-        format!("  theme: {}  ⟳ {}", t.name(), m.refresh.label()),
-        t.muted(),
-    );
+    let theme = Span::styled(format!("  theme: {}", t.name()), t.muted());
+    let rate = Span::styled(format!("  ⟳ {}", m.refresh.label()), t.muted());
     let line = if m.loading {
         Line::from(Span::styled("Connecting…", t.muted()))
     } else if let Some(ws) = m.active_ws() {
@@ -38,15 +36,16 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
                 t.muted(),
             ),
         ];
-        let bp = super::layout::Bp::of(area.width);
-        if let (Some(d), true) = (&ws.details, bp != super::layout::Bp::Compact) {
+        // Ordered by priority: `fit_line` drops what does not fit.
+        v.push(rate.clone());
+        if let Some(d) = &ws.details {
             let s = &d.system;
             v.push(Span::styled(
                 format!("  Android {}", s.android_release),
                 t.muted(),
             ));
             v.push(Span::styled(format!("  🔋{}%", d.battery.level), t.muted()));
-            if bp == super::layout::Bp::Wide {
+            {
                 v.push(Span::styled(
                     format!("  Wi-Fi {}", d.network.wifi_ssid.as_deref().unwrap_or("-")),
                     t.muted(),
@@ -75,9 +74,7 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
                 ));
             }
         }
-        if bp == super::layout::Bp::Wide {
-            v.push(theme);
-        }
+        v.push(theme);
         Line::from(v)
     } else {
         let f = m.fleet();
@@ -85,15 +82,38 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
             Line::from(vec![
                 Span::styled("● ", t.status(Status::Error)),
                 Span::raw("No device connected"),
+                rate,
                 theme,
             ])
         } else {
             Line::from(vec![
                 Span::styled("● ", t.status(Status::Success)),
                 Span::raw(format!("{} online of {}", f.online, f.total)),
+                rate,
                 theme,
             ])
         }
     };
-    f.render_widget(Paragraph::new(line), inner);
+    f.render_widget(Paragraph::new(fit_line(line, inner.width as usize)), inner);
+}
+
+/// Keep leading spans while they fit in `width`; later spans that do not fit
+/// are skipped (so low-priority info drops first). The first two spans (status
+/// dot + name) are always kept but truncated.
+fn fit_line(line: Line<'static>, width: usize) -> Line<'static> {
+    let mut out: Vec<Span<'static>> = Vec::new();
+    let mut used = 0usize;
+    for (i, sp) in line.spans.into_iter().enumerate() {
+        let w = super::layout::cells(&sp.content);
+        if used + w <= width {
+            used += w;
+            out.push(sp);
+        } else if i < 2 {
+            let room = width.saturating_sub(used);
+            let content = super::layout::truncate_to(&sp.content, room);
+            used += super::layout::cells(&content);
+            out.push(Span::styled(content, sp.style));
+        }
+    }
+    Line::from(out)
 }

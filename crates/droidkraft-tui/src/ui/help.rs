@@ -31,7 +31,9 @@ pub const LINES: &[&str] = &[
 
 pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
     let w = 92.min(area.width);
-    let h = (LINES.len() as u16 + 4).min(area.height);
+    let text = LINES.join("\n");
+    let inner_w = w.saturating_sub(2) as usize;
+    let h = (super::layout::wrapped_height(&text, inner_w) as u16 + 2).min(area.height);
     let [r] = Layout::horizontal([Constraint::Length(w)])
         .flex(Flex::Center)
         .areas(area);
@@ -43,7 +45,9 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
     let inner = block.inner(r);
     f.render_widget(block, r);
     f.render_widget(
-        Paragraph::new(LINES.join("\n")).style(m.themes.base()),
+        Paragraph::new(text)
+            .style(m.themes.base())
+            .wrap(ratatui::widgets::Wrap { trim: false }),
         inner,
     );
 }

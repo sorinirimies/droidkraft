@@ -18,7 +18,7 @@ pub mod statusbar;
 
 use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::text::{Line, Span};
+use ratatui::text::Span;
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::Frame;
 use tui_nuances::Status;
@@ -39,10 +39,13 @@ pub fn draw(f: &mut Frame, m: &mut Model) {
     let area = f.area();
     m.screen.gfx.begin_frame();
     f.render_widget(Block::default().style(m.themes.base()), area);
+    let footer_h = statusbar::plan(m, area.width, area.height)
+        .height()
+        .min(area.height.saturating_sub(4).max(1));
     let rows = Layout::vertical([
-        Constraint::Length(3),
+        Constraint::Length(3.min(area.height)),
         Constraint::Min(1),
-        Constraint::Length(1),
+        Constraint::Length(footer_h),
     ])
     .split(area);
     header::draw(f, rows[0], m);
@@ -68,7 +71,13 @@ fn draw_main(f: &mut Frame, area: Rect, m: &mut Model) {
         return;
     }
     let offline = !m.connected();
-    let banner_h = u16::from(offline);
+    let banner_h = if offline {
+        banner_text(m)
+            .map(|t| layout::wrapped_height(&t, area.width as usize).min(3) as u16)
+            .unwrap_or(1)
+    } else {
+        0
+    };
     let rows = Layout::vertical([
         Constraint::Length(1),
         Constraint::Length(banner_h),
@@ -89,18 +98,20 @@ fn draw_main(f: &mut Frame, area: Rect, m: &mut Model) {
 }
 
 fn draw_tabs(f: &mut Frame, area: Rect, m: &mut Model) {
+    let names: Vec<&str> = Panel::ALL.iter().map(|p| p.label()).collect();
+    let w = area.width as usize;
+    let labels: Vec<(Panel, String)> = match layout::tab_labels(&names, w) {
+        Some(l) => Panel::ALL.iter().copied().zip(l).collect(),
+        // Too narrow even for single letters: show the active tab only.
+        None => vec![(
+            m.panel,
+            layout::truncate_to(&format!(" {} ", m.panel.label()), w),
+        )],
+    };
     let mut x = area.x;
-    for p in Panel::ALL {
-        let label = if area.width < 60 {
-            format!(" {} ", p.label().chars().take(3).collect::<String>())
-        } else {
-            format!(" {} ", p.label())
-        };
-        let w = label.chars().count() as u16;
-        if x + w > area.x + area.width {
-            break;
-        }
-        let r = Rect::new(x, area.y, w, 1);
+    for (p, label) in labels {
+        let lw = layout::cells(&label) as u16;
+        let r = Rect::new(x, area.y, lw.min(area.right().saturating_sub(x)), 1);
         let style = if p == m.panel {
             m.themes.selected()
         } else {
@@ -108,23 +119,28 @@ fn draw_tabs(f: &mut Frame, area: Rect, m: &mut Model) {
         };
         f.render_widget(Paragraph::new(label).style(style), r);
         m.tab_rects.push((p, r));
-        x += w + 1;
+        x += lw + 1;
     }
 }
 
+fn banner_text(m: &Model) -> Option<String> {
+    let w = m.active_ws()?;
+    Some(format!(
+        " ○ {} is {} — {}",
+        w.name(),
+        w.state,
+        crate::model::state_hint(&w.state)
+    ))
+}
+
 fn draw_banner(f: &mut Frame, area: Rect, m: &Model) {
-    let (state, name) = m
-        .active_ws()
-        .map(|w| (w.state.clone(), w.name()))
-        .unwrap_or_default();
-    let line = Line::from(vec![
-        Span::styled(
-            format!(" ○ {name} is {state} — "),
-            m.themes.status(Status::Warning),
-        ),
-        Span::styled(crate::model::state_hint(&state), m.themes.muted()),
-    ]);
-    f.render_widget(Paragraph::new(line), area);
+    let Some(text) = banner_text(m) else { return };
+    f.render_widget(
+        Paragraph::new(text)
+            .style(m.themes.status(Status::Warning))
+            .wrap(ratatui::widgets::Wrap { trim: false }),
+        area,
+    );
 }
 
 pub fn hints(p: Panel) -> &'static str {
@@ -289,6 +305,98 @@ mod size_tests {
             assert_eq!(out.lines().count(), h as usize);
             if w >= 60 {
                 assert!(out.contains("Battery"), "{w}x{h}");
+            }
+        }
+    }
+
+    mod responsive {
+        use crate::model::Panel;
+        use crate::ui::{layout, statusbar, test_util};
+
+        fn rows(out: &str) -> Vec<String> {
+            out.lines().map(|l| l.trim_end().to_string()).collect()
+        }
+
+        fn footer_of(r: &[String]) -> String {
+            r[r.len().saturating_sub(3)..].join("\n")
+        }
+
+        #[test]
+        fn footer_always_shows_help_and_quit() {
+            for panel in Panel::ALL {
+                for w in (20..=200).step_by(7) {
+                    for h in [10u16, 14, 24, 40] {
+                        let mut m = test_util::with_device(panel);
+                        let r = rows(&test_util::render(&mut m, w, h));
+                        assert!(
+                            footer_of(&r).contains("q quit"),
+                            "{panel:?} {w}x{h}:\n{}",
+                            footer_of(&r)
+                        );
+                    }
+                }
+            }
+        }
+
+        #[test]
+        fn footer_rows_never_exceed_budget() {
+            let m = test_util::with_device(Panel::Logs);
+            for w in 10..=200u16 {
+                for h in [8u16, 14, 30] {
+                    let p = statusbar::plan(&m, w, h);
+                    assert!(p.height() as usize <= layout::footer_max_lines(h));
+                    assert!(p.hints.iter().all(|l| layout::cells(l) <= w as usize));
+                }
+            }
+        }
+
+        #[test]
+        fn message_is_visible_on_any_height() {
+            for (w, h) in [(30u16, 10u16), (60, 20), (120, 40)] {
+                let mut m = test_util::with_device(Panel::Overview);
+                m.set_message("Refresh every 2s");
+                let r = rows(&test_util::render(&mut m, w, h));
+                assert!(footer_of(&r).contains("Refresh"), "{w}x{h}");
+            }
+        }
+
+        #[test]
+        fn header_keeps_name_and_never_overflows() {
+            for w in 24..=200u16 {
+                let mut m = test_util::with_device(Panel::Overview);
+                let r = rows(&test_util::render(&mut m, w, 20));
+                assert!(r[1].contains("TESTSE"), "{w}: header {:?}", r[1]);
+                assert!(layout::cells(&r[1]) <= w as usize);
+            }
+        }
+
+        #[test]
+        fn tabs_degrade_but_active_stays_visible() {
+            for w in 12..=200u16 {
+                let mut m = test_util::with_device(Panel::Logs);
+                let r = rows(&test_util::render(&mut m, w, 20));
+                let top = r[..8].join("\n");
+                assert!(top.contains("Log") || top.contains(" L "), "{w}:\n{top}");
+            }
+        }
+
+        #[test]
+        fn help_wraps_instead_of_clipping() {
+            let mut m = test_util::with_device(Panel::Overview);
+            m.help = true;
+            for w in [20u16, 40, 70, 120] {
+                let out = test_util::render(&mut m, w, 60);
+                assert!(out.contains("Help"), "{w}");
+            }
+        }
+
+        #[test]
+        fn offline_banner_wraps() {
+            let mut m = test_util::with_device(Panel::Overview);
+            m.workspaces.get_mut("TESTSERIAL").unwrap().state = "offline".into();
+            for w in [24u16, 40, 80] {
+                let out = test_util::render(&mut m, w, 20);
+                assert!(out.contains("offline"), "{w}");
             }
         }
     }

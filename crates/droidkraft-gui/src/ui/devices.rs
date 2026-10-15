@@ -6,7 +6,7 @@ use crate::app::DroidGui;
 use crate::fmt::{
     battery_color, connection_kind, fmt_mib, nonempty, state_hint, temp_color, usage_color,
 };
-use crate::layout::Layout;
+use crate::layout::{Layout, RateStyle};
 use crate::state::{DeviceState, Tab};
 use crate::theme;
 use crate::ui::widgets::{
@@ -21,13 +21,15 @@ impl DroidGui {
             .flex()
             .items_center()
             .justify_between()
+            .flex_wrap()
+            .gap_2()
             .child(heading("Devices"))
             .child(
                 div()
                     .flex()
                     .items_center()
                     .gap_3()
-                    .child(self.rate_control(cx))
+                    .child(self.rate_control(RateStyle::Full, cx))
                     .child(button(
                         "refresh",
                         "Refresh",

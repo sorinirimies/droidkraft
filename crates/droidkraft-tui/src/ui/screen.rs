@@ -543,10 +543,11 @@ fn draw_mirror(f: &mut Frame, area: Rect, m: &mut Model) {
                 st.frame_count,
                 if st.is_still { " · still" } else { "" }
             );
-            let w = (chip.chars().count() as u16).min(rect.width);
+            // Overlay on the panel's top row, not the (possibly tiny) frame.
+            let w = (chip.chars().count() as u16).min(inner.width);
             f.render_widget(
                 Paragraph::new(chip).style(t.base().add_modifier(Modifier::REVERSED)),
-                Rect::new(rect.x, rect.y, w, 1),
+                Rect::new(inner.x, inner.y, w, 1),
             );
         }
     }
@@ -803,7 +804,7 @@ mod tests {
             with_frame(&mut m);
             let out = render(&mut m, w, h);
             assert!(out.contains('▀'));
-            assert!(out.contains("fps"));
+            assert!(out.contains("fps"), "{w}x{h}:\n{out}");
             assert!(m.screen.frame_rect.width > 0 && m.screen.frame_rect.height > 0);
             assert_eq!(m.screen.frame_px, (108, 240));
         }

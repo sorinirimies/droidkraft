@@ -4,7 +4,7 @@ use gpui::{div, prelude::*, rgb, AnyElement, ClickEvent, Context};
 
 use crate::app::DroidGui;
 use crate::fmt::{battery_color, connection_kind, nonempty, state_hint};
-use crate::layout::Layout;
+use crate::layout::{Layout, RateStyle, TabStyle};
 use crate::state::{Route, Tab};
 use crate::theme;
 use crate::ui::overview::overview;
@@ -104,6 +104,10 @@ impl DroidGui {
             .justify_between()
             .border_b_1()
             .border_color(rgb(theme::BORDER));
+        let full: Vec<&str> = Tab::all().iter().map(|t| t.label()).collect();
+        let short: Vec<&str> = Tab::all().iter().map(|t| t.short_label()).collect();
+        let init: Vec<&str> = Tab::all().iter().map(|t| t.initial()).collect();
+        let bar = lay.tab_bar(&full, &short, &init);
         let mut tab_row = div().flex().gap_1().overflow_hidden();
         for tab in Tab::all() {
             let tab = *tab;
@@ -112,7 +116,7 @@ impl DroidGui {
             tab_row = tab_row.child(
                 div()
                     .id(("tab", tab as usize))
-                    .px(gpui::px(if lay.short_tabs() { 8. } else { 12. }))
+                    .px(gpui::px(if bar.tabs == TabStyle::Full { 12. } else { 8. }))
                     .py_2()
                     .text_sm()
                     .cursor_pointer()
@@ -124,10 +128,10 @@ impl DroidGui {
                     .border_b_2()
                     .border_color(rgb(if active { theme::ACCENT } else { theme::BG }))
                     .hover(|s| s.text_color(rgb(theme::TEXT)))
-                    .child(if lay.short_tabs() {
-                        tab.short_label()
-                    } else {
-                        tab.label()
+                    .child(match bar.tabs {
+                        TabStyle::Full => tab.label(),
+                        TabStyle::Short => tab.short_label(),
+                        TabStyle::Initial => tab.initial(),
                     })
                     .on_click(cx.listener(move |this, _ev: &ClickEvent, _w, cx| {
                         this.select_tab(&s, tab, cx);
@@ -135,7 +139,10 @@ impl DroidGui {
                     })),
             );
         }
-        tabs = tabs.child(tab_row).child(self.rate_control(cx));
+        tabs = tabs.child(tab_row);
+        if bar.rate != RateStyle::Hidden {
+            tabs = tabs.child(self.rate_control(bar.rate, cx));
+        }
 
         let banner: Option<AnyElement> = if d.is_online() {
             None
@@ -193,7 +200,7 @@ impl DroidGui {
 
 impl DroidGui {
     /// `Graphs  [−] 1.5s [+]` control: lower interval = faster graphs.
-    pub(crate) fn rate_control(&self, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn rate_control(&self, style: RateStyle, cx: &mut Context<Self>) -> AnyElement {
         let r = self.rate;
         let step = |id: &'static str,
                     label: &'static str,
@@ -222,7 +229,7 @@ impl DroidGui {
             .flex_none()
             .text_xs()
             .text_color(rgb(theme::TEXT_DIM))
-            .child("Refresh")
+            .children((style == RateStyle::Full).then_some("Refresh"))
             .child(step("rate-slower", "−", false, r.is_slowest(), cx))
             .child(
                 div()
