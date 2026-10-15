@@ -260,9 +260,20 @@ pull-gitea:
 
 # Pull from both remotes
 pull-all:
-    git pull origin main
-    git pull gitea main
-    @echo "✅ Pulled from both!"
+    #!/usr/bin/env sh
+    failed=""; ok_=""; skipped=""
+    for r in origin gitea; do
+        if ! git remote get-url "$r" >/dev/null 2>&1; then
+            echo "↷ skipping $r (not configured here; add with: git remote add $r <url>)"
+            skipped="$skipped $r"; continue
+        fi
+        echo "→ pulling from $r"
+        if git pull "$r" main; then ok_="$ok_ $r"; else failed="$failed $r"; fi
+    done
+    echo ""
+    [ -n "$ok_" ] && echo "✅ Pulled from:$ok_"
+    [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
+    if [ -n "$failed" ]; then echo "⚠️  Failed:$failed"; exit 1; fi
 
 # Push to GitHub
 push:
@@ -274,9 +285,20 @@ push-gitea:
 
 # Push to both GitHub and Gitea
 push-all:
-    git push origin main
-    git push gitea main
-    @echo "✅ Pushed to both!"
+    #!/usr/bin/env sh
+    failed=""; ok_=""; skipped=""
+    for r in origin gitea; do
+        if ! git remote get-url "$r" >/dev/null 2>&1; then
+            echo "↷ skipping $r (not configured here; add with: git remote add $r <url>)"
+            skipped="$skipped $r"; continue
+        fi
+        echo "→ pushing to $r"
+        if git push "$r" main; then ok_="$ok_ $r"; else failed="$failed $r"; fi
+    done
+    echo ""
+    [ -n "$ok_" ] && echo "✅ Pushed to:$ok_"
+    [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
+    if [ -n "$failed" ]; then echo "⚠️  Failed:$failed"; exit 1; fi
 
 # Push tags to GitHub
 push-tags:
@@ -284,9 +306,20 @@ push-tags:
 
 # Push tags to both remotes
 push-tags-all:
-    git push origin --tags
-    git push gitea --tags
-    @echo "✅ Tags pushed to both!"
+    #!/usr/bin/env sh
+    failed=""; ok_=""; skipped=""
+    for r in origin gitea; do
+        if ! git remote get-url "$r" >/dev/null 2>&1; then
+            echo "↷ skipping $r (not configured here; add with: git remote add $r <url>)"
+            skipped="$skipped $r"; continue
+        fi
+        echo "→ pushing tags to $r"
+        if git push "$r" --tags; then ok_="$ok_ $r"; else failed="$failed $r"; fi
+    done
+    echo ""
+    [ -n "$ok_" ] && echo "✅ Tags pushed to:$ok_"
+    [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
+    if [ -n "$failed" ]; then echo "⚠️  Failed:$failed"; exit 1; fi
 
 # Force-sync Gitea from GitHub
 sync-gitea:
