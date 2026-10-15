@@ -145,11 +145,13 @@ release-check: check-nu
 
 # Publish to crates.io (dry run — no side-effects)
 publish-dry:
-    cargo publish --dry-run
+    cargo publish --dry-run -p droidkraft-mirror
+    cargo publish --dry-run -p droidkraft-fastboot
+    @echo "ℹ️  core/tui/gui dry-runs need their dependencies on crates.io first"
 
 # Publish to crates.io
-publish: release-check
-    cargo publish
+publish: release-check publish-mirror publish-fastboot publish-core publish-tui publish-gui
+    @echo "✅ All crates published."
 
 # ── Full release workflows ────────────────────────────────────────────────────
 
@@ -421,3 +423,152 @@ leaks name="droidkraft-tui":
 heap name="droidkraft":
     heap {{name}} | head -40
 
+# ── Per-crate build / run / test / doc ────────────────────────────────────────
+
+# Build core only
+build-core:
+    cargo build -p droidkraft-core
+
+# Build the TUI only
+build-tui:
+    cargo build -p droidkraft-tui
+
+# Run the TUI
+run-tui:
+    cargo run -p droidkraft-tui
+
+# Test the TUI
+test-tui:
+    cargo test -p droidkraft-tui --all-features
+
+# Test the GUI
+test-gui:
+    cargo test -p droidkraft --all-features
+
+# Open TUI docs
+doc-tui:
+    cargo doc --no-deps -p droidkraft-tui --open
+
+# Open GUI docs
+doc-gui:
+    cargo doc --no-deps -p droidkraft --open
+
+# ── Coverage / benchmarks ─────────────────────────────────────────────────────
+
+# HTML coverage report (needs `cargo install cargo-llvm-cov`)
+coverage:
+    cargo llvm-cov --workspace --html
+    @echo "→ target/llvm-cov/html/index.html"
+
+# Run benchmarks, if any (cargo bench)
+bench:
+    cargo bench --workspace
+
+# Soak both frontends' memory (needs a device): just soak 60
+soak secs="60": (soak-tui secs) (soak-gui secs)
+
+# ── Publishing (order: mirror/fastboot → core → tui → gui) ────────────────────
+
+# Check publish readiness
+check-publish: check-nu
+    nu scripts/check_publish.nu
+
+publish-mirror:
+    @echo "📦 Publishing droidkraft-mirror…"
+    cargo publish -p droidkraft-mirror
+
+publish-fastboot:
+    @echo "📦 Publishing droidkraft-fastboot…"
+    cargo publish -p droidkraft-fastboot
+    @echo "⏳ Waiting 30 s for the index to propagate…"
+    sleep 30
+
+publish-core:
+    @echo "📦 Publishing droidkraft-core…"
+    cargo publish -p droidkraft-core
+    @echo "⏳ Waiting 30 s for the index to propagate…"
+    sleep 30
+
+publish-tui:
+    @echo "📦 Publishing droidkraft-tui…"
+    cargo publish -p droidkraft-tui
+
+publish-gui:
+    @echo "📦 Publishing the GUI (package droidkraft)…"
+    cargo publish -p droidkraft
+
+# ── Release helpers ───────────────────────────────────────────────────────────
+
+# Show the latest changelog section
+changelog-latest: check-git-cliff
+    @git-cliff --latest
+
+# Preview what the next release would contain
+release-preview: check-git-cliff
+    @echo "Current version: $(just version)"
+    @echo ""
+    @echo "Unreleased commits:"
+    @git-cliff --unreleased
+    @echo ""
+    @echo "Published crates: droidkraft-mirror • droidkraft-fastboot • droidkraft-core • droidkraft-tui • droidkraft (GUI)"
+
+# Release quality gate: fmt + clippy + test + release build
+check-release: check-all build-release
+    @echo "✅ Release quality gate passed!"
+
+# Release to GitHub only: bump, tag, push to origin
+release-github version: (bump version)
+    git push --follow-tags origin "$(git branch --show-current)"
+    @echo "✅ Release v{{version}} pushed to GitHub."
+
+# Re-run the Release workflow for an existing tag
+release-retrigger version:
+    @command -v gh >/dev/null 2>&1 || { echo "❌ GitHub CLI (gh) not found. Install from https://cli.github.com"; exit 1; }
+    gh workflow run release.yml --field tag=v{{version}}
+    @echo "✅ Dispatched — see GitHub Actions."
+
+# Push latest commit + tags to every remote (after the quality gate)
+push-release-all: check-all
+    #!/usr/bin/env sh
+    failed=""; skipped=""
+    for r in {{REMOTES}}; do
+        git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r"; skipped="$skipped $r"; continue; }
+        git push --follow-tags "$r" "$(git branch --show-current)" || failed="$failed $r"
+    done
+    [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
+    [ -n "$failed" ] && { echo "⚠️  Failed to push to:$failed"; exit 1; }
+    echo "✅ Latest commit + tags pushed to: {{REMOTES}}"
+
+# Force-push the current branch to every remote
+push-all-force:
+    #!/usr/bin/env sh
+    failed=""; skipped=""
+    for r in {{REMOTES}}; do
+        git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r"; skipped="$skipped $r"; continue; }
+        git push --force "$r" "$(git branch --show-current)" || failed="$failed $r"
+    done
+    [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
+    [ -n "$failed" ] && { echo "⚠️  Failed to force-push to:$failed"; exit 1; }
+    echo "✅ Force-pushed to: {{REMOTES}}"
+
+# ── Housekeeping ──────────────────────────────────────────────────────────────
+
+# Update deps, run the gate, commit Cargo.lock and push
+update-deps:
+    @echo "⬆️  Updating dependencies…"
+    cargo update
+    cargo fmt --all -- --check
+    cargo clippy --workspace --all-targets -- -D warnings
+    cargo test --workspace --locked
+    git add Cargo.lock
+    git diff --cached --quiet || git commit -m "chore: update dependencies"
+    git push origin "$(git branch --show-current)"
+    @echo "✅ Dependency updates pushed."
+
+# Trigger the dependency-update workflow on GitHub
+deps-update-now:
+    gh workflow run deps-update.yml
+
+# List available VHS tapes
+vhs-list:
+    @ls docs/tapes/*.tape | sed 's|.*/||; s|\.tape||' | sed 's/^/  /'

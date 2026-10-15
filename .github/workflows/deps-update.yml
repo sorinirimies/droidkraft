@@ -1,0 +1,36 @@
+name: Dependency update
+
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Update Cargo.lock
+        run: cargo update
+      - name: Verify (default members)
+        run: |
+          cargo check --locked --all-targets
+          cargo test --locked
+      - name: Open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git diff --quiet Cargo.lock && { echo "No updates"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          b="chore/deps-$(date +%Y%m%d)"
+          git checkout -b "$b"
+          git commit -am "chore: update dependencies"
+          git push origin "$b"
+          gh pr create --title "chore: update dependencies" --body "Automated \`cargo update\`." --base "${GITHUB_REF_NAME}"
