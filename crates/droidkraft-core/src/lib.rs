@@ -48,6 +48,11 @@ pub use client::{AdbManager, ADB_PORT};
 pub use color::{hash_tag, level_text_color, tag_color, Rgb, TAG_PALETTE};
 pub use error::{AdbError, AdbResult};
 
+pub use features::device::{
+    collect_device_details, list_all_details, BatteryInfo, BatteryStatus, CpuInfo, CpuSample,
+    DeviceDetails, DeviceHistory, DisplayInfo, MemoryInfo, NetworkInfo, PlugType, Ring,
+    StorageInfo, SystemInfo, ThermalInfo,
+};
 pub use features::device::{AdbDeviceEntry, DeviceInfo, DeviceStatus};
 pub use features::fastboot::{FastbootCommand, FastbootError, FastbootManager, FastbootResult};
 pub use features::flash::{RebootTarget, RootMethod, RootStatus};

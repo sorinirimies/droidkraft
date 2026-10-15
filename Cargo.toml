@@ -1,5 +1,7 @@
 [workspace]
 members = [
+    "crates/droidkraft-fastboot",
+    "crates/droidkraft-mirror",
     "crates/droidkraft-core",
     "crates/droidkraft-tui",
     "crates/droidkraft-gui",
@@ -8,6 +10,8 @@ members = [
 # (macOS) to build. Keep it out of the default set so `cargo build`/`cargo test`
 # stay green on machines without it; build it explicitly with `-p droidkraft`.
 default-members = [
+    "crates/droidkraft-mirror",
+    "crates/droidkraft-fastboot",
     "crates/droidkraft-core",
     "crates/droidkraft-tui",
 ]
@@ -41,18 +45,33 @@ futures  = "0.3.32"
 # Errors
 color-eyre = "0.6.3"
 
-# TUI (Ratatui)
-crossterm         = { version = "0.28.1", features = ["event-stream"] }
-ratatui           = "0.29.0"
-ratatui-widgets   = "0.2.2"
-tachyonfx         = "0.7.0"
-tui-file-explorer = { version = "0.8.8", default-features = false }
+# TUI (Ratatui 0.30 ecosystem)
+crossterm         = { version = "0.29", features = ["event-stream"] }
+ratatui           = "0.30"
+tui-file-explorer = { version = "3", default-features = false }
+tui-nuances       = "0.1.6"
+tui-chart         = "0.1.1"
+tui-piechart      = "1.1"
+tui-spinner       = "0.5"
+tui-slider        = "0.4"
+tui-checkbox      = "0.5"
+ratatui-image     = { version = "12.0.0-rc.2", default-features = false, features = ["crossterm"] }
 
 # Internal crates
 droidkraft-core = { path = "crates/droidkraft-core", version = "1.2.0" }
+droidkraft-mirror = { path = "crates/droidkraft-mirror", version = "1.2.0" }
+droidkraft-fastboot = { path = "crates/droidkraft-fastboot", version = "1.2.0" }
 
 [profile.release]
 opt-level     = 3
 lto           = "thin"
 codegen-units = 1
 strip         = "symbols"
+
+# Debug builds of the GUI decode video in real time; unoptimised deps
+# (image/jpeg, gpui) make the mirror crawl, so optimise them even in dev.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev.package.droidkraft]
+opt-level = 2

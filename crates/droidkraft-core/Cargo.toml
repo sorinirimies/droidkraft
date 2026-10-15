@@ -13,6 +13,7 @@ keywords = ["android", "adb", "fastboot", "logcat", "device"]
 
 [dependencies]
 adb_client = { workspace = true }
+droidkraft-fastboot = { workspace = true }
 regex      = { workspace = true }
 serde      = { workspace = true }
 serde_json = { workspace = true }

@@ -1,4 +1,4 @@
-//! Fastboot domain types.
+//! Fastboot domain types shared by every backend.
 
 use std::fmt;
 
@@ -11,6 +11,8 @@ pub enum FastbootError {
     NotInstalled,
     /// No device detected in fastboot mode.
     NoDevice,
+    /// USB-level failure in the native backend (permissions, driver, …).
+    Usb(String),
     /// Command failed.
     CommandFailed(String),
     /// I/O error spawning the process.
@@ -34,6 +36,7 @@ impl fmt::Display for FastbootError {
                  2. Run 'Reboot to Bootloader' from the ROOT & FLASH menu\n\
                  3. Retry this command"
             ),
+            FastbootError::Usb(msg) => write!(f, "USB error: {msg}"),
             FastbootError::CommandFailed(msg) => write!(f, "{}", msg),
             FastbootError::Io(e) => write!(f, "I/O error: {}", e),
         }
@@ -48,7 +51,7 @@ impl From<std::io::Error> for FastbootError {
     }
 }
 
-/// Fastboot commands that require the `fastboot` binary.
+/// High-level fastboot operations.
 #[derive(Debug, Clone)]
 pub enum FastbootCommand {
     /// Unlock the bootloader — enables custom ROM flashing. ⚠ Wipes device data.
@@ -68,6 +71,18 @@ pub enum FastbootCommand {
     Reboot,
     /// Reboot directly into recovery from fastboot mode.
     RebootRecovery,
+    /// Erase a partition (`fastboot erase <partition>`). ⚠ Data loss.
+    Erase { partition: String },
+    /// Switch the active A/B slot (`a` or `b`).
+    SetActiveSlot { slot: String },
+    /// Read a single fastboot variable.
+    GetVar { name: String },
+    /// Arbitrary fastboot command line (e.g. `oem device-info`). ⚠ Treated as destructive.
+    Raw(String),
+    /// Reboot back into the bootloader.
+    RebootBootloader,
+    /// Reboot into userspace fastboot (fastbootd).
+    RebootFastbootd,
 }
 
 impl FastbootCommand {
@@ -84,6 +99,12 @@ impl FastbootCommand {
                 partition,
                 image_path,
             } => vec!["flash".into(), partition.clone(), image_path.clone()],
+            Self::Erase { partition } => vec!["erase".into(), partition.clone()],
+            Self::SetActiveSlot { slot } => vec![format!("--set-active={slot}")],
+            Self::GetVar { name } => vec!["getvar".into(), name.clone()],
+            Self::Raw(line) => line.split_whitespace().map(String::from).collect(),
+            Self::RebootBootloader => vec!["reboot".into(), "bootloader".into()],
+            Self::RebootFastbootd => vec!["reboot".into(), "fastboot".into()],
         }
     }
 
@@ -97,12 +118,21 @@ impl FastbootCommand {
             Self::GetVarAll => "Get Device Variables",
             Self::Reboot => "Reboot",
             Self::RebootRecovery => "Reboot to Recovery",
+            Self::Erase { .. } => "Erase Partition",
+            Self::SetActiveSlot { .. } => "Set Active Slot",
+            Self::GetVar { .. } => "Get Variable",
+            Self::Raw(_) => "Raw Command",
+            Self::RebootBootloader => "Reboot to Bootloader",
+            Self::RebootFastbootd => "Reboot to Fastbootd",
         }
     }
 
     /// Whether this command is destructive (wipes data / changes lock state).
     pub fn is_destructive(&self) -> bool {
-        matches!(self, Self::OemUnlock | Self::OemLock | Self::WipeData)
+        matches!(
+            self,
+            Self::OemUnlock | Self::OemLock | Self::WipeData | Self::Erase { .. } | Self::Raw(_)
+        )
     }
 }
 
@@ -151,5 +181,44 @@ mod tests {
     fn destructive_classification() {
         assert!(FastbootCommand::WipeData.is_destructive());
         assert!(!FastbootCommand::Reboot.is_destructive());
+    }
+
+    #[test]
+    fn new_command_args() {
+        assert_eq!(
+            FastbootCommand::Erase {
+                partition: "userdata".into()
+            }
+            .args(),
+            vec!["erase", "userdata"]
+        );
+        assert_eq!(
+            FastbootCommand::SetActiveSlot { slot: "b".into() }.args(),
+            vec!["--set-active=b"]
+        );
+        assert_eq!(
+            FastbootCommand::GetVar {
+                name: "product".into()
+            }
+            .args(),
+            vec!["getvar", "product"]
+        );
+        assert_eq!(
+            FastbootCommand::Raw("oem device-info".into()).args(),
+            vec!["oem", "device-info"]
+        );
+        assert_eq!(
+            FastbootCommand::RebootBootloader.args(),
+            vec!["reboot", "bootloader"]
+        );
+        assert_eq!(
+            FastbootCommand::RebootFastbootd.args(),
+            vec!["reboot", "fastboot"]
+        );
+        assert!(FastbootCommand::Erase {
+            partition: "x".into()
+        }
+        .is_destructive());
+        assert!(!FastbootCommand::GetVar { name: "x".into() }.is_destructive());
     }
 }

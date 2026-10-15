@@ -220,12 +220,12 @@ pub fn preflight(profile: &DeviceProfile) -> Vec<String> {
     if profile.bootloader_unlocked == Some(false) {
         warnings.push("Bootloader is locked — it must be unlocked (this wipes data).".to_string());
     }
-    if !FastbootManager::is_available() {
-        warnings.push("`fastboot` not found in PATH — install Android platform-tools.".to_string());
-    }
-    if !adb_binary_available() {
-        warnings
-            .push("`adb` binary not found in PATH — required for the sideload step.".to_string());
+    if !FastbootManager::binary_available() {
+        warnings.push(
+            "`fastboot` binary not found in PATH — needed for factory-image flashing and \
+             large images (other steps use native USB)."
+                .to_string(),
+        );
     }
     warnings
 }
@@ -349,36 +349,79 @@ fn execute_step(
         FlashStep::LockBootloader => fastboot
             .execute(FastbootCommand::OemLock)
             .map_err(|e| e.to_string()),
-        FlashStep::FactoryFlash { zip } => factory_flash(zip),
+        FlashStep::FactoryFlash { zip } => factory_flash(zip, serial),
     }
 }
 
-/// Whether the `adb` binary is available in `PATH` (needed for sideload, which
-/// the pure-Rust ADB backend does not implement).
-pub fn adb_binary_available() -> bool {
-    Command::new("adb").arg("version").output().is_ok()
-}
-
-/// Sideload a zip via the `adb` binary (`adb -s <serial> sideload <zip>`).
+/// Sideload a zip over the local adb server (pure Rust, no `adb` binary).
+///
+/// Speaks the `sideload-host` protocol: the device (in recovery sideload mode)
+/// requests 64 KiB blocks by index until it answers `DONEDONE`.
 fn adb_sideload(serial: &str, zip: &str) -> Result<String, String> {
-    if !adb_binary_available() {
-        return Err("`adb` binary not found in PATH (required for sideload)".into());
+    use std::io::{Read, Write};
+    use std::net::{Ipv4Addr, TcpStream};
+
+    const BLOCK: u64 = 64 * 1024;
+
+    fn request(stream: &mut TcpStream, cmd: &str) -> Result<(), String> {
+        stream
+            .write_all(format!("{:04x}{cmd}", cmd.len()).as_bytes())
+            .map_err(|e| e.to_string())?;
+        let mut status = [0u8; 4];
+        stream.read_exact(&mut status).map_err(|e| e.to_string())?;
+        if &status == b"OKAY" {
+            return Ok(());
+        }
+        let mut len = [0u8; 4];
+        stream.read_exact(&mut len).map_err(|e| e.to_string())?;
+        let n = usize::from_str_radix(&String::from_utf8_lossy(&len), 16).unwrap_or(0);
+        let mut msg = vec![0u8; n];
+        stream.read_exact(&mut msg).map_err(|e| e.to_string())?;
+        Err(String::from_utf8_lossy(&msg).into_owned())
     }
-    let mut cmd = Command::new("adb");
-    if !serial.is_empty() {
-        cmd.arg("-s").arg(serial);
-    }
-    let output = cmd
-        .arg("sideload")
-        .arg(zip)
-        .output()
-        .map_err(|e| format!("failed to run adb sideload: {e}"))?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    if output.status.success() {
-        Ok(format!("{stdout}{stderr}").trim().to_string())
+
+    let mut file = std::fs::File::open(zip).map_err(|e| format!("open {zip}: {e}"))?;
+    let size = file.metadata().map_err(|e| e.to_string())?.len();
+
+    let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, 5037))
+        .map_err(|e| format!("adb server not reachable ({e}); try `adb start-server`"))?;
+    if serial.is_empty() {
+        request(&mut stream, "host:transport-any")?;
     } else {
-        Err(format!("sideload failed: {}", stderr.trim()))
+        request(&mut stream, &format!("host:transport:{serial}"))?;
+    }
+    request(&mut stream, &format!("sideload-host:{size}:{BLOCK}"))
+        .map_err(|e| format!("sideload failed: {e}"))?;
+
+    let mut buf = vec![0u8; BLOCK as usize];
+    loop {
+        let mut req = [0u8; 8];
+        stream
+            .read_exact(&mut req)
+            .map_err(|e| format!("sideload failed: {e}"))?;
+        if &req == b"DONEDONE" {
+            return Ok("sideload complete".to_string());
+        }
+        let block: u64 = String::from_utf8_lossy(&req)
+            .trim()
+            .parse()
+            .map_err(|_| format!("sideload failed: bad request {req:?}"))?;
+        let offset = block * BLOCK;
+        if offset >= size {
+            return Err("sideload failed: device requested block past end of file".into());
+        }
+        let want = BLOCK.min(size - offset) as usize;
+        buf.fill(0);
+        {
+            use std::io::{Seek, SeekFrom};
+            file.seek(SeekFrom::Start(offset))
+                .map_err(|e| e.to_string())?;
+            file.read_exact(&mut buf[..want])
+                .map_err(|e| e.to_string())?;
+        }
+        stream
+            .write_all(&buf)
+            .map_err(|e| format!("sideload failed: {e}"))?;
     }
 }
 
@@ -387,8 +430,25 @@ fn adb_sideload(serial: &str, zip: &str) -> Result<String, String> {
 /// GrapheneOS/Pixel factory zips ship the officially-maintained flashing
 /// sequence as `flash-all.sh` (Unix) / `flash-all.bat` (Windows); running it is
 /// the recommended CLI install method. Requires `fastboot` in `PATH`.
-fn factory_flash(zip: &std::path::Path) -> Result<String, String> {
-    if !FastbootManager::is_available() {
+fn factory_flash(zip: &std::path::Path, serial: &str) -> Result<String, String> {
+    use droidkraft_fastboot::{FactoryOptions, FastbootError};
+    if std::env::var("DROIDKRAFT_FASTBOOT_BACKEND").as_deref() != Ok("binary") {
+        let mut log = Vec::new();
+        let opts = FactoryOptions::default();
+        let serial = (!serial.is_empty()).then_some(serial);
+        match droidkraft_fastboot::flash_all(zip, serial, &opts, &mut |p| {
+            log.push(format!("[{}/{}] {}", p.step_index, p.total_steps, p.label));
+        }) {
+            Ok(msg) => {
+                log.push(msg);
+                return Ok(log.join("\n"));
+            }
+            // Device could not be opened natively: fall back to the script.
+            Err(FastbootError::NoDevice | FastbootError::Usb(_)) => {}
+            Err(e) => return Err(format!("factory flash failed: {e}")),
+        }
+    }
+    if !FastbootManager::binary_available() {
         return Err("`fastboot` not found in PATH (required for factory flashing)".into());
     }
     let dir = zip.with_file_name(format!(

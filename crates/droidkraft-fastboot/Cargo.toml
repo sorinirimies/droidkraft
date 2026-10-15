@@ -1,0 +1,16 @@
+[package]
+name = "droidkraft-fastboot"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Fastboot for DroidKraft — native pure-Rust USB backend (nusb) with automatic fallback to the `fastboot` binary"
+categories = ["development-tools", "hardware-support"]
+keywords = ["android", "fastboot", "usb", "flash"]
+
+[dependencies]
+nusb = "0.1"
+pollster = "0.4"
+zip = { workspace = true }

@@ -1,11 +1,8 @@
-//! Fastboot feature — types and operations for the `fastboot` protocol.
+//! Fastboot feature — re-exported from the `droidkraft-fastboot` crate.
 //!
-//! The fastboot protocol is separate from ADB and requires the `fastboot`
-//! binary (part of Android platform-tools). There is no pure-Rust fastboot
-//! library, so this module shells out to the `fastboot` binary.
+//! The default backend talks to the device over USB in pure Rust and falls
+//! back to the `fastboot` binary for operations it doesn't cover yet.
 
-pub mod ops;
-pub mod types;
-
-pub use ops::FastbootManager;
-pub use types::{FastbootCommand, FastbootError, FastbootResult};
+pub use droidkraft_fastboot::{
+    Backend, FastbootCommand, FastbootError, FastbootManager, FastbootResult,
+};
