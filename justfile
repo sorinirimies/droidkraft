@@ -209,24 +209,16 @@ test-wide-output:
 
 # ── VHS / Demo GIFs ──────────────────────────────────────────────────────────
 
-# Generate quickstart VHS demo (requires vhs: brew install vhs)
-vhs-quickstart:
-    vhs examples/vhs/quickstart.tape
-    @echo "✅ Generated examples/vhs/quickstart.gif"
+# Re-record one preview GIF (usage: just vhs tui-overview; needs vhs + a device + release build)
+vhs name:
+    cargo build --release -p droidkraft-tui
+    vhs docs/tapes/{{name}}.tape
+    @echo "✅ Generated docs/previews/{{name}}.gif"
 
-# Generate main menu VHS demo
-vhs-menu:
-    vhs examples/vhs/main_menu.tape
-    @echo "✅ Generated examples/vhs/main_menu.gif"
-
-# Generate full demo VHS
-vhs-full:
-    vhs examples/vhs/full_demo.tape
-    @echo "✅ Generated examples/vhs/full_demo.gif"
-
-# Generate all VHS demos
-vhs-all:
-    ./examples/vhs/generate_all.sh
+# Re-record all TUI preview GIFs (the GUI GIFs are screen captures, see docs/tapes/README.md)
+previews:
+    cargo build --release -p droidkraft-tui
+    for t in docs/tapes/tui-*.tape; do vhs "$t"; done
 
 # Check if VHS is installed
 vhs-check:
