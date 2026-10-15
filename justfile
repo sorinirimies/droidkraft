@@ -159,7 +159,7 @@ publish: release-check
 release version: check-all check-git-cliff check-nu
     nu scripts/bump_version.nu --yes {{version}}
     @echo "Pushing branch and tag to GitHub..."
-    git push origin main
+    git push origin "$(git branch --show-current)"
     git push origin v{{version}}
     @echo "✅ Release v{{version}} pushed — GitHub Actions will handle the rest."
 
@@ -167,7 +167,7 @@ release version: check-all check-git-cliff check-nu
 release-gitea version: check-all check-git-cliff check-nu
     nu scripts/bump_version.nu --yes {{version}}
     @echo "Pushing branch and tag to Gitea..."
-    git push gitea main
+    git push gitea "$(git branch --show-current)"
     git push gitea v{{version}}
     @echo "✅ Release v{{version}} pushed to Gitea."
 
@@ -175,8 +175,8 @@ release-gitea version: check-all check-git-cliff check-nu
 release-all version: check-all check-git-cliff check-nu
     nu scripts/bump_version.nu --yes {{version}}
     @echo "Pushing branch and tag to GitHub and Gitea..."
-    git push origin main
-    git push gitea main
+    git push origin "$(git branch --show-current)"
+    git push gitea "$(git branch --show-current)"
     git push origin v{{version}}
     git push gitea v{{version}}
     @echo "✅ Release v{{version}} pushed to both remotes."
@@ -252,11 +252,11 @@ commit message:
 
 # Pull from GitHub
 pull:
-    git pull origin main
+    git pull origin "$(git branch --show-current)"
 
 # Pull from Gitea
 pull-gitea:
-    git pull gitea main
+    git pull gitea "$(git branch --show-current)"
 
 # Pull from both remotes
 pull-all:
@@ -268,7 +268,7 @@ pull-all:
             skipped="$skipped $r"; continue
         fi
         echo "→ pulling from $r"
-        if git pull "$r" main; then ok_="$ok_ $r"; else failed="$failed $r"; fi
+        if git pull "$r" "$(git branch --show-current)"; then ok_="$ok_ $r"; else failed="$failed $r"; fi
     done
     echo ""
     [ -n "$ok_" ] && echo "✅ Pulled from:$ok_"
@@ -277,11 +277,11 @@ pull-all:
 
 # Push to GitHub
 push:
-    git push origin main
+    git push origin "$(git branch --show-current)"
 
 # Push to Gitea
 push-gitea:
-    git push gitea main
+    git push gitea "$(git branch --show-current)"
 
 # Push to both GitHub and Gitea
 push-all:
@@ -293,7 +293,7 @@ push-all:
             skipped="$skipped $r"; continue
         fi
         echo "→ pushing to $r"
-        if git push "$r" main; then ok_="$ok_ $r"; else failed="$failed $r"; fi
+        if git push "$r" "$(git branch --show-current)"; then ok_="$ok_ $r"; else failed="$failed $r"; fi
     done
     echo ""
     [ -n "$ok_" ] && echo "✅ Pushed to:$ok_"
@@ -323,7 +323,7 @@ push-tags-all:
 
 # Force-sync Gitea from GitHub
 sync-gitea:
-    git push gitea main --force
+    git push gitea "$(git branch --show-current)" --force
     git push gitea --tags --force
     @echo "✅ Gitea synced!"
 
