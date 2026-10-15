@@ -22,6 +22,9 @@ path = "src/lib.rs"
 
 [dependencies]
 droidkraft-core = { workspace = true }
+droidkraft-mirror = { workspace = true }
+adb_client = { workspace = true }
 gpui = "0.2.2"
 serde      = { workspace = true }
 serde_json = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }

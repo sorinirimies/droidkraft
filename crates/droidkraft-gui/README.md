@@ -25,6 +25,31 @@ The **DroidKraft** desktop GUI — an Android device monitor built with
 All device I/O runs on background threads (a command worker + the logcat and
 screen capture threads), so the UI thread never blocks.
 
+## Responsive layout
+
+Breakpoints come from the window size (`src/layout.rs`, unit-tested): compact (<760 px), medium (<1100 px), wide. The nav rail goes full → shorter → icon-only; device cards reflow 1..N columns and drop sparklines, gauges and quick actions as they shrink; workspace chips/tabs shorten; Overview panels reflow 3 → 2 → 1 columns and hide charts when small; the Screen tab's recording panel moves below the mirror on narrow windows. Minimum window size is 640×420.
+
+## Detach / attach the mirror
+
+In the **Screen** panel, **⇱ Detach** (or `⌘D` / `Ctrl+D`) moves the live mirror
+into its own resizable window titled "DroidKraft — <model> (<serial>)". The same
+stream keeps running (no restart, Stop/Start state preserved). The main panel
+shows a placeholder with **Attach** and **Focus window** buttons. Re-embed with
+**Attach**, the detached window's **⇲ Attach** button, `⌘D`/`Ctrl+D`, or by
+closing the detached window (`⌘W`/`Ctrl+W`). Closing the main window closes the
+detached one too. `⌘/Ctrl+C` etc. are never forwarded to the device.
+
+## Mirror-only mode (scrcpy-like)
+
+```sh
+droidkraft --mirror [--serial SERIAL] [--size WxH] [--title TITLE]
+droidkraft --help
+```
+
+Opens only the mirror window (viewport + thin control strip: zoom, Back/Home,
+Start/Stop), auto-starts on `SERIAL` (or the first connected device) and quits
+when the window closes.
+
 ## Install
 
 ```sh

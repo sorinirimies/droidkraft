@@ -1,96 +1,33 @@
-//! The root gpui view: a left navigation rail plus one of five panels —
-//! Dashboard, Logs, Commands, Flash/Root, and Screen mirror.
+//! The root gpui view: nav rail + either the fleet overview, a device
+//! workspace, or settings. All device state lives in [`Fleet`]; this module
+//! owns the worker, routing, and per-device actions.
 
+use std::sync::Arc;
 use std::time::Duration;
 
-use gpui::{div, img, prelude::*, px, rgb, AnyElement, ClickEvent, Context, Window};
+use gpui::{
+    div, prelude::*, px, rgb, size, Bounds, Context, Entity, TitlebarOptions, Window, WindowBounds,
+    WindowOptions,
+};
 
 use droidkraft_core::features::fastboot::FastbootCommand;
-use droidkraft_core::features::flash::{RebootTarget, RootStatus};
+use droidkraft_core::features::flash::RebootTarget;
 use droidkraft_core::features::rom::{
-    build_plan, DeviceProfile, DownloadProgress, FlashOptions, FlashSession, InstallMethod,
-    RomBuild, StepStatus,
+    build_plan, DownloadProgress, FlashOptions, FlashSession, InstallMethod, RomBuild, StepStatus,
 };
-use droidkraft_core::{DeviceStatus, LogEntry, LogcatFilter, LogcatStream};
+use droidkraft_mirror::{timestamped_name, RecordStatus};
 
-use crate::commands::{by_category, CommandCategory, GuiCommand};
-use crate::screen::ScreenStream;
+use crate::commands::{CommandAction, GuiCommand};
+use crate::mirror_view::{Chrome, DetachedRoot, MirrorEvent, MirrorView, ToggleDetach};
+use crate::state::{DeviceState, Fleet, Route, Tab};
 use crate::theme;
 use crate::worker::{Worker, WorkerRequest, WorkerResponse};
 
-/// Which panel is currently shown.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Panel {
-    Dashboard,
-    Logs,
-    Commands,
-    Flash,
-    Screen,
-}
-
-impl Panel {
-    fn label(&self) -> &'static str {
-        match self {
-            Panel::Dashboard => "Dashboard",
-            Panel::Logs => "Live Logs",
-            Panel::Commands => "Commands",
-            Panel::Flash => "Flash & Root",
-            Panel::Screen => "Screen",
-        }
-    }
-
-    fn icon(&self) -> &'static str {
-        match self {
-            Panel::Dashboard => "▦",
-            Panel::Logs => "≣",
-            Panel::Commands => "⌘",
-            Panel::Flash => "⚡",
-            Panel::Screen => "▶",
-        }
-    }
-
-    fn all() -> &'static [Panel] {
-        &[
-            Panel::Dashboard,
-            Panel::Logs,
-            Panel::Commands,
-            Panel::Flash,
-            Panel::Screen,
-        ]
-    }
-}
-
-/// Maximum number of log entries retained in the GUI.
-const MAX_LOG_ENTRIES: usize = 20_000;
-/// Maximum number of visible (filtered) log rows rendered per frame.
-const MAX_VISIBLE_LOGS: usize = 500;
-
 /// Root application state + view.
 pub struct DroidGui {
-    worker: Worker,
-    active: Panel,
-    status: DeviceStatus,
-
-    log_stream: LogcatStream,
-    log_entries: Vec<LogEntry>,
-    log_filter: LogcatFilter,
-    log_streaming: bool,
-
-    screen: ScreenStream,
-
-    last_output: Option<(String, Result<String, String>)>,
-    root_status: Option<RootStatus>,
-    busy_label: Option<String>,
-
-    // ── Custom-ROM flashing ──────────────────────────────────────────────
-    profile: Option<DeviceProfile>,
-    rom_builds: Vec<RomBuild>,
-    rom_status: Option<String>,
-    download_progress: Option<DownloadProgress>,
-    downloaded_path: Option<std::path::PathBuf>,
-    pending_method: Option<InstallMethod>,
-    flash_session: Option<FlashSession>,
-    flash_busy: bool,
+    pub(crate) worker: Worker,
+    pub(crate) fleet: Fleet,
+    pub(crate) route: Route,
 }
 
 impl DroidGui {
@@ -98,7 +35,7 @@ impl DroidGui {
         // Periodic refresh loop (drains worker + logcat, then repaints).
         cx.spawn(async move |this, cx| loop {
             let alive = this.update(cx, |this, cx| {
-                this.tick();
+                this.tick(cx);
                 cx.notify();
             });
             if alive.is_err() {
@@ -110,965 +47,541 @@ impl DroidGui {
         })
         .detach();
 
+        // Main window closing releases this view → close detached mirrors too.
+        cx.on_release(|this, cx| {
+            for d in this.fleet.iter_mut() {
+                d.detach_subs.clear();
+                if let Some(h) = d.detached.take() {
+                    let _ = h.update(cx, |_, w, _| w.remove_window());
+                }
+                d.stream.stop();
+                d.log_stream.stop();
+                d.recorder.stop();
+            }
+        })
+        .detach();
+
         Self {
             worker: Worker::spawn(),
-            active: Panel::Dashboard,
-            status: DeviceStatus::default(),
-            log_stream: LogcatStream::new(),
-            log_entries: Vec::new(),
-            log_filter: LogcatFilter::default(),
-            log_streaming: false,
-            screen: ScreenStream::new(),
-            last_output: None,
-            root_status: None,
-            busy_label: None,
-            profile: None,
-            rom_builds: Vec::new(),
-            rom_status: None,
-            download_progress: None,
-            downloaded_path: None,
-            pending_method: None,
-            flash_session: None,
-            flash_busy: false,
+            fleet: Fleet::new(),
+            route: Route::Devices,
         }
     }
 
-    /// The active device serial, if connected and authorised.
-    fn active_serial(&self) -> Option<String> {
-        self.status.active().map(|d| d.serial.clone())
+    // ── routing ───────────────────────────────────────────────────────────
+
+    /// Show a route and tell the worker which device is focused.
+    pub fn set_route(&mut self, route: Route) {
+        let focus = self.fleet.open_serial(&route);
+        self.route = route;
+        self.worker.send(WorkerRequest::Focus(focus));
+    }
+
+    /// Open a device workspace on `tab`.
+    pub fn open_device(&mut self, serial: &str, tab: Tab, cx: &mut Context<Self>) {
+        if let Some(d) = self.fleet.get_mut(serial) {
+            d.tab = tab;
+        }
+        self.set_route(Route::Device(serial.to_string()));
+        if tab == Tab::Screen {
+            self.ensure_mirror(serial, cx);
+        }
+    }
+
+    pub fn select_tab(&mut self, serial: &str, tab: Tab, cx: &mut Context<Self>) {
+        self.open_device(serial, tab, cx);
+    }
+
+    pub(crate) fn dev(&mut self, serial: &str) -> Option<&mut DeviceState> {
+        self.fleet.get_mut(serial)
     }
 
     // ── per-tick data pump ────────────────────────────────────────────────
 
-    fn tick(&mut self) {
-        // Drain worker responses.
-        for resp in self.worker.drain() {
-            match resp {
-                WorkerResponse::Status(s) => self.status = s,
-                WorkerResponse::Output { label, result } => {
-                    self.busy_label = None;
-                    self.last_output = Some((label, result));
-                }
-                WorkerResponse::Root(result) => {
-                    self.busy_label = None;
-                    match result {
-                        Ok(status) => self.root_status = Some(status),
-                        Err(e) => self.last_output = Some(("Root check".into(), Err(e))),
-                    }
-                }
-                WorkerResponse::Profile(p) => {
-                    // Once we know the codename, resolve downloadable ROM builds.
-                    if !p.codename.is_empty() {
-                        self.rom_status = Some(format!("Searching ROMs for {}…", p.codename));
-                        self.worker.send(WorkerRequest::FetchRoms {
-                            codename: p.codename.clone(),
-                        });
-                    } else {
-                        self.rom_status = Some("Could not detect device codename.".into());
-                    }
-                    self.profile = Some(p);
-                }
-                WorkerResponse::Roms(result) => match result {
-                    Ok(builds) => {
-                        self.rom_status = if builds.is_empty() {
-                            Some("No downloadable builds found for this device.".into())
-                        } else {
-                            None
-                        };
-                        self.rom_builds = builds;
-                    }
-                    Err(e) => self.rom_status = Some(format!("ROM lookup failed: {e}")),
-                },
-                WorkerResponse::DownloadProgress(p) => self.download_progress = Some(p),
-                WorkerResponse::Downloaded(result) => {
-                    self.download_progress = None;
-                    match result {
-                        Ok(path) => {
-                            self.rom_status = Some(format!("Downloaded {}", path.display()));
-                            self.downloaded_path = Some(path.clone());
-                            self.build_flash_session(path);
-                        }
-                        Err(e) => self.rom_status = Some(format!("Download failed: {e}")),
-                    }
-                }
-                WorkerResponse::FlashStepDone { idx, result } => {
-                    self.flash_busy = false;
-                    if let Some(session) = &mut self.flash_session {
-                        session.statuses[idx] = match result {
-                            Ok(_) => droidkraft_core::features::rom::StepStatus::Done,
-                            Err(e) => droidkraft_core::features::rom::StepStatus::Failed(e),
-                        };
-                    }
-                }
-            }
+    fn tick(&mut self, cx: &mut Context<Self>) {
+        let open = self.fleet.open_serial(&self.route);
+        let on_screen_tab = open
+            .as_deref()
+            .and_then(|s| self.fleet.get(s))
+            .is_some_and(|d| d.tab == Tab::Screen);
+        if let (Some(s), true) = (&open, on_screen_tab) {
+            let s = s.clone();
+            self.ensure_mirror(&s, cx);
         }
 
-        // Drain the logcat stream.
-        if self.log_stream.is_running() {
-            let mut lines = Vec::new();
-            let (_n, _status) = self.log_stream.drain_into(&mut lines, 2000);
-            for line in lines {
-                self.log_entries.push(LogEntry::parse(&line));
+        for resp in self.worker.drain() {
+            self.apply(resp);
+        }
+
+        for d in self.fleet.iter_mut() {
+            // Keep each mirror pointed at its device; auto-start while its
+            // Screen tab is open or its window is detached.
+            if let Some(m) = &d.mirror {
+                let auto = d.is_online()
+                    && (d.detached.is_some()
+                        || (open.as_deref() == Some(d.serial.as_str()) && d.tab == Tab::Screen));
+                let serial = d.serial.clone();
+                m.update(cx, |m, _| {
+                    m.set_serial(Some(serial));
+                    m.set_auto_start(auto);
+                });
             }
-            if self.log_entries.len() > MAX_LOG_ENTRIES {
-                let excess = self.log_entries.len() - MAX_LOG_ENTRIES;
-                self.log_entries.drain(0..excess);
+            // Logcat.
+            if d.log_stream.is_running() {
+                let mut lines = Vec::new();
+                let _ = d.log_stream.drain_into(&mut lines, 2000);
+                d.push_log_lines(&lines);
+            }
+            // Recorder finished?
+            match d.recorder.status() {
+                RecordStatus::Recording { .. } | RecordStatus::Finishing => d.rec_harvested = false,
+                RecordStatus::Done { files } if !d.rec_harvested => {
+                    d.rec_harvested = true;
+                    d.add_recordings(&files);
+                    d.capture_status = Some(format!("Saved {} recording file(s)", files.len()));
+                }
+                RecordStatus::Failed(e) if !d.rec_harvested => {
+                    d.rec_harvested = true;
+                    d.capture_status = Some(format!("Recording failed: {e}"));
+                }
+                _ => {}
             }
         }
     }
 
-    // ── actions ───────────────────────────────────────────────────────────
+    /// Route one worker response to its device.
+    fn apply(&mut self, resp: WorkerResponse) {
+        match resp {
+            WorkerResponse::Devices(entries) => {
+                self.fleet.apply_entries(&entries);
+                // Stop work tied to devices that vanished.
+                for d in self.fleet.iter_mut().filter(|d| !d.connected) {
+                    if d.log_streaming {
+                        d.log_stream.stop();
+                        d.log_streaming = false;
+                    }
+                }
+            }
+            WorkerResponse::Details {
+                serial,
+                details,
+                history,
+            } => {
+                self.fleet.apply_details(&serial, *details, *history);
+            }
+            WorkerResponse::Output {
+                serial,
+                label,
+                result,
+            } => {
+                if let Some(d) = self.dev(&serial) {
+                    d.busy_label = None;
+                    d.last_output = Some((label, result));
+                }
+            }
+            WorkerResponse::Root { serial, result } => {
+                if let Some(d) = self.dev(&serial) {
+                    d.busy_label = None;
+                    match result {
+                        Ok(s) => d.root_status = Some(s),
+                        Err(e) => d.last_output = Some(("Root check".into(), Err(e))),
+                    }
+                }
+            }
+            WorkerResponse::Profile { serial, profile } => {
+                let mut fetch = None;
+                if let Some(d) = self.dev(&serial) {
+                    if profile.codename.is_empty() {
+                        d.rom_status = Some("Could not detect device codename.".into());
+                    } else {
+                        d.rom_status = Some(format!("Searching ROMs for {}…", profile.codename));
+                        fetch = Some(profile.codename.clone());
+                    }
+                    d.profile = Some(profile);
+                }
+                if let Some(codename) = fetch {
+                    self.worker
+                        .send(WorkerRequest::FetchRoms { serial, codename });
+                }
+            }
+            WorkerResponse::Roms { serial, result } => {
+                if let Some(d) = self.dev(&serial) {
+                    match result {
+                        Ok(builds) => {
+                            d.rom_status = builds.is_empty().then(|| {
+                                "No downloadable builds found for this device.".to_string()
+                            });
+                            d.rom_builds = builds;
+                        }
+                        Err(e) => d.rom_status = Some(format!("ROM lookup failed: {e}")),
+                    }
+                }
+            }
+            WorkerResponse::DownloadProgress { serial, progress } => {
+                if let Some(d) = self.dev(&serial) {
+                    d.download_progress = Some(progress);
+                }
+            }
+            WorkerResponse::Downloaded { serial, result } => {
+                if let Some(d) = self.dev(&serial) {
+                    d.download_progress = None;
+                    match result {
+                        Ok(path) => {
+                            d.rom_status = Some(format!("Downloaded {}", path.display()));
+                            d.downloaded_path = Some(path.clone());
+                            build_flash_session(d, path);
+                        }
+                        Err(e) => d.rom_status = Some(format!("Download failed: {e}")),
+                    }
+                }
+            }
+            WorkerResponse::FlashStepDone {
+                serial,
+                idx,
+                result,
+            } => {
+                if let Some(d) = self.dev(&serial) {
+                    d.flash_busy = false;
+                    if let Some(s) = &mut d.flash_session {
+                        if let Some(slot) = s.statuses.get_mut(idx) {
+                            *slot = match result {
+                                Ok(_) => StepStatus::Done,
+                                Err(e) => StepStatus::Failed(e),
+                            };
+                        }
+                    }
+                }
+            }
+            WorkerResponse::Screenshot { serial, result } => {
+                if let Some(d) = self.dev(&serial) {
+                    match result {
+                        Ok(p) => {
+                            d.capture_status = Some(format!("Screenshot saved: {}", p.display()));
+                            d.add_screenshot(p);
+                        }
+                        Err(e) => d.capture_status = Some(format!("Screenshot failed: {e}")),
+                    }
+                }
+            }
+        }
+    }
 
-    fn run_command(&mut self, cmd: &GuiCommand) {
-        self.busy_label = Some(cmd.label.to_string());
+    // ── per-device actions ────────────────────────────────────────────────
+
+    pub(crate) fn run_command(&mut self, serial: &str, cmd: &GuiCommand) {
+        if let Some(d) = self.dev(serial) {
+            d.busy_label = Some(cmd.label.to_string());
+        }
         self.worker.send(WorkerRequest::Run {
+            serial: serial.to_string(),
             label: cmd.label.to_string(),
             action: cmd.action.clone(),
         });
     }
 
-    fn toggle_log_stream(&mut self) {
-        if self.log_streaming {
-            self.log_stream.stop();
-            self.log_streaming = false;
-        } else if let Some(serial) = self.active_serial() {
-            self.log_entries.clear();
-            self.log_stream.start(serial);
-            self.log_streaming = true;
+    pub(crate) fn toggle_log_stream(&mut self, serial: &str) {
+        if let Some(d) = self.dev(serial) {
+            if d.log_streaming {
+                d.log_stream.stop();
+                d.log_streaming = false;
+            } else if d.is_online() {
+                d.log_entries.clear();
+                d.log_stream.start(d.serial.clone());
+                d.log_streaming = true;
+            }
         }
     }
 
-    fn toggle_screen(&mut self) {
-        if self.screen.is_running() {
-            self.screen.stop();
-        } else if let Some(serial) = self.active_serial() {
-            self.screen.start(serial);
+    pub(crate) fn detect_root(&mut self, serial: &str) {
+        if let Some(d) = self.dev(serial) {
+            d.busy_label = Some("Root check".into());
         }
-    }
-
-    fn detect_root(&mut self) {
-        self.busy_label = Some("Root check".into());
-        self.worker.send(WorkerRequest::DetectRoot);
-    }
-
-    fn reboot(&mut self, target: RebootTarget) {
-        self.busy_label = Some(target.label().into());
-        self.worker.send(WorkerRequest::Run {
-            label: target.label().into(),
-            action: crate::commands::CommandAction::Reboot(target),
+        self.worker.send(WorkerRequest::DetectRoot {
+            serial: serial.to_string(),
         });
     }
 
-    fn fastboot(&mut self, command: FastbootCommand) {
+    pub(crate) fn remount(&mut self, serial: &str) {
+        if let Some(d) = self.dev(serial) {
+            d.busy_label = Some("Remount".into());
+        }
+        self.worker.send(WorkerRequest::Remount {
+            serial: serial.to_string(),
+        });
+    }
+
+    pub(crate) fn reboot(&mut self, serial: &str, target: RebootTarget) {
+        if let Some(d) = self.dev(serial) {
+            d.busy_label = Some(target.label().into());
+        }
+        self.worker.send(WorkerRequest::Run {
+            serial: serial.to_string(),
+            label: target.label().into(),
+            action: CommandAction::Reboot(target),
+        });
+    }
+
+    pub(crate) fn fastboot(&mut self, serial: &str, command: FastbootCommand) {
         let label = command.label().to_string();
-        self.busy_label = Some(label.clone());
-        self.worker.send(WorkerRequest::Fastboot { label, command });
+        if let Some(d) = self.dev(serial) {
+            d.busy_label = Some(label.clone());
+        }
+        self.worker.send(WorkerRequest::Fastboot {
+            serial: serial.to_string(),
+            label,
+            command,
+        });
     }
 
-    // ── custom-ROM flashing ─────────────────────────────────────────
+    // ── custom-ROM flashing ───────────────────────────────────────────────
 
-    /// Detect the device and search for compatible downloadable ROMs.
-    fn detect_roms(&mut self) {
-        self.rom_builds.clear();
-        self.flash_session = None;
-        self.downloaded_path = None;
-        self.rom_status = Some("Detecting device…".into());
-        self.worker.send(WorkerRequest::DetectProfile);
+    pub(crate) fn detect_roms(&mut self, serial: &str) {
+        if let Some(d) = self.dev(serial) {
+            d.rom_builds.clear();
+            d.flash_session = None;
+            d.downloaded_path = None;
+            d.rom_status = Some("Detecting device…".into());
+        }
+        self.worker.send(WorkerRequest::DetectProfile {
+            serial: serial.to_string(),
+        });
     }
 
-    /// Start downloading a ROM build to a temp file.
-    fn download_build(&mut self, build: &RomBuild) {
+    pub(crate) fn download_build(&mut self, serial: &str, build: &RomBuild) {
         let dest = std::env::temp_dir()
             .join("droidkraft-roms")
             .join(build.file_name());
-        self.pending_method = Some(build.os.install_method());
-        self.rom_status = Some(format!("Downloading {}…", build.file_name()));
-        self.download_progress = Some(DownloadProgress {
-            downloaded: 0,
-            total: build.size_bytes,
-        });
+        if let Some(d) = self.dev(serial) {
+            d.pending_method = Some(build.os.install_method());
+            d.rom_status = Some(format!("Downloading {}…", build.file_name()));
+            d.download_progress = Some(DownloadProgress {
+                downloaded: 0,
+                total: build.size_bytes,
+            });
+        }
         self.worker.send(WorkerRequest::Download {
+            serial: serial.to_string(),
             build: build.clone(),
             dest,
         });
     }
 
-    /// Build a flash session for a downloaded ROM zip, honouring the detected
-    /// bootloader-lock state.
-    fn build_flash_session(&mut self, rom_zip: std::path::PathBuf) {
-        let serial = self.active_serial().unwrap_or_default();
-        let mut opts = match self.pending_method {
-            Some(InstallMethod::FastbootFactory) => FlashOptions::factory(rom_zip),
-            _ => FlashOptions::new(rom_zip),
-        };
-        // If we know the bootloader is locked, include the unlock step.
-        if self.profile.as_ref().and_then(|p| p.bootloader_unlocked) == Some(false) {
-            opts.unlock_bootloader = true;
+    /// Run the next pending flash step (the caller has already consented).
+    pub(crate) fn run_next_flash_step(&mut self, serial: &str) {
+        let mut req = None;
+        if let Some(d) = self.dev(serial) {
+            if d.flash_busy {
+                return;
+            }
+            if let Some(session) = &d.flash_session {
+                if let Some((idx, step)) = session.next_step() {
+                    req = Some(WorkerRequest::RunFlashStep {
+                        serial: serial.to_string(),
+                        idx,
+                        step: step.clone(),
+                    });
+                }
+            }
+            if req.is_some() {
+                d.flash_busy = true;
+            }
         }
-        let plan = build_plan(&opts);
-        self.flash_session = Some(FlashSession::new(plan, serial));
+        if let Some(r) = req {
+            self.worker.send(r);
+        }
     }
 
-    /// Run the next pending flash step (the caller has already consented).
-    fn run_next_flash_step(&mut self) {
-        if self.flash_busy {
+    // ── recording / screenshots ───────────────────────────────────────────
+
+    pub(crate) fn start_recording(&mut self, serial: &str) {
+        if let Some(d) = self.dev(serial) {
+            let name = timestamped_name(serial);
+            d.capture_status =
+                match d
+                    .recorder
+                    .start(serial, &d.out_dir.clone(), &name, d.rec_opts.clone())
+                {
+                    Ok(()) => None,
+                    Err(e) => Some(format!("Cannot record: {e}")),
+                };
+        }
+    }
+
+    pub(crate) fn stop_recording(&mut self, serial: &str) {
+        if let Some(d) = self.dev(serial) {
+            d.recorder.stop();
+        }
+    }
+
+    pub(crate) fn take_screenshot(&mut self, serial: &str) {
+        let path = match self.dev(serial) {
+            Some(d) => {
+                d.capture_status = Some("Capturing screenshot…".into());
+                d.out_dir.join(format!("{}.png", timestamped_name(serial)))
+            }
+            None => return,
+        };
+        self.worker.send(WorkerRequest::Screenshot {
+            serial: serial.to_string(),
+            path,
+        });
+    }
+
+    // ── mirror / detach (per device) ──────────────────────────────────────
+
+    /// Create the device's `MirrorView` on first use.
+    pub(crate) fn ensure_mirror(
+        &mut self,
+        serial: &str,
+        cx: &mut Context<Self>,
+    ) -> Option<Entity<MirrorView>> {
+        let d = self.fleet.get_mut(serial)?;
+        if let Some(m) = &d.mirror {
+            return Some(m.clone());
+        }
+        let stream = Arc::clone(&d.stream);
+        let mirror = cx.new(|cx| MirrorView::new(stream, Chrome::Full, cx));
+        let ser = serial.to_string();
+        mirror.update(cx, |m, _| m.set_serial(Some(ser.clone())));
+        let sub = cx.subscribe(&mirror, move |_this, _m, ev: &MirrorEvent, cx| match ev {
+            MirrorEvent::AttachRequested => {
+                // Deferred: we may be inside the detached window's update.
+                let me = cx.entity();
+                let ser = ser.clone();
+                cx.defer(move |cx| me.update(cx, |t, cx| t.attach(&ser, cx)));
+            }
+        });
+        d.mirror_subs.push(sub);
+        d.mirror = Some(mirror.clone());
+        Some(mirror)
+    }
+
+    /// Move a device's mirror view into its own window (stream keeps running).
+    pub(crate) fn detach(&mut self, serial: &str, cx: &mut Context<Self>) {
+        let Some(mirror) = self.ensure_mirror(serial, cx) else {
+            return;
+        };
+        let Some(d) = self.fleet.get_mut(serial) else {
+            return;
+        };
+        if d.detached.is_some() {
             return;
         }
-        let serial = self.active_serial().unwrap_or_default();
-        if let Some(session) = &self.flash_session {
-            if let Some((idx, step)) = session.next_step() {
-                self.flash_busy = true;
-                self.worker.send(WorkerRequest::RunFlashStep {
-                    idx,
-                    step: step.clone(),
-                    serial,
-                });
-            }
-        }
-    }
-
-    // ── shared widgets ────────────────────────────────────────────────────
-
-    fn pill(label: impl Into<String>, value: impl Into<String>, color: u32) -> AnyElement {
-        div()
-            .flex()
-            .flex_col()
-            .gap_1()
-            .px_3()
-            .py_2()
-            .min_w(px(120.))
-            .rounded_md()
-            .bg(rgb(theme::BG_ELEV))
-            .border_1()
-            .border_color(rgb(theme::BORDER))
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(theme::TEXT_DIM))
-                    .child(label.into()),
-            )
-            .child(div().text_lg().text_color(rgb(color)).child(value.into()))
-            .into_any_element()
-    }
-
-    fn button(
-        &self,
-        id: impl Into<gpui::ElementId>,
-        label: impl Into<String>,
-        bg: u32,
-        fg: u32,
-        cx: &mut Context<Self>,
-        on_click: impl Fn(&mut Self, &mut Context<Self>) + 'static,
-    ) -> AnyElement {
-        div()
-            .id(id)
-            .flex()
-            .items_center()
-            .justify_center()
-            .px_3()
-            .py_2()
-            .rounded_md()
-            .bg(rgb(bg))
-            .text_sm()
-            .text_color(rgb(fg))
-            .cursor_pointer()
-            .border_1()
-            .border_color(rgb(theme::BORDER))
-            .child(label.into())
-            .on_click(cx.listener(move |this, _ev: &ClickEvent, _window, cx| {
-                on_click(this, cx);
-                cx.notify();
-            }))
-            .into_any_element()
-    }
-
-    fn section_title(text: &str) -> AnyElement {
-        div()
-            .text_xs()
-            .text_color(rgb(theme::TEXT_FAINT))
-            .child(text.to_uppercase())
-            .into_any_element()
-    }
-
-    // ── panels ────────────────────────────────────────────────────────────
-
-    fn render_nav(&self, cx: &mut Context<Self>) -> AnyElement {
-        let mut rail = div()
-            .flex()
-            .flex_col()
-            .gap_1()
-            .w(px(180.))
-            .h_full()
-            .p_2()
-            .bg(rgb(theme::BG_PANEL))
-            .border_r_1()
-            .border_color(rgb(theme::BORDER))
-            .child(
-                div()
-                    .px_2()
-                    .py_2()
-                    .text_lg()
-                    .text_color(rgb(theme::ACCENT))
-                    .child("DroidKraft"),
-            );
-
-        for panel in Panel::all() {
-            let panel = *panel;
-            let active = panel == self.active;
-            let bg = if active {
-                theme::BG_ELEV
-            } else {
-                theme::BG_PANEL
-            };
-            let fg = if active { theme::TEXT } else { theme::TEXT_DIM };
-            rail = rail.child(
-                div()
-                    .id(panel.label())
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .px_2()
-                    .py_2()
-                    .rounded_md()
-                    .bg(rgb(bg))
-                    .text_color(rgb(fg))
-                    .cursor_pointer()
-                    .child(div().text_sm().child(panel.icon()))
-                    .child(div().text_sm().child(panel.label()))
-                    .on_click(cx.listener(move |this, _ev: &ClickEvent, _window, cx| {
-                        this.active = panel;
-                        cx.notify();
-                    })),
-            );
-        }
-
-        // Connection indicator.
-        let (dot, label) = if self.status.is_connected() {
-            (theme::OK, format!("{} online", self.status.devices.len()))
+        let name = d.display_name();
+        let title = if name == serial {
+            format!("DroidKraft — {serial}")
         } else {
-            (theme::ERR, "no device".to_string())
+            format!("DroidKraft — {name} ({serial})")
         };
-        rail = rail.child(div().flex_grow()).child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .px_2()
-                .py_2()
-                .child(div().size_2().rounded_full().bg(rgb(dot)))
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(rgb(theme::TEXT_DIM))
-                        .child(label),
-                ),
-        );
-
-        rail.into_any_element()
-    }
-
-    fn render_dashboard(&self, cx: &mut Context<Self>) -> AnyElement {
-        let s = &self.status;
-        let connected = s.is_connected();
-
-        let header = div()
-            .flex()
-            .items_center()
-            .justify_between()
-            .child(
-                div()
-                    .text_xl()
-                    .text_color(rgb(theme::TEXT))
-                    .child("Dashboard"),
-            )
-            .child(self.button(
-                "refresh",
-                "Refresh",
-                theme::BG_ELEV,
-                theme::TEXT,
-                cx,
-                |this, _cx| this.worker.send(WorkerRequest::RefreshStatus),
-            ));
-
-        let body: AnyElement = if connected {
-            div()
-                .flex()
-                .flex_col()
-                .gap_4()
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .gap_3()
-                        .flex_wrap()
-                        .child(Self::pill(
-                            "Model",
-                            nonempty(&s.model, "unknown"),
-                            theme::TEXT,
-                        ))
-                        .child(Self::pill(
-                            "Android",
-                            nonempty(&s.android_version, "?"),
-                            theme::TEXT,
-                        ))
-                        .child(Self::pill(
-                            "Battery",
-                            format!("{}%", s.battery_pct),
-                            battery_color(s.battery_pct),
-                        ))
-                        .child(Self::pill(
-                            "RAM",
-                            format!("{} / {} MiB", s.ram_used_mib(), s.ram_total_mib),
-                            theme::TEXT,
-                        ))
-                        .child(Self::pill(
-                            "CPU load",
-                            format!("{:.2}", s.cpu_load_1min),
-                            theme::TEXT,
-                        )),
-                )
-                .child(Self::section_title("Devices"))
-                .children(s.devices.iter().enumerate().map(|(i, d)| {
-                    let active = i == s.selected_idx;
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .px_3()
-                        .py_2()
-                        .rounded_md()
-                        .bg(rgb(if active {
-                            theme::BG_ELEV
-                        } else {
-                            theme::BG_PANEL
-                        }))
-                        .child(div().size_2().rounded_full().bg(rgb(if d.is_online() {
-                            theme::OK
-                        } else {
-                            theme::WARN
-                        })))
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(rgb(theme::TEXT))
-                                .child(d.serial.clone()),
-                        )
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(rgb(theme::TEXT_DIM))
-                                .child(d.state.clone()),
-                        )
-                        .into_any_element()
-                }))
-                .into_any_element()
-        } else {
-            empty_state(
-                "No device connected",
-                "Connect a device over USB with debugging enabled.",
-            )
-        };
-
-        panel_container(Panel::Dashboard)
-            .child(header)
-            .child(body)
-            .into_any_element()
-    }
-
-    fn render_commands(&self, cx: &mut Context<Self>) -> AnyElement {
-        let mut root = panel_container(Panel::Commands).child(
-            div()
-                .text_xl()
-                .text_color(rgb(theme::TEXT))
-                .child("Commands"),
-        );
-
-        for cat in CommandCategory::all() {
-            let mut row = div().flex().flex_row().flex_wrap().gap_2();
-            for cmd in by_category(*cat) {
-                let (bg, fg) = if cmd.destructive {
-                    (theme::DANGER, 0xffffff)
-                } else {
-                    (theme::BG_ELEV, theme::TEXT)
-                };
-                let id: &'static str = cmd.label;
-                let cmd_clone = cmd.clone();
-                row = row.child(self.button(id, cmd.label, bg, fg, cx, move |this, _cx| {
-                    this.run_command(&cmd_clone)
-                }));
-            }
-            root = root.child(Self::section_title(cat.label())).child(row);
+        // Window aspect follows the device (portrait by default).
+        let aspect = mirror
+            .read(cx)
+            .stream()
+            .state()
+            .device_size
+            .map(|(w, h)| w as f32 / h.max(1) as f32)
+            .unwrap_or(9.0 / 19.5)
+            .clamp(0.3, 3.0);
+        let (mut w, mut h) = (aspect * 780.0 + 16.0, 780.0 + 48.0);
+        if w > 1100.0 {
+            h *= 1100.0 / w;
+            w = 1100.0;
         }
-
-        root.child(self.render_output()).into_any_element()
-    }
-
-    fn render_output(&self) -> AnyElement {
-        let content: AnyElement = match &self.last_output {
-            None => div()
-                .text_sm()
-                .text_color(rgb(theme::TEXT_FAINT))
-                .child("Command output will appear here.")
-                .into_any_element(),
-            Some((label, result)) => {
-                let (color, text) = match result {
-                    Ok(out) => (theme::OK, out.clone()),
-                    Err(e) => (theme::ERR, e.clone()),
-                };
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .child(div().text_xs().text_color(rgb(color)).child(label.clone()))
-                    .child(
-                        div()
-                            .font_family("monospace")
-                            .text_xs()
-                            .text_color(rgb(theme::TEXT))
-                            .child(truncate(&text, 4000)),
-                    )
-                    .into_any_element()
-            }
-        };
-
-        div()
-            .id("cmd-output")
-            .mt_3()
-            .p_3()
-            .h(px(240.))
-            .w_full()
-            .rounded_md()
-            .bg(rgb(theme::BG))
-            .border_1()
-            .border_color(rgb(theme::BORDER))
-            .overflow_y_scroll()
-            .child(content)
-            .into_any_element()
-    }
-
-    fn render_flash(&self, cx: &mut Context<Self>) -> AnyElement {
-        let root_line: AnyElement = match &self.root_status {
-            None => div()
-                .text_sm()
-                .text_color(rgb(theme::TEXT_DIM))
-                .child("Root status unknown — run a check.")
-                .into_any_element(),
-            Some(rs) => {
-                let (color, text) = if rs.is_rooted {
-                    (
-                        theme::OK,
-                        format!(
-                            "Rooted via {}{}",
-                            rs.method.label(),
-                            rs.magisk_version
-                                .as_ref()
-                                .map(|v| format!(" (Magisk {v})"))
-                                .unwrap_or_default()
-                        ),
-                    )
-                } else {
-                    (theme::WARN, "Not rooted".to_string())
-                };
-                div()
-                    .text_sm()
-                    .text_color(rgb(color))
-                    .child(text)
-                    .into_any_element()
-            }
-        };
-
-        let reboots = RebootTarget::all().iter().fold(
-            div().flex().flex_row().flex_wrap().gap_2(),
-            |row, &target| {
-                let id: &'static str = target.label();
-                row.child(self.button(
-                    id,
-                    target.label(),
-                    theme::BG_ELEV,
-                    theme::TEXT,
-                    cx,
-                    move |this, _cx| this.reboot(target),
-                ))
+        let m2 = mirror.clone();
+        let bounds = Bounds::centered(None, size(px(w), px(h)), cx);
+        let opened = cx.open_window(
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                titlebar: Some(TitlebarOptions {
+                    title: Some(title.into()),
+                    ..Default::default()
+                }),
+                window_min_size: Some(size(px(240.), px(320.))),
+                ..Default::default()
             },
+            |_, cx| cx.new(|_| DetachedRoot::new(m2)),
         );
-
-        let fastboot_cmds = [
-            ("fb-unlock", "Unlock Bootloader", FastbootCommand::OemUnlock),
-            ("fb-lock", "Lock Bootloader", FastbootCommand::OemLock),
-            ("fb-wipe", "Wipe Data", FastbootCommand::WipeData),
-            ("fb-reboot", "Fastboot Reboot", FastbootCommand::Reboot),
-            ("fb-getvar", "Get Variables", FastbootCommand::GetVarAll),
-        ];
-        let mut fb_row = div().flex().flex_row().flex_wrap().gap_2();
-        for (id, label, cmd) in fastboot_cmds {
-            let destructive = cmd.is_destructive();
-            let (bg, fg) = if destructive {
-                (theme::DANGER, 0xffffff)
-            } else {
-                (theme::BG_ELEV, theme::TEXT)
-            };
-            let cmd_clone = cmd.clone();
-            fb_row = fb_row.child(self.button(id, label, bg, fg, cx, move |this, _cx| {
-                this.fastboot(cmd_clone.clone())
-            }));
+        let Ok(handle) = opened else { return };
+        mirror.update(cx, |m, cx| m.set_chrome(Chrome::Compact, true, cx));
+        let ser = serial.to_string();
+        let sub = handle
+            .entity(cx)
+            .ok()
+            // Window closed by any means (close button, Cmd+W, …) → re-embed.
+            .map(|root| {
+                cx.observe_release(&root, move |this, _root, cx| {
+                    this.on_detached_closed(&ser, cx)
+                })
+            });
+        if let Some(d) = self.fleet.get_mut(serial) {
+            d.detach_subs.extend(sub);
+            d.detached = Some(handle);
         }
-
-        panel_container(Panel::Flash)
-            .child(
-                div()
-                    .text_xl()
-                    .text_color(rgb(theme::TEXT))
-                    .child("Flash & Root"),
-            )
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .child(self.button(
-                        "root-check",
-                        "Check Root",
-                        theme::ACCENT_DIM,
-                        0xffffff,
-                        cx,
-                        |this, _cx| this.detect_root(),
-                    ))
-                    .child(self.button(
-                        "remount",
-                        "Remount RW",
-                        theme::BG_ELEV,
-                        theme::TEXT,
-                        cx,
-                        |this, _cx| {
-                            this.busy_label = Some("Remount".into());
-                            this.worker.send(WorkerRequest::Remount);
-                        },
-                    ))
-                    .child(root_line),
-            )
-            .child(Self::section_title("Reboot into"))
-            .child(reboots)
-            .child(Self::section_title(
-                "Fastboot (device must be in bootloader)",
-            ))
-            .child(fb_row)
-            .child(Self::section_title("Custom ROM (one-stop flash)"))
-            .child(self.render_rom_flash(cx))
-            .child(self.render_output())
-            .into_any_element()
+        let _ = handle.update(cx, |_, w, _| w.activate_window());
     }
 
-    /// The custom-ROM catalog + download + guided flash UI.
-    fn render_rom_flash(&self, cx: &mut Context<Self>) -> AnyElement {
-        let mut col = div().flex().flex_col().gap_2();
-
-        // Detect / status row.
-        let device_line = match &self.profile {
-            Some(p) => format!(
-                "{}  •  bootloader {}",
-                p.display(),
-                match p.bootloader_unlocked {
-                    Some(true) => "unlocked",
-                    Some(false) => "LOCKED",
-                    None => "unknown",
-                }
-            ),
-            None => "No device scanned yet.".to_string(),
+    fn on_detached_closed(&mut self, serial: &str, cx: &mut Context<Self>) {
+        let Some(d) = self.fleet.get_mut(serial) else {
+            return;
         };
-        col = col.child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(self.button(
-                    "rom-detect",
-                    "Find ROMs for this device",
-                    theme::ACCENT_DIM,
-                    0xffffff,
-                    cx,
-                    |this, _cx| this.detect_roms(),
-                ))
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(rgb(theme::TEXT_DIM))
-                        .child(device_line),
-                ),
-        );
-
-        if let Some(s) = &self.rom_status {
-            col = col.child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(theme::TEXT_DIM))
-                    .child(s.clone()),
-            );
-        }
-
-        // Download progress.
-        if let Some(p) = &self.download_progress {
-            let pct = p
-                .fraction()
-                .map(|f| format!("{:.0}%", f * 100.0))
-                .unwrap_or_else(|| format!("{} bytes", p.downloaded));
-            col = col.child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(theme::ACCENT))
-                    .child(format!("Downloading… {pct}")),
-            );
-        }
-
-        // ROM build list (only shown until a flash session exists).
-        if self.flash_session.is_none() {
-            for (i, build) in self.rom_builds.iter().take(12).enumerate() {
-                let label = format!(
-                    "{} {}  •  Android {}  •  {}{}",
-                    build.os.label(),
-                    build.version,
-                    build.android_version,
-                    build.build_date.clone().unwrap_or_default(),
-                    build
-                        .size_bytes
-                        .map(|b| format!("  •  {} MB", b / 1_000_000))
-                        .unwrap_or_default(),
-                );
-                let build_clone = build.clone();
-                col = col.child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .gap_2()
-                        .px_2()
-                        .py_1()
-                        .rounded_md()
-                        .bg(rgb(theme::BG_ELEV))
-                        .child(div().text_sm().text_color(rgb(theme::TEXT)).child(label))
-                        .child(self.button(
-                            ("rom-dl", i),
-                            "Download",
-                            theme::ACCENT_DIM,
-                            0xffffff,
-                            cx,
-                            move |this, _cx| this.download_build(&build_clone),
-                        )),
-                );
+        if d.detached.take().is_some() {
+            d.detach_subs.clear();
+            if let Some(m) = &d.mirror {
+                m.update(cx, |m, cx| m.set_chrome(Chrome::Full, false, cx));
             }
+            cx.notify();
         }
-
-        // Flash session (plan + guided execution).
-        if let Some(session) = &self.flash_session {
-            let (done, total) = session.progress();
-            col = col.child(
-                div()
-                    .text_sm()
-                    .text_color(rgb(theme::TEXT))
-                    .child(format!("Flash plan — {done}/{total} steps done")),
-            );
-            for (i, step) in session.plan.steps.iter().enumerate() {
-                let (icon, color) = match &session.statuses[i] {
-                    StepStatus::Pending => ("○", theme::TEXT_FAINT),
-                    StepStatus::Running => ("◐", theme::WARN),
-                    StepStatus::Done => ("✔", theme::OK),
-                    StepStatus::Failed(_) => ("✗", theme::ERR),
-                };
-                col = col.child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(div().text_sm().text_color(rgb(color)).child(icon))
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(rgb(theme::TEXT))
-                                .child(step.label()),
-                        )
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(rgb(theme::TEXT_FAINT))
-                                .child(step.description()),
-                        ),
-                );
-            }
-
-            // Next-step action, with consent styling for destructive steps.
-            if let Some((_, step)) = session.next_step() {
-                let destructive = step.requires_confirmation();
-                let (bg, fg, verb) = if destructive {
-                    (theme::DANGER, 0xffffff, "⚠ Confirm & run")
-                } else {
-                    (theme::ACCENT_DIM, 0xffffff, "Run")
-                };
-                let label = format!("{verb}: {}", step.label());
-                col = col.child(
-                    self.button("rom-flash-next", label, bg, fg, cx, |this, _cx| {
-                        this.run_next_flash_step()
-                    }),
-                );
-            } else if session.is_complete() {
-                col = col.child(
-                    div()
-                        .text_sm()
-                        .text_color(rgb(theme::OK))
-                        .child("✅ Flash complete — device rebooting into the new ROM."),
-                );
-            }
-        }
-
-        col.into_any_element()
     }
 
-    fn render_logs(&self, cx: &mut Context<Self>) -> AnyElement {
-        let toolbar = div()
-            .flex()
-            .items_center()
-            .gap_2()
-            .child(self.button(
-                "log-toggle",
-                if self.log_streaming { "Stop" } else { "Start" },
-                if self.log_streaming {
-                    theme::DANGER
-                } else {
-                    theme::ACCENT_DIM
-                },
-                0xffffff,
-                cx,
-                |this, _cx| this.toggle_log_stream(),
-            ))
-            .child(self.button(
-                "log-clear",
-                "Clear",
-                theme::BG_ELEV,
-                theme::TEXT,
-                cx,
-                |this, _cx| this.log_entries.clear(),
-            ))
-            .child(self.button(
-                "log-level",
-                format!("Level ≥ {}", self.log_filter.min_level.as_char()),
-                theme::BG_ELEV,
-                theme::TEXT,
-                cx,
-                |this, _cx| this.log_filter.cycle_level(),
-            ))
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(theme::TEXT_DIM))
-                    .child(format!("{} lines", self.log_entries.len())),
-            );
-
-        // Filtered, capped, newest-last.
-        let mut rows: Vec<AnyElement> = Vec::new();
-        for entry in self
-            .log_entries
-            .iter()
-            .filter(|e| self.log_filter.matches(e))
-        {
-            rows.push(log_row(entry));
-        }
-        let start = rows.len().saturating_sub(MAX_VISIBLE_LOGS);
-        let visible = rows.split_off(start);
-
-        let list = div()
-            .id("log-list")
-            .flex()
-            .flex_col()
-            .w_full()
-            .flex_grow()
-            .mt_2()
-            .p_2()
-            .rounded_md()
-            .bg(rgb(theme::BG))
-            .border_1()
-            .border_color(rgb(theme::BORDER))
-            .overflow_y_scroll()
-            .children(visible);
-
-        panel_container(Panel::Logs)
-            .child(
-                div()
-                    .text_xl()
-                    .text_color(rgb(theme::TEXT))
-                    .child("Live Logs"),
-            )
-            .child(toolbar)
-            .child(list)
-            .into_any_element()
-    }
-
-    fn render_screen(&self, cx: &mut Context<Self>) -> AnyElement {
-        let st = self.screen.state();
-        let running = self.screen.is_running();
-
-        let toolbar = div()
-            .flex()
-            .items_center()
-            .gap_2()
-            .child(self.button(
-                "screen-toggle",
-                if running {
-                    "Stop Mirror"
-                } else {
-                    "Start Mirror"
-                },
-                if running {
-                    theme::DANGER
-                } else {
-                    theme::ACCENT_DIM
-                },
-                0xffffff,
-                cx,
-                |this, _cx| this.toggle_screen(),
-            ))
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(theme::TEXT_DIM))
-                    .child(format!("{:.1} fps · {} frames", st.fps, st.frame_count)),
-            );
-
-        let view: AnyElement = match (&st.latest_path, &st.error) {
-            (Some(path), _) => img(path.clone())
-                .max_h(px(640.))
-                .rounded_md()
-                .into_any_element(),
-            (None, Some(err)) => empty_state("Capture error", err),
-            (None, None) if running => empty_state("Waiting for first frame…", ""),
-            _ => empty_state(
-                "Screen mirror stopped",
-                "Start the mirror to stream the device screen.",
-            ),
+    /// Close the detached window and re-embed the view in the Screen tab.
+    pub(crate) fn attach(&mut self, serial: &str, cx: &mut Context<Self>) {
+        let Some(d) = self.fleet.get_mut(serial) else {
+            return;
         };
+        let Some(handle) = d.detached.take() else {
+            return;
+        };
+        d.detach_subs.clear();
+        if let Some(m) = &d.mirror {
+            m.update(cx, |m, cx| m.set_chrome(Chrome::Full, false, cx));
+        }
+        let _ = handle.update(cx, |_, w, _| w.remove_window());
+        self.open_device(serial, Tab::Screen, cx);
+        cx.notify();
+    }
 
-        panel_container(Panel::Screen)
-            .child(div().text_xl().text_color(rgb(theme::TEXT)).child("Screen"))
-            .child(toolbar)
-            .child(
-                div()
-                    .flex()
-                    .justify_center()
-                    .items_center()
-                    .w_full()
-                    .flex_grow()
-                    .mt_2()
-                    .child(view),
-            )
-            .into_any_element()
+    pub(crate) fn toggle_detach(&mut self, serial: &str, cx: &mut Context<Self>) {
+        let detached = self.fleet.get(serial).is_some_and(|d| d.detached.is_some());
+        if detached {
+            self.attach(serial, cx);
+        } else {
+            self.detach(serial, cx);
+        }
     }
 }
 
+/// Build a flash session for a downloaded ROM zip, honouring the detected
+/// bootloader-lock state.
+fn build_flash_session(d: &mut DeviceState, rom_zip: std::path::PathBuf) {
+    let mut opts = match d.pending_method {
+        Some(InstallMethod::FastbootFactory) => FlashOptions::factory(rom_zip),
+        _ => FlashOptions::new(rom_zip),
+    };
+    if d.profile.as_ref().and_then(|p| p.bootloader_unlocked) == Some(false) {
+        opts.unlock_bootloader = true;
+    }
+    d.flash_session = Some(FlashSession::new(build_plan(&opts), d.serial.clone()));
+}
+
 impl Render for DroidGui {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let content = match self.active {
-            Panel::Dashboard => self.render_dashboard(cx),
-            Panel::Logs => self.render_logs(cx),
-            Panel::Commands => self.render_commands(cx),
-            Panel::Flash => self.render_flash(cx),
-            Panel::Screen => self.render_screen(cx),
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let route = self.fleet.resolve(&self.route);
+        let vp = window.viewport_size();
+        let lay = crate::layout::Layout::new(f32::from(vp.width), f32::from(vp.height));
+        let content = match &route {
+            Route::Devices => self.render_devices(&lay, cx),
+            Route::Device(s) => self.render_workspace(s, &lay, cx),
+            Route::Settings => self.render_settings(),
         };
 
         div()
@@ -1078,102 +591,12 @@ impl Render for DroidGui {
             .bg(rgb(theme::BG))
             .text_color(rgb(theme::TEXT))
             .font_family("sans-serif")
-            .child(self.render_nav(cx))
-            .child(content)
-    }
-}
-
-// ── free helpers ───────────────────────────────────────────────────────────
-
-fn panel_container(_panel: Panel) -> gpui::Div {
-    div()
-        .flex()
-        .flex_col()
-        .gap_3()
-        .size_full()
-        .p_4()
-        .overflow_hidden()
-}
-
-fn empty_state(title: &str, subtitle: &str) -> AnyElement {
-    div()
-        .flex()
-        .flex_col()
-        .items_center()
-        .justify_center()
-        .gap_2()
-        .size_full()
-        .child(
-            div()
-                .text_lg()
-                .text_color(rgb(theme::TEXT_DIM))
-                .child(title.to_string()),
-        )
-        .child(
-            div()
-                .text_sm()
-                .text_color(rgb(theme::TEXT_FAINT))
-                .child(subtitle.to_string()),
-        )
-        .into_any_element()
-}
-
-fn log_row(entry: &LogEntry) -> AnyElement {
-    let mut row = div().flex().flex_row().gap_2().py(px(1.));
-
-    row = row.child(
-        div()
-            .w(px(14.))
-            .text_xs()
-            .text_color(theme::level_color(entry.level))
-            .child(entry.level.as_char().to_string()),
-    );
-
-    if let Some(tag) = &entry.tag {
-        row = row.child(
-            div()
-                .min_w(px(120.))
-                .max_w(px(180.))
-                .text_xs()
-                .text_color(theme::tag_color(tag))
-                .overflow_hidden()
-                .child(tag.clone()),
-        );
-    }
-
-    row.child(
-        div()
-            .flex_grow()
-            .font_family("monospace")
-            .text_xs()
-            .text_color(theme::level_color(entry.level))
-            .child(entry.message.clone()),
-    )
-    .into_any_element()
-}
-
-fn nonempty(s: &str, fallback: &str) -> String {
-    if s.trim().is_empty() {
-        fallback.to_string()
-    } else {
-        s.to_string()
-    }
-}
-
-fn battery_color(pct: u8) -> u32 {
-    if pct >= 50 {
-        theme::OK
-    } else if pct >= 20 {
-        theme::WARN
-    } else {
-        theme::ERR
-    }
-}
-
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        s.to_string()
-    } else {
-        format!("{}…\n[truncated]", &s[..max])
+            .on_action(cx.listener(|this, _: &ToggleDetach, _w, cx| {
+                if let Some(s) = this.fleet.open_serial(&this.route) {
+                    this.toggle_detach(&s, cx);
+                }
+            }))
+            .child(self.render_nav(&route, &lay, cx))
+            .child(div().flex_1().min_w_0().h_full().child(content))
     }
 }
