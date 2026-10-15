@@ -4,6 +4,10 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Release](https://github.com/sorinirimies/droidkraft/actions/workflows/release.yml/badge.svg)](https://github.com/sorinirimies/droidkraft/actions/workflows/release.yml)
 [![CI](https://github.com/sorinirimies/droidkraft/actions/workflows/ci.yml/badge.svg)](https://github.com/sorinirimies/droidkraft/actions/workflows/ci.yml)
+[![TUI installs](https://img.shields.io/crates/d/droidkraft-tui?label=droidkraft-tui%20installs&logo=rust&color=orange)](https://crates.io/crates/droidkraft-tui)
+[![GUI installs](https://img.shields.io/crates/d/droidkraft-gui?label=droidkraft-gui%20installs&logo=rust&color=orange)](https://crates.io/crates/droidkraft-gui)
+[![Audit](https://github.com/sorinirimies/droidkraft/actions/workflows/security.yml/badge.svg)](https://github.com/sorinirimies/droidkraft/actions/workflows/security.yml)
+[![Fuzz](https://github.com/sorinirimies/droidkraft/actions/workflows/fuzz.yml/badge.svg)](https://github.com/sorinirimies/droidkraft/actions/workflows/fuzz.yml)
 
 **Everything for your Android devices, in pure Rust.** A device-centric toolkit
 with a **terminal UI**, a **GPU desktop app** and reusable **libraries**. No
