@@ -139,10 +139,16 @@ impl DroidGui {
                         .flex_1()
                         .min_w_0()
                         .overflow_hidden()
-                        .child(div().text_sm().child(ellipsize(&d.display_name(), name_n)))
+                        .child(
+                            div()
+                                .text_sm()
+                                .whitespace_nowrap()
+                                .child(ellipsize(&d.display_name(), name_n)),
+                        )
                         .child(
                             div()
                                 .text_xs()
+                                .whitespace_nowrap()
                                 .text_color(rgb(theme::TEXT_FAINT))
                                 .child(ellipsize(&d.serial, serial_n)),
                         ),

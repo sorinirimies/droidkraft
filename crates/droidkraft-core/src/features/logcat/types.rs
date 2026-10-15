@@ -245,7 +245,7 @@ impl LogEntry {
             return None;
         }
         let level = LogLevel::from_char(level_char);
-        let rest = &line[2..];
+        let rest = &line[level_char.len_utf8() + 1..];
 
         let paren_open = rest.find('(')?;
         let tag = rest[..paren_open].to_string();
@@ -505,5 +505,13 @@ mod tests {
         let msg = "word ".repeat(40);
         let lines = wrap_entry_message(msg.trim(), 40, 4);
         assert!(lines.len() > 1);
+    }
+
+    #[test]
+    fn parse_brief_multibyte_level_does_not_panic() {
+        // Found by `cargo fuzz run log_entry`: a multibyte first char used to
+        // slice inside a UTF-8 sequence.
+        let _ = LogEntry::parse("\u{10d836}/(\0o)\0");
+        let _ = LogEntry::parse("é/tag(1): msg");
     }
 }

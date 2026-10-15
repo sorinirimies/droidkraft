@@ -2,3 +2,8 @@
 
 # CodeGraph index
 .codegraph/
+
+# cargo-fuzz
+fuzz/target/
+fuzz/artifacts/
+fuzz/corpus/

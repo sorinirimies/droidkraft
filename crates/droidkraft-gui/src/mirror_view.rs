@@ -105,7 +105,9 @@ impl MirrorView {
                             cx.notify();
                         }
                     } else if seq == 0 && this.shown.is_some() {
-                        this.shown = None;
+                        if let Some((_, old)) = this.shown.take() {
+                            cx.drop_image(old, None);
+                        }
                         cx.notify();
                     }
                 });

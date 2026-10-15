@@ -164,11 +164,11 @@ release version: check-all check-git-cliff check-nu
     @echo "✅ Release v{{version}} pushed — GitHub Actions will handle the rest."
 
 # Full automated release to Gitea only.
-release-gitea version: check-all check-git-cliff check-nu
+release-gitea-starscream version: check-all check-git-cliff check-nu
     nu scripts/bump_version.nu --yes {{version}}
     @echo "Pushing branch and tag to Gitea..."
-    git push gitea "$(git branch --show-current)"
-    git push gitea v{{version}}
+    git push gitea-starscream "$(git branch --show-current)"
+    git push gitea-starscream v{{version}}
     @echo "✅ Release v{{version}} pushed to Gitea."
 
 # Full automated release to both GitHub and Gitea.
@@ -176,9 +176,9 @@ release-all version: check-all check-git-cliff check-nu
     nu scripts/bump_version.nu --yes {{version}}
     @echo "Pushing branch and tag to GitHub and Gitea..."
     git push origin "$(git branch --show-current)"
-    git push gitea "$(git branch --show-current)"
+    git push gitea-starscream "$(git branch --show-current)"
     git push origin v{{version}}
-    git push gitea v{{version}}
+    git push gitea-starscream v{{version}}
     @echo "✅ Release v{{version}} pushed to both remotes."
 
 # ── Application ───────────────────────────────────────────────────────────────
@@ -228,6 +228,8 @@ vhs-check:
 # ── Git helpers ───────────────────────────────────────────────────────────────
 
 # Show current git remotes
+REMOTES := "origin gitea-starscream"
+
 remotes:
     @echo "Configured git remotes:"
     @git remote -v
@@ -235,7 +237,7 @@ remotes:
 # Add a Gitea remote (usage: just setup-gitea https://gitea.example.com/user/repo.git)
 setup-gitea url:
     git remote add gitea {{url}}
-    @echo "✅ Gitea remote added! Test with: git push gitea main"
+    @echo "✅ Gitea remote added! Test with: git push gitea-starscream main"
 
 # Commit all staged changes
 commit message:
@@ -247,14 +249,14 @@ pull:
     git pull origin "$(git branch --show-current)"
 
 # Pull from Gitea
-pull-gitea:
-    git pull gitea "$(git branch --show-current)"
+pull-gitea-starscream:
+    git pull gitea-starscream "$(git branch --show-current)"
 
 # Pull from both remotes
 pull-all:
     #!/usr/bin/env sh
     failed=""; ok_=""; skipped=""
-    for r in origin gitea; do
+    for r in {{REMOTES}}; do
         if ! git remote get-url "$r" >/dev/null 2>&1; then
             echo "↷ skipping $r (not configured here; add with: git remote add $r <url>)"
             skipped="$skipped $r"; continue
@@ -272,14 +274,14 @@ push:
     git push origin "$(git branch --show-current)"
 
 # Push to Gitea
-push-gitea:
-    git push gitea "$(git branch --show-current)"
+push-gitea-starscream:
+    git push gitea-starscream "$(git branch --show-current)"
 
 # Push to both GitHub and Gitea
 push-all:
     #!/usr/bin/env sh
     failed=""; ok_=""; skipped=""
-    for r in origin gitea; do
+    for r in {{REMOTES}}; do
         if ! git remote get-url "$r" >/dev/null 2>&1; then
             echo "↷ skipping $r (not configured here; add with: git remote add $r <url>)"
             skipped="$skipped $r"; continue
@@ -300,7 +302,7 @@ push-tags:
 push-tags-all:
     #!/usr/bin/env sh
     failed=""; ok_=""; skipped=""
-    for r in origin gitea; do
+    for r in {{REMOTES}}; do
         if ! git remote get-url "$r" >/dev/null 2>&1; then
             echo "↷ skipping $r (not configured here; add with: git remote add $r <url>)"
             skipped="$skipped $r"; continue
@@ -314,9 +316,9 @@ push-tags-all:
     if [ -n "$failed" ]; then echo "⚠️  Failed:$failed"; exit 1; fi
 
 # Force-sync Gitea from GitHub
-sync-gitea:
-    git push gitea "$(git branch --show-current)" --force
-    git push gitea --tags --force
+sync-gitea-starscream:
+    git push gitea-starscream "$(git branch --show-current)" --force
+    git push gitea-starscream --tags --force
     @echo "✅ Gitea synced!"
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
@@ -363,10 +365,59 @@ view-changelog:
 
 # ── Security ──────────────────────────────────────────────────────────────────
 
-# Run cargo-deny checks
+# ── Security ──────────────────────────────────────────────────────────────────
+
+# Run cargo-deny checks (advisories, licenses, bans, sources)
 deny:
     cargo deny check
 
-# Run cargo-audit
+# Run cargo-audit (RustSec advisories against Cargo.lock)
 audit:
     cargo audit
+
+# Full security gate: audit + deny
+security: audit deny
+
+# ── Fuzzing (needs nightly + `cargo install cargo-fuzz`) ──────────────────────
+
+# List fuzz targets
+fuzz-list:
+    cargo +nightly fuzz list
+
+# Fuzz one target: just fuzz log_entry [secs]
+fuzz target="log_entry" secs="60":
+    cargo +nightly fuzz run {{target}} -- -max_total_time={{secs}}
+
+# Short fuzz run of every target (CI smoke)
+fuzz-smoke secs="10":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for t in $(cargo +nightly fuzz list); do
+        echo "== $t"
+        cargo +nightly fuzz run "$t" -- -max_total_time={{secs}}
+    done
+
+# Check the fuzz crate compiles (stable, no fuzzing)
+fuzz-check:
+    cd fuzz && cargo check --bins
+
+# ── Memory / leak checks ──────────────────────────────────────────────────────
+
+# TUI soak: drive the Screen tab in a pty and sample RSS (needs a device). just soak-tui 120
+soak-tui secs="60":
+    cargo build --release -p droidkraft-tui
+    python3 scripts/soak_tui.py {{secs}}
+
+# GUI soak: sample RSS of the running GUI every 10s. just soak-gui 120
+soak-gui secs="60":
+    cargo build -p droidkraft
+    bash scripts/soak_gui.sh {{secs}}
+
+# macOS: report leaked allocations in a running process (leaks <name>). just leaks droidkraft-tui
+leaks name="droidkraft-tui":
+    leaks {{name}} | tail -40
+
+# macOS: heap summary of a running process. just heap droidkraft
+heap name="droidkraft":
+    heap {{name}} | head -40
+

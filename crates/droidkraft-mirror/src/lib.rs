@@ -23,7 +23,7 @@ use std::io::{self, Read, Write};
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -32,6 +32,8 @@ use image::{ImageFormat, RgbaImage};
 
 /// Longest edge (px) of the mirrored video; larger is sharper but heavier.
 const MAX_HEIGHT: u32 = 1280;
+/// Max queued input commands (taps/moves) before new ones are dropped.
+const INPUT_QUEUE: usize = 512;
 /// H.264 bitrate requested from `screenrecord`.
 const BIT_RATE: &str = "16M";
 /// `screenrecord` hard-stops after 180 s; we restart seamlessly.
@@ -71,7 +73,7 @@ pub struct ScreenStream {
     running: Arc<AtomicBool>,
     generation: Arc<AtomicU64>,
     state: Arc<Mutex<ScreenState>>,
-    input: Arc<Mutex<Option<Sender<String>>>>,
+    input: Arc<Mutex<Option<SyncSender<String>>>>,
 }
 
 impl Default for ScreenStream {
@@ -120,7 +122,8 @@ impl ScreenStream {
             last_video_ms: Arc::new(AtomicU64::new(0)),
             video_seq: Arc::new(AtomicU64::new(0)),
         };
-        let (tx, rx) = channel::<String>();
+        // Bounded: if adb falls behind, drop input instead of queuing forever.
+        let (tx, rx) = sync_channel::<String>(INPUT_QUEUE);
         if let Ok(mut i) = self.input.lock() {
             *i = Some(tx);
         }
@@ -142,7 +145,7 @@ impl ScreenStream {
     fn send(&self, line: String) {
         if let Ok(i) = self.input.lock() {
             if let Some(tx) = i.as_ref() {
-                let _ = tx.send(line);
+                let _ = tx.try_send(line);
             }
         }
     }

@@ -1,0 +1,53 @@
+[package]
+name = "droidkraft-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+droidkraft-core = { path = "../crates/droidkraft-core" }
+droidkraft-fastboot = { path = "../crates/droidkraft-fastboot" }
+droidkraft-mirror = { path = "../crates/droidkraft-mirror" }
+
+# Not part of the main workspace (needs nightly + cargo-fuzz).
+[workspace]
+
+[[bin]]
+name = "log_entry"
+path = "fuzz_targets/log_entry.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzzy_match"
+path = "fuzz_targets/fuzzy_match.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "parse_variables"
+path = "fuzz_targets/parse_variables.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "parse_meminfo"
+path = "fuzz_targets/parse_meminfo.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "rom_json"
+path = "fuzz_targets/rom_json.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "mirror_text"
+path = "fuzz_targets/mirror_text.rs"
+test = false
+doc = false

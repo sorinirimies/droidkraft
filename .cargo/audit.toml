@@ -1,4 +1,8 @@
 # cargo-audit configuration. Vulnerabilities always fail; unsound/unmaintained
 # are reported as warnings.
 [advisories]
-ignore = []   # add "RUSTSEC-YYYY-NNNN" with a justification comment
+ignore = [
+    # rsa Marvin attack: no fixed release. Pulled in by adb_client for ADB
+    # key signing; local-only use, no remote decryption oracle is exposed.
+    "RUSTSEC-2023-0071",
+]
