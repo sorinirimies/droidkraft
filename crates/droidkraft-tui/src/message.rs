@@ -1,153 +1,25 @@
-use crate::menu::MenuCommand;
-use ratatui::crossterm::event::KeyEvent;
+//! Messages (input to `update`) and commands (side effects requested by it).
 
-/// Messages represent all possible actions/events in the application
-/// This follows the Elm architecture pattern for clear state transitions
-#[derive(Debug, Clone)]
+use crossterm::event::{KeyEvent, MouseEvent};
+
+use crate::worker::{Req, Res};
+
 pub enum Message {
-    // Navigation messages
-    MenuUp,
-    MenuDown,
-    EnterChild,
-    ExitChild,
-    /// Jump to the first item of the next section (Tab).
-    SectionNext,
-    /// Jump to the first item of the previous section (Shift+Tab).
-    SectionPrev,
-    /// Refresh the live device status bar (r key).
-    RefreshDeviceInfo,
-    /// Cycle to the next connected device (d key).
-    NextDevice,
-    /// Background device watcher pushed a fresh status snapshot.
-    DeviceStatusUpdate(crate::adb::DeviceStatus),
-
-    // Command execution
-    ExecuteCommand(MenuCommand),
-    CommandStarted,
-    CommandCompleted(CommandResult),
-
-    // Scroll messages for result view
-    ScrollUp,
-    ScrollDown,
-    ScrollPageUp,
-    ScrollPageDown,
-    ScrollToTop,
-    ScrollToBottom,
-
-    // Custom-ROM flasher messages
-    OpenRomFlash,
-    CloseRomFlash,
-    RomDetect,
-    RomSelectUp,
-    RomSelectDown,
-    RomDownload,
-    /// Run the next flash step (non-destructive; destructive needs RomConfirmStep).
-    RomRunStep,
-    /// Explicitly confirm and run a destructive flash step.
-    RomConfirmStep,
-
-    // Logcat messages
-    OpenLogcat,
-    LogcatScrollUp,
-    LogcatScrollDown,
-    LogcatScrollPageUp,
-    LogcatScrollPageDown,
-    LogcatScrollToTop,
-    LogcatScrollToBottom,
-    LogcatTogglePause,
-    LogcatClear,
-    LogcatCycleLevel,
-    LogcatToggleSearch,
-    LogcatToggleTagFilter,
-    LogcatTogglePackageFilter,
-    LogcatSearchInput(char),
-    LogcatSearchBackspace,
-    LogcatSearchDelete,
-    LogcatCursorLeft,
-    LogcatCursorRight,
-    LogcatExitFilter,
-    LogcatSave,
-    LogcatSaveFilteredOnly,
-    LogcatToggleWordWrap,
-    LogcatFileSaved(String),
-    LogcatFileExplorerKey(KeyEvent),
-    LogcatCancelSave,
-    LogcatSaveAs,
-    // Logcat feature messages
-    LogcatToggleRegex,
-    LogcatToggleExclude,
-    LogcatToggleCompact,
-    LogcatToggleDetail,
-    LogcatBookmarkToggle,
-    LogcatBookmarkNext,
-    LogcatBookmarkPrev,
-    LogcatHScrollLeft,
-    LogcatHScrollRight,
-    LogcatHScrollReset,
-    LogcatCopyLine,
-    LogcatToggleFold,
-    LogcatSelectUp,
-    LogcatSelectDown,
-    CloseLogcat,
-
-    // Dev Tools messages
-    OpenDevMode,
-    CloseDevMode,
-    DevBuild,
-    DevBuildAndInstall,
-    DevRun,
-    DevCycleFocus,
-    DevToggleEditorPicker,
-    DevEditorUp,
-    DevEditorDown,
-    DevEditorConfirm,
-    DevToggleVariantPicker,
-    DevNextVariant,
-    DevPrevVariant,
-    DevFileExplorerKey(ratatui::crossterm::event::KeyEvent),
-    DevOpenFile,
-
-    // Theme messages
-    ToggleThemeSelector,
-    ThemeNext,
-    ThemePrev,
-    ThemeApply,
-
-    // Application lifecycle
+    Key(KeyEvent),
+    Mouse(MouseEvent),
     Tick,
+    Worker(Res),
+}
+
+/// Side effects the app loop executes after `update`.
+pub enum Cmd {
+    Worker(Req),
     Quit,
-    ReturnToMenu,
-
-    // UI state
-    SkipStartup,
-}
-
-/// Result of command execution
-#[derive(Debug, Clone)]
-pub enum CommandResult {
-    Success(String),
-    Error(String),
-}
-
-impl Message {
-    /// Check if this message should trigger a state transition
-    pub fn is_state_changing(&self) -> bool {
-        matches!(
-            self,
-            Message::ExecuteCommand(_)
-                | Message::CommandStarted
-                | Message::CommandCompleted(_)
-                | Message::Quit
-                | Message::ReturnToMenu
-                | Message::EnterChild
-                | Message::ExitChild
-                | Message::SkipStartup
-                | Message::OpenLogcat
-                | Message::CloseLogcat
-                | Message::OpenDevMode
-                | Message::CloseDevMode
-                | Message::LogcatSave
-                | Message::LogcatCancelSave
-        )
-    }
+    /// Reveal/open a file or folder with the OS handler.
+    Open(std::path::PathBuf),
+    /// Spawn the external GUI mirror window.
+    Mirror {
+        serial: Option<String>,
+        size: Option<(u32, u32)>,
+    },
 }

@@ -21,17 +21,25 @@ name = "droidkraft-tui"
 path = "src/main.rs"
 
 [dependencies]
-droidkraft-core = { workspace = true }
+droidkraft-core   = { workspace = true }
+droidkraft-mirror = { workspace = true }
+droidkraft-fastboot = { workspace = true }
 
 crossterm         = { workspace = true }
-futures           = { workspace = true }
 ratatui           = { workspace = true }
+ratatui-image     = { workspace = true }
 tokio             = { workspace = true }
 color-eyre        = { workspace = true }
-tachyonfx         = { workspace = true }
-ratatui-widgets   = { workspace = true }
+futures           = { workspace = true }
 tui-file-explorer = { workspace = true }
+tui-nuances       = { workspace = true }
+tui-chart         = { workspace = true }
+tui-piechart      = { workspace = true }
+tui-spinner       = { workspace = true }
+tui-slider        = { workspace = true }
+tui-checkbox      = { workspace = true }
 regex             = { workspace = true }
 serde             = { workspace = true }
 serde_json        = { workspace = true }
 adb_client        = { workspace = true }
+image             = { version = "0.25", default-features = false, features = ["jpeg", "png"] }

@@ -1,38 +1,23 @@
-use crate::app::App;
-
-pub mod adb;
-pub mod app;
-pub mod devtools;
-pub mod effects;
-pub mod event;
-pub mod fastboot;
-pub mod logcat;
-pub mod menu;
-pub mod message;
-pub mod model;
-pub mod rom_flash;
-pub mod theme;
-pub mod update;
-pub mod view;
+use droidkraft_tui::cli::{self, Action};
+use droidkraft_tui::{app::App, logcat, mirror_cmd};
 
 fn print_usage() {
-    eprintln!("Usage: droidkraft [OPTIONS]");
-    eprintln!();
-    eprintln!("Options:");
-    eprintln!("  --query              Stream logcat as JSON lines to stdout (no TUI)");
-    eprintln!("  --query --last N     Dump the last N logcat lines as JSON and exit");
-    eprintln!("  --query --level L    Filter by minimum level: V, D, I, W, E, F");
-    eprintln!("  --query --tag TAG    Filter by tag substring");
-    eprintln!("  --query --grep PAT   Filter by message substring");
-    eprintln!("  --help               Show this help message");
-    eprintln!();
-    eprintln!("Examples:");
-    eprintln!("  droidkraft                              # Launch the TUI");
-    eprintln!("  droidkraft --query                      # Stream live logcat as JSONL");
-    eprintln!("  droidkraft --query --last 500            # Dump last 500 lines as JSONL");
-    eprintln!("  droidkraft --query --level E             # Stream only errors");
-    eprintln!("  droidkraft --query --tag MyApp           # Stream only tag matching 'MyApp'");
-    eprintln!(
+    println!("Logcat query options (with --query):");
+    println!("  --query              Stream logcat as JSON lines to stdout (no TUI)");
+    println!("  --query --last N     Dump the last N logcat lines as JSON and exit");
+    println!("  --query --level L    Filter by minimum level: V, D, I, W, E, F");
+    println!("  --query --tag TAG    Filter by tag substring");
+    println!("  --query --grep PAT   Filter by message substring");
+    println!("  --version            Print version");
+    println!("  --help               Show this help message");
+    println!();
+    println!("Examples:");
+    println!("  droidkraft                              # Launch the TUI");
+    println!("  droidkraft --query                      # Stream live logcat as JSONL");
+    println!("  droidkraft --query --last 500            # Dump last 500 lines as JSONL");
+    println!("  droidkraft --query --level E             # Stream only errors");
+    println!("  droidkraft --query --tag MyApp           # Stream only tag matching 'MyApp'");
+    println!(
         "  droidkraft --query | nu -c 'lines | each {{ from json }} | where level == \"Error\"'"
     );
 }
@@ -103,23 +88,23 @@ fn run_query_mode(args: &[String]) -> color_eyre::Result<()> {
     }
 
     let serial = devices[0].identifier.clone();
-    eprintln!(
+    println!(
         "droidkraft: streaming logcat from {} as JSON lines…",
         serial
     );
     if let Some(ref level) = min_level {
-        eprintln!("  filter: level >= {}", level.as_char());
+        println!("  filter: level >= {}", level.as_char());
     }
     if let Some(ref tag) = tag_lower {
-        eprintln!("  filter: tag contains \"{}\"", tag);
+        println!("  filter: tag contains \"{}\"", tag);
     }
     if let Some(ref pat) = grep_lower {
-        eprintln!("  filter: message contains \"{}\"", pat);
+        println!("  filter: message contains \"{}\"", pat);
     }
     if let Some(n) = last_n {
-        eprintln!("  mode: last {} lines", n);
+        println!("  mode: last {} lines", n);
     } else {
-        eprintln!("  mode: live stream (Ctrl+C to stop)");
+        println!("  mode: live stream (Ctrl+C to stop)");
     }
 
     // ── Start streaming in a background thread ────────────────────────────
@@ -190,7 +175,7 @@ fn run_query_mode(args: &[String]) -> color_eyre::Result<()> {
         }
     }
 
-    eprintln!("droidkraft: {} lines written", count);
+    println!("droidkraft: {} lines written", count);
     Ok(())
 }
 
@@ -206,26 +191,144 @@ fn ctrlc_handler(_flag: std::sync::Arc<std::sync::atomic::AtomicBool>) {
     // handling needed.
 }
 
-#[tokio::main]
-async fn main() -> color_eyre::Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-
-    // ── Help ──────────────────────────────────────────────────────────────
-    if args.iter().any(|a| a == "--help" || a == "-h") {
-        print_usage();
+fn run_devices() -> color_eyre::Result<()> {
+    let mut adb = droidkraft_core::adb::AdbManager::new();
+    let st = adb.fetch_device_status();
+    if st.devices.is_empty() {
+        println!("No devices connected.");
         return Ok(());
     }
-
-    // ── Query mode (no TUI) ───────────────────────────────────────────────
-    if args.iter().any(|a| a == "--query") {
-        color_eyre::install()?;
-        return run_query_mode(&args[1..]);
+    println!("{:<24} {:<14} MODEL", "SERIAL", "STATE");
+    for (i, d) in st.devices.iter().enumerate() {
+        let model = if i == st.selected_idx {
+            st.model.as_str()
+        } else {
+            "-"
+        };
+        println!("{:<24} {:<14} {}", d.serial, d.state, model);
     }
+    Ok(())
+}
 
-    // ── Normal TUI mode ───────────────────────────────────────────────────
-    color_eyre::install()?;
-    let terminal = ratatui::init();
-    let result = App::new().run(terminal).await;
-    ratatui::restore();
-    result
+fn run_screenshot(path: &str, serial: Option<String>) -> color_eyre::Result<()> {
+    let mut adb = droidkraft_core::adb::AdbManager::new();
+    adb.connect().map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
+    match serial {
+        Some(s) => adb.select_device(s),
+        None => {
+            adb.list_devices()
+                .map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
+        }
+    }
+    let png = adb
+        .capture_frame_png()
+        .map_err(|e| color_eyre::eyre::eyre!("screenshot failed: {e}"))?;
+    std::fs::write(path, &png)?;
+    println!("Saved {} ({} bytes)", path, png.len());
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> color_eyre::Result<()> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let cli = match cli::parse(&args) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("error: {e}\n\n{}", cli::USAGE);
+            std::process::exit(2);
+        }
+    };
+    match cli.action {
+        Action::Help => {
+            print!("{}", cli::USAGE);
+            println!();
+            print_usage();
+            Ok(())
+        }
+        Action::Version => {
+            println!("droidkraft-tui {}", env!("CARGO_PKG_VERSION"));
+            Ok(())
+        }
+        Action::Query(rest) => {
+            color_eyre::install()?;
+            run_query_mode(&rest)
+        }
+        Action::Devices => {
+            color_eyre::install()?;
+            run_devices()
+        }
+        Action::Info { serial, json } => {
+            color_eyre::install()?;
+            run_info(serial, json)
+        }
+        Action::Screenshot { path, serial } => {
+            color_eyre::install()?;
+            run_screenshot(&path, serial)
+        }
+        Action::Mirror { serial, size } => match mirror_cmd::spawn(serial.as_deref(), size) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        },
+        Action::Tui => {
+            color_eyre::install()?;
+            let mut app = App::new();
+            app.graphics = droidkraft_tui::gfx::resolve_mode(
+                cli.graphics,
+                std::env::var("DROIDKRAFT_GRAPHICS").ok().as_deref(),
+            );
+            if let Some(t) = cli.theme {
+                app.model.themes.set_by_name(&t);
+            }
+            app.run()
+        }
+    }
+}
+
+/// `info`: print the rich per-device details (text or JSON).
+fn run_info(serial: Option<String>, json: bool) -> color_eyre::Result<()> {
+    let serials: Vec<String> = match serial {
+        Some(s) => vec![s],
+        None => {
+            let mut srv = adb_client::ADBServer::default();
+            srv.devices()
+                .map_err(|e| color_eyre::eyre::eyre!("adb: {e}"))?
+                .into_iter()
+                .map(|d| d.identifier)
+                .collect()
+        }
+    };
+    if serials.is_empty() {
+        eprintln!("no devices connected");
+        std::process::exit(1);
+    }
+    let all = droidkraft_core::list_all_details(&serials);
+    if json {
+        println!("{}", serde_json::to_string_pretty(&all)?);
+    } else {
+        for d in &all {
+            println!("{}  [{}]  {}", d.serial, d.state, d.summary_line());
+            let s = &d.system;
+            println!(
+                "  {} {} ({}) · SDK {} · patch {} · build {}",
+                s.manufacturer, s.model, s.codename, s.sdk, s.security_patch, s.build_id
+            );
+            println!(
+                "  kernel {} · uptime {}s · bootloader {}",
+                s.kernel, s.uptime_secs, s.bootloader
+            );
+            println!(
+                "  battery {}% {:?} · RAM {}/{} MiB · storage {}/{} MiB",
+                d.battery.level,
+                d.battery.status,
+                d.memory.used_mib(),
+                d.memory.total_mib,
+                d.storage.used_mib,
+                d.storage.total_mib
+            );
+        }
+    }
+    Ok(())
 }
