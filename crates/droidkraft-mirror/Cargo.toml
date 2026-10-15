@@ -1,0 +1,13 @@
+[package]
+name = "droidkraft-mirror"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Frontend-neutral low-latency Android screen mirroring + input (screenrecord → ffmpeg → frames) over adb_client"
+
+[dependencies]
+adb_client = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
