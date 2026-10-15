@@ -208,8 +208,8 @@ impl LogEntry {
             return None;
         }
 
-        let timestamp = &line[0..18];
-        let rest = line[18..].trim_start();
+        let timestamp = line.get(0..18)?;
+        let rest = line.get(18..)?.trim_start();
 
         let pid = rest.split_whitespace().next()?.to_string();
         let remaining = rest[pid.len()..].trim_start();
@@ -513,5 +513,6 @@ mod tests {
         // slice inside a UTF-8 sequence.
         let _ = LogEntry::parse("\u{10d836}/(\0o)\0");
         let _ = LogEntry::parse("é/tag(1): msg");
+        let _ = LogEntry::parse("01-02 03:04:05.67é  123  456 I Tag: message");
     }
 }
