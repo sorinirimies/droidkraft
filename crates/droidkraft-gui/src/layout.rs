@@ -4,6 +4,12 @@
 pub const COMPACT_MAX: f32 = 760.0;
 pub const MEDIUM_MAX: f32 = 1100.0;
 
+pub const NAV_RAIL_PAD: f32 = 16.0;
+pub const NAV_ITEM_PAD: f32 = 16.0;
+pub const NAV_ICON: f32 = 24.0;
+pub const NAV_GAP: f32 = 8.0;
+pub const NAV_BADGE: f32 = 36.0;
+
 /// Window size class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -39,9 +45,9 @@ impl Layout {
     /// Nav rail width in px: full / shorter / icon-only.
     pub fn nav_width(&self) -> f32 {
         match self.mode {
-            Mode::Wide => 210.0,
-            Mode::Medium => 150.0,
-            Mode::Compact => 52.0,
+            Mode::Wide => 220.0,
+            Mode::Medium => 176.0,
+            Mode::Compact => 56.0,
         }
     }
 
@@ -49,11 +55,29 @@ impl Layout {
         self.mode != Mode::Compact
     }
 
-    pub fn nav_name_chars(&self) -> usize {
-        match self.mode {
-            Mode::Wide => 22,
-            _ => 12,
+    /// Px available for text inside a nav item (after rail/item padding,
+    /// the 24px icon, the gap and the optional battery badge).
+    pub fn nav_text_px(&self, badge: bool) -> f32 {
+        if !self.nav_labels() {
+            return 0.0;
         }
+        let w = self.nav_width() - NAV_RAIL_PAD - NAV_ITEM_PAD - NAV_ICON - NAV_GAP;
+        (w - if badge { NAV_BADGE } else { 0.0 }).max(0.0)
+    }
+
+    /// Max characters of a device name (`text_sm`, ~7px/char) that fit.
+    pub fn nav_name_chars(&self) -> usize {
+        (self.nav_text_px(true) / 7.0).floor() as usize
+    }
+
+    /// Max characters of a serial (`text_xs`, ~6.2px/char) that fit.
+    pub fn nav_serial_chars(&self) -> usize {
+        (self.nav_text_px(true) / 6.2).floor() as usize
+    }
+
+    /// Whether the "Settings & Help" long label fits (else "Settings").
+    pub fn nav_long_settings(&self) -> bool {
+        self.nav_text_px(false) >= 15.0 * 7.0
     }
 
     /// Width available to the main content.
@@ -288,5 +312,27 @@ mod tests {
                 assert!(l.card_detail() <= 2);
             }
         }
+    }
+
+    #[test]
+    fn nav_text_always_fits() {
+        for w in (0..=3000).step_by(10) {
+            let l = Layout::new(w as f32, 700.);
+            if l.nav_labels() {
+                assert!(l.nav_name_chars() as f32 * 7.0 <= l.nav_text_px(true));
+                assert!(l.nav_serial_chars() as f32 * 6.2 <= l.nav_text_px(true) + 0.1);
+                assert!(l.nav_name_chars() >= 6, "w={w}");
+            } else {
+                assert_eq!(l.nav_name_chars(), 0);
+                // Icon-only rail must hold one 24px icon.
+                assert!(l.nav_width() >= NAV_ICON + 16.0 + 8.0);
+            }
+        }
+    }
+
+    #[test]
+    fn long_settings_label_only_when_it_fits() {
+        assert!(Layout::new(1600., 900.).nav_long_settings());
+        assert!(!Layout::new(640., 700.).nav_long_settings());
     }
 }

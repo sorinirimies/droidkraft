@@ -290,3 +290,48 @@ pub fn chart(
         )
         .into_any_element()
 }
+
+/// Phone glyph for a device: outline coloured by connection state, filled
+/// bottom-up by battery level, with a status dot in the corner.
+pub fn device_icon(color: u32, battery: Option<u8>) -> AnyElement {
+    let fill = f32::from(battery.unwrap_or(0).min(100)) / 100.0 * 16.0;
+    div()
+        .relative()
+        .flex()
+        .flex_shrink_0()
+        .items_center()
+        .justify_center()
+        .size(gpui::px(24.0))
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .justify_end()
+                .w(gpui::px(14.0))
+                .h(gpui::px(22.0))
+                .p(gpui::px(2.0))
+                .rounded_sm()
+                .border_2()
+                .border_color(rgb(color))
+                .child(
+                    div()
+                        .w_full()
+                        .h(gpui::px(fill))
+                        .rounded_sm()
+                        .bg(rgb(color))
+                        .opacity(0.55),
+                ),
+        )
+        .child(
+            div()
+                .absolute()
+                .bottom(gpui::px(0.0))
+                .right(gpui::px(0.0))
+                .size(gpui::px(7.0))
+                .rounded_full()
+                .border_1()
+                .border_color(rgb(theme::BG_PANEL))
+                .bg(rgb(color)),
+        )
+        .into_any_element()
+}

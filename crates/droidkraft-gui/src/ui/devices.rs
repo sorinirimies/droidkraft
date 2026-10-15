@@ -10,7 +10,7 @@ use crate::layout::{Layout, RateStyle};
 use crate::state::{DeviceState, Tab};
 use crate::theme;
 use crate::ui::widgets::{
-    bar, button, card, chip, dot, heading, pill, section_title, small_button, sparkline,
+    bar, button, card, chip, device_icon, heading, pill, section_title, small_button, sparkline,
 };
 
 impl DroidGui {
@@ -139,7 +139,7 @@ impl DroidGui {
                     .flex()
                     .items_center()
                     .gap_2()
-                    .child(dot(status_color))
+                    .child(device_icon(status_color, d.battery_pct()))
                     .child(
                         div()
                             .flex_1()

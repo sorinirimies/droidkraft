@@ -7,16 +7,17 @@ use crate::fmt::{battery_color, ellipsize};
 use crate::layout::Layout;
 use crate::state::{Route, Tab};
 use crate::theme;
-use crate::ui::widgets::{dot, section_title};
+use crate::ui::widgets::{device_icon, section_title};
 
-fn nav_item(active: bool) -> gpui::Div {
-    div()
+fn nav_item(active: bool, labels: bool) -> gpui::Div {
+    let d = div()
         .flex()
+        .flex_shrink_0()
         .items_center()
         .gap_2()
-        .px_2()
         .py_2()
         .rounded_md()
+        .overflow_hidden()
         .bg(rgb(if active {
             theme::BG_ELEV
         } else {
@@ -24,7 +25,13 @@ fn nav_item(active: bool) -> gpui::Div {
         }))
         .text_color(rgb(if active { theme::TEXT } else { theme::TEXT_DIM }))
         .cursor_pointer()
-        .hover(|s| s.bg(rgb(theme::BG_HOVER)))
+        .hover(|s| s.bg(rgb(theme::BG_HOVER)));
+    // Icon-only rail: centre the glyph.
+    if labels {
+        d.px_2()
+    } else {
+        d.px_1().justify_center()
+    }
 }
 
 impl DroidGui {
@@ -36,6 +43,7 @@ impl DroidGui {
     ) -> AnyElement {
         let labels = lay.nav_labels();
         let name_n = lay.nav_name_chars();
+        let serial_n = lay.nav_serial_chars();
         let mut rail = div()
             .flex()
             .flex_col()
@@ -43,31 +51,43 @@ impl DroidGui {
             .w(px(lay.nav_width()))
             .flex_shrink_0()
             .h_full()
+            .overflow_hidden()
             .p_2()
             .bg(rgb(theme::BG_PANEL))
             .border_r_1()
             .border_color(rgb(theme::BORDER))
             .child(
                 div()
-                    .px_2()
+                    .flex()
+                    .justify_center()
+                    .px_1()
                     .py_2()
                     .text_lg()
                     .text_color(rgb(theme::ACCENT))
+                    .when(labels, |d| d.justify_start().px_2())
                     .child(if labels { "DroidKraft" } else { "DK" }),
             );
 
         let online = self.fleet.online_count();
         rail = rail.child(
-            nav_item(*route == Route::Devices)
+            nav_item(*route == Route::Devices, labels)
                 .id("nav-devices")
-                .child(div().text_sm().child("▦"))
-                .children(labels.then(|| div().text_sm().flex_1().child("Devices")))
                 .child(
+                    div()
+                        .flex()
+                        .flex_shrink_0()
+                        .justify_center()
+                        .w(px(24.0))
+                        .text_sm()
+                        .child("▦"),
+                )
+                .children(labels.then(|| div().text_sm().flex_1().child("Devices")))
+                .children(labels.then(|| {
                     div()
                         .text_xs()
                         .text_color(rgb(theme::TEXT_FAINT))
-                        .child(format!("{online}/{}", self.fleet.len())),
-                )
+                        .child(format!("{online}/{}", self.fleet.len()))
+                }))
                 .on_click(cx.listener(|this, _ev: &ClickEvent, _w, cx| {
                     this.set_route(Route::Devices);
                     cx.notify();
@@ -76,6 +96,8 @@ impl DroidGui {
 
         if labels {
             rail = rail.child(div().px_2().pt_2().child(section_title("Connected")));
+        } else if !self.fleet.is_empty() {
+            rail = rail.child(div().mx_2().my_1().h(px(1.0)).bg(rgb(theme::BORDER)));
         }
         if self.fleet.is_empty() && labels {
             rail = rail.child(
@@ -86,47 +108,59 @@ impl DroidGui {
                     .child("No devices"),
             );
         }
+        // Device list scrolls when there are more devices than rows.
+        let mut list = div()
+            .id("nav-list")
+            .flex()
+            .flex_col()
+            .gap_1()
+            .flex_1()
+            .min_h_0()
+            .overflow_y_scroll();
         for (i, d) in self.fleet.ordered().into_iter().enumerate() {
             let serial = d.serial.clone();
             let active = *route == Route::Device(serial.clone());
-            let dot_color = if d.is_online() {
+            let color = if d.is_online() {
                 theme::OK
             } else if d.connected {
                 theme::WARN
             } else {
                 theme::TEXT_FAINT
             };
-            let mut item = nav_item(active).id(("nav-dev", i)).child(dot(dot_color));
-            item = if labels {
-                item.child(
+            let battery = d.battery_pct();
+            let mut item = nav_item(active, labels)
+                .id(("nav-dev", i))
+                .child(device_icon(color, battery));
+            if labels {
+                item = item.child(
                     div()
                         .flex()
                         .flex_col()
                         .flex_1()
                         .min_w_0()
+                        .overflow_hidden()
                         .child(div().text_sm().child(ellipsize(&d.display_name(), name_n)))
                         .child(
                             div()
                                 .text_xs()
                                 .text_color(rgb(theme::TEXT_FAINT))
-                                .child(ellipsize(&d.serial, name_n.saturating_sub(4).max(8))),
+                                .child(ellipsize(&d.serial, serial_n)),
                         ),
-                )
-            } else {
-                item.child(div().text_xs().min_w_0().child(ellipsize(&d.serial, 3)))
-            };
-            if let Some(b) = d.battery_pct().filter(|_| labels) {
-                item = item.child(
-                    div()
-                        .text_xs()
-                        .text_color(rgb(battery_color(b)))
-                        .child(format!("{b}%")),
                 );
+                if let Some(b) = battery {
+                    item = item.child(
+                        div()
+                            .flex_shrink_0()
+                            .text_xs()
+                            .text_color(rgb(battery_color(b)))
+                            .child(format!("{b}%")),
+                    );
+                }
             }
             if !d.connected {
                 item = item.opacity(0.55);
             }
-            rail = rail.child(
+            list = list.child(
                 item.on_click(cx.listener(move |this, _ev: &ClickEvent, _w, cx| {
                     let tab = this
                         .fleet
@@ -138,13 +172,22 @@ impl DroidGui {
                 })),
             );
         }
+        rail = rail.child(list);
 
-        rail = rail.child(div().flex_grow()).child(
-            nav_item(*route == Route::Settings)
+        rail = rail.child(
+            nav_item(*route == Route::Settings, labels)
                 .id("nav-settings")
-                .child(div().text_sm().child("⚙"))
+                .child(
+                    div()
+                        .flex()
+                        .flex_shrink_0()
+                        .justify_center()
+                        .w(px(24.0))
+                        .text_sm()
+                        .child("⚙"),
+                )
                 .children(labels.then(|| {
-                    div().text_sm().child(if name_n > 12 {
+                    div().text_sm().child(if lay.nav_long_settings() {
                         "Settings & Help"
                     } else {
                         "Settings"

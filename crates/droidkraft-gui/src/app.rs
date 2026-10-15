@@ -606,6 +606,13 @@ impl Render for DroidGui {
                 }
             }))
             .child(self.render_nav(&route, &lay, cx))
-            .child(div().flex_1().min_w_0().h_full().child(content))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .h_full()
+                    .overflow_hidden()
+                    .child(content),
+            )
     }
 }
