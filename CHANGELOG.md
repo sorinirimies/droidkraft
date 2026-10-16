@@ -2,7 +2,82 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-10-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Add gitea-nexus-lab remote recipes (push/pull/sync/release) - ([0f55897](https://github.com/sorinirimies/droidkraft/commit/0f55897528d802fd37ad4f404a3298b79be447b8))
+
+- Rename gitea -> gitea-microlab; add full gitea-microlab/-starscream/-nexus-lab parity - ([9e9943a](https://github.com/sorinirimies/droidkraft/commit/9e9943a80a6f2f337cc23629e4f74e1b6413de89))
+
+- Trigger Gitea Actions (retest after adding runners) - ([a0a5055](https://github.com/sorinirimies/droidkraft/commit/a0a5055edc0f8d38558dbe5db8077355edcecdaa))
+
+- **security:** Add cargo-audit workflow and just audit recipe - ([e70c29f](https://github.com/sorinirimies/droidkraft/commit/e70c29f94af060d24c2d4bc72521b9dbee219b92))
+
+- Prebuilt Nushell, cargo-deny + cargo-audit security workflow - ([6b407ed](https://github.com/sorinirimies/droidkraft/commit/6b407ed50a6f39b3a310120a7249c933e31f7260))
+
+- **justfile:** Skip unconfigured remotes in *-all recipes - ([d2e70a2](https://github.com/sorinirimies/droidkraft/commit/d2e70a2dcec5935ed9edb337caa64f6311957321))
+
+- **justfile:** Push/pull current branch instead of hardcoded main - ([379e9ef](https://github.com/sorinirimies/droidkraft/commit/379e9ef6668b55bef3a1d4d1b855342d5fa4eed8))
+
+- Fuzz targets + fix UTF-8 panic in brief log parser, security/fuzz/soak recipes and workflows, gitea-starscream remote, bounded mirror input queue, cargo update - ([f666ea9](https://github.com/sorinirimies/droidkraft/commit/f666ea9e135830cb19d8a90bdbe5d776da696aea))
+
+- **just:** Port tokenburn recipes (publish-*, release-*, coverage, update-deps, ...), add deps-update workflow - ([b8f5795](https://github.com/sorinirimies/droidkraft/commit/b8f5795be7e1ebb990c5fcbffa1502b82ca187b4))
+
+- Package workflow (AppImage, Flatpak, Windows, macOS), icons, prune old releases - ([e6330b5](https://github.com/sorinirimies/droidkraft/commit/e6330b501f8ea2fe12e9c7f5a93f9c250a8fb0cb))
+
+- Drop python; icon generator as Rust example, soak as nushell - ([cc123d9](https://github.com/sorinirimies/droidkraft/commit/cc123d9cb715c5a1ecd70da95c1272efbaaefd39))
+
+- Packaging scripts in nushell, packaging asset tests, prune tests - ([a8fc6f7](https://github.com/sorinirimies/droidkraft/commit/a8fc6f71b230c4579683ac9a226092b1cdfe3917))
+
+- **release:** Publish mirror + fastboot crates before core/tui/gui - ([8370629](https://github.com/sorinirimies/droidkraft/commit/8370629140b7e495f0f8b6b7211792189e78ef52))
+
+
+### 🐛 Bug Fixes
+
+- **gui:** Robust nav rail (icon-only when narrow, device icons, text budgets, scrolling list) - ([3874574](https://github.com/sorinirimies/droidkraft/commit/38745749e3f29a035b9f811baa511a4ffb07eedf))
+
+- **core:** Threadtime log parser panicked on multibyte chars (found by fuzz CI) - ([c72fcb3](https://github.com/sorinirimies/droidkraft/commit/c72fcb35f095574601605b451ccc18e2f7bf25e0))
+
+- Packaging test + script refs after nushell port - ([e462ee3](https://github.com/sorinirimies/droidkraft/commit/e462ee32904751fd5a0ef03e5fd25ed5d05b3443))
+
+- Fmt; make screen no-frame test deterministic without adb - ([ca74259](https://github.com/sorinirimies/droidkraft/commit/ca74259ad16d82f91fe72dffeb578ae608c55046))
+
+
+### 📚 Documentation
+
+- Rewrite README, new VHS tapes and preview GIFs, drop stale docs - ([0c3f94b](https://github.com/sorinirimies/droidkraft/commit/0c3f94b5b1e2655c83d16bc37a0a4cde9710a149))
+
+- Add TUI/GUI install, audit and fuzz badges - ([f054990](https://github.com/sorinirimies/droidkraft/commit/f05499065f2dfb15f25ae00388fe746f8cba5d88))
+
+
+### 🚀 Features
+
+- Pure-Rust fastboot crate, device details API, native ADB sideload - ([61bbcae](https://github.com/sorinirimies/droidkraft/commit/61bbcaef1e6a94b5eade173fd17dfa0177382240))
+
+- Droidkraft-mirror crate (screen mirror + screen recorder shared by TUI/GUI) - ([a5a5f26](https://github.com/sorinirimies/droidkraft/commit/a5a5f2630a02242e1f3037c50b0f65f0862447ef))
+
+- **tui:** Device-centric redesign, responsive layouts, direct Kitty graphics, braille pie chart - ([57836fe](https://github.com/sorinirimies/droidkraft/commit/57836fe46f56ac589b79d514a23a53f7513b6d91))
+
+- **gui:** Device-centric redesign, responsive layouts, recording UI, per-device mirror windows - ([1768802](https://github.com/sorinirimies/droidkraft/commit/1768802bd35fc12b5bb0946f7cfa9be42af87f8c))
+
+- **fastboot:** Ergonomic API (flash/erase/getvar/variables/reboot*/flash_factory), docs + README; polish(gui): stable sparkline bars - ([464e26a](https://github.com/sorinirimies/droidkraft/commit/464e26a6c0d2268d4d7ee8d9669f451d472af53c))
+
+- Adjustable refresh rate for stats/graphs (core RefreshRate, TUI </>, GUI Refresh −/+ control) - ([1ecb702](https://github.com/sorinirimies/droidkraft/commit/1ecb70233a1cb7b6cc86fbc2d9ae0c61191cdae4))
+
+- Thorough responsive design for TUI (wrapping footer, fitted header/tabs/banner/help) and GUI (adaptive tab bar), with tests - ([b10bcdf](https://github.com/sorinirimies/droidkraft/commit/b10bcdf026787a1d7f4b75a9e0e84a32ad57ce26))
+
+- **logs:** GUI search box, fuzzy search mode in core/TUI/GUI, regex/fuzzy/text cycling - ([022bb91](https://github.com/sorinirimies/droidkraft/commit/022bb91df4afed54e7da016033ab0877b7f93628))
+
+- **packaging:** Tarballs + binstall, deb, rpm, AUR PKGBUILD, Homebrew formula, Nix flake, aarch64 TUI - ([82b1ec5](https://github.com/sorinirimies/droidkraft/commit/82b1ec5472151cd6d2c1ff28835da281b3a182ab))
+
+
 ## [1.2.0] - 2026-07-19
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 1.2.0 - ([b94c900](https://github.com/sorinirimies/droidkraft/commit/b94c900c69e00d8d87faf5addd687379e6f9799e))
+
 
 ### 🚀 Features
 
