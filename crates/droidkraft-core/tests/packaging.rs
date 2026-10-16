@@ -67,6 +67,7 @@ fn flatpak_manifest_matches_metainfo() {
     let m = text(&format!("packaging/flatpak/{APP_ID}.yml"));
     assert!(m.contains(&format!("app-id: {APP_ID}")));
     assert!(m.contains("command: droidkraft"));
+    assert!(m.contains("appstream-compose: false"));
     let info = text(&format!("packaging/linux/{APP_ID}.metainfo.xml"));
     assert!(info.contains(&format!("<id>{APP_ID}</id>")));
     assert!(
