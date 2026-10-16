@@ -401,7 +401,7 @@ impl Poller {
 }
 
 /// `screencap -p` → PNG file on the host.
-fn screenshot(adb: &mut AdbManager, path: &std::path::Path) -> Result<PathBuf, String> {
+pub(crate) fn screenshot(adb: &mut AdbManager, path: &std::path::Path) -> Result<PathBuf, String> {
     let bytes = adb.shell_command_raw("screencap -p").str_err()?;
     const SIG: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
     // Some adb shells translate \n → \r\n; undo that when the signature is broken.

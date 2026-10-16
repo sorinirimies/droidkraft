@@ -39,6 +39,10 @@ shows a placeholder with **Attach** and **Focus window** buttons. Re-embed with
 closing the detached window (`⌘W`/`Ctrl+W`). Closing the main window closes the
 detached one too. `⌘/Ctrl+C` etc. are never forwarded to the device.
 
+The detached window (and the standalone `--mirror` window launched from the TUI)
+has a capture bar: **● Record** / **■ Stop** (with elapsed timer) and
+**📷 Screenshot**, saved to the usual capture folder.
+
 ## Mirror-only mode (scrcpy-like)
 
 ```sh

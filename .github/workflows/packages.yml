@@ -143,6 +143,35 @@ jobs:
             dist/*.zip
             dist/*-setup.exe
 
+  # Windows GUI cross-build, best-effort (expected to fail: gpui's build.rs only compiles
+  # HLSL shaders with fxc.exe on a Windows host). Never blocks the release.
+  windows-gui:
+    needs: release
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-nu@v3
+        with: { version: "0.116.1" }
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: x86_64-pc-windows-msvc }
+      - uses: Swatinem/rust-cache@v2
+      - run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang lld llvm zip cmake wine64 wine32 || sudo apt-get install -y --no-install-recommends clang lld llvm zip cmake wine64
+      - uses: taiki-e/install-action@v2
+        with: { tool: cargo-xwin }
+      - run: cargo xwin build --release --target x86_64-pc-windows-msvc -p droidkraft
+      - run: |
+          mkdir -p dist
+          V="${TAG#v}"
+          zip -j "dist/droidkraft-gui-$V-x86_64-pc-windows-msvc.zip" target/x86_64-pc-windows-msvc/release/droidkraft.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-gui
+          path: dist/droidkraft-gui-*.zip
+
   # macOS TUI cross-compiled from Linux (zig + Apple SDK). Best-effort: a failure does not block the release.
   macos:
     needs: release
@@ -188,7 +217,7 @@ jobs:
           path: dist/*.tar.gz
 
   publish:
-    needs: [linux, windows, macos]
+    needs: [linux, windows, macos, windows-gui]
 
     runs-on: ubuntu-latest
     steps:

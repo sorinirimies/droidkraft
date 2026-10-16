@@ -500,6 +500,8 @@ impl DroidGui {
             w = 1100.0;
         }
         let m2 = mirror.clone();
+        let app = cx.weak_entity();
+        let ser_root = serial.to_string();
         let bounds = Bounds::centered(None, size(px(w), px(h)), cx);
         let opened = cx.open_window(
             WindowOptions {
@@ -511,7 +513,7 @@ impl DroidGui {
                 window_min_size: Some(size(px(240.), px(320.))),
                 ..Default::default()
             },
-            |_, cx| cx.new(|_| DetachedRoot::new(m2)),
+            |_, cx| cx.new(|cx| DetachedRoot::new(m2, app, ser_root, cx)),
         );
         let Ok(handle) = opened else { return };
         mirror.update(cx, |m, cx| m.set_chrome(Chrome::Compact, true, cx));

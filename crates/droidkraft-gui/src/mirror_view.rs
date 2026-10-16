@@ -802,21 +802,89 @@ fn to_render_image(rgba: &image::RgbaImage) -> Arc<RenderImage> {
     Arc::new(RenderImage::new(vec![image::Frame::new(bgra)]))
 }
 
-/// Root view of the detached mirror window: hosts the shared [`MirrorView`].
+/// Root view of the detached mirror window: hosts the shared [`MirrorView`]
+/// plus a capture bar (record / stop / screenshot).
 pub struct DetachedRoot {
     mirror: gpui::Entity<MirrorView>,
+    app: gpui::WeakEntity<crate::app::DroidGui>,
+    serial: String,
 }
 
 impl DetachedRoot {
-    pub fn new(mirror: gpui::Entity<MirrorView>) -> Self {
-        Self { mirror }
+    pub fn new(
+        mirror: gpui::Entity<MirrorView>,
+        app: gpui::WeakEntity<crate::app::DroidGui>,
+        serial: String,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        // Repaint (elapsed timer) whenever the mirror repaints.
+        cx.observe(&mirror, |_, _, cx| cx.notify()).detach();
+        Self { mirror, app, serial }
     }
 }
 
 impl gpui::Render for DetachedRoot {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        use droidkraft_mirror::RecordStatus;
+        let (status, elapsed, note) = self
+            .app
+            .upgrade()
+            .and_then(|a| {
+                a.read(cx).fleet.get(&self.serial).map(|d| {
+                    (
+                        d.recorder.status(),
+                        d.recorder.elapsed(),
+                        d.capture_status.clone(),
+                    )
+                })
+            })
+            .unwrap_or((RecordStatus::Idle, None, None));
+        let recording = matches!(status, RecordStatus::Recording { .. });
+        let busy = recording || matches!(status, RecordStatus::Finishing);
+
+        let bar_btn = |id: &'static str, label: String, bg: u32, cb: fn(&mut crate::app::DroidGui, &str)| {
+            let app = self.app.clone();
+            let ser = self.serial.clone();
+            div()
+                .id(id)
+                .px_2()
+                .py_1()
+                .rounded_md()
+                .bg(rgb(bg))
+                .text_xs()
+                .text_color(rgb(0xffffff))
+                .cursor_pointer()
+                .child(label)
+                .on_click(move |_, _, cx| {
+                    let _ = app.update(cx, |t, cx| {
+                        cb(t, &ser);
+                        cx.notify();
+                    });
+                })
+        };
+        let rec = if busy {
+            bar_btn("d-stop", "■ Stop".into(), theme::DANGER, |t, s| {
+                t.stop_recording(s)
+            })
+        } else {
+            bar_btn("d-rec", "● Record".into(), theme::ACCENT_DIM, |t, s| {
+                t.start_recording(s)
+            })
+        };
+        let shot = bar_btn("d-shot", "📷 Screenshot".into(), theme::BG_ELEV, |t, s| {
+            t.take_screenshot(s)
+        });
+        let label = if recording {
+            elapsed
+                .map(|e| format!("● REC {}", crate::fmt::fmt_elapsed(e)))
+                .unwrap_or_default()
+        } else {
+            note.unwrap_or_default()
+        };
         div()
             .size_full()
+            .flex()
+            .flex_col()
             .bg(rgb(theme::BG))
             .text_color(rgb(theme::TEXT))
             .font_family("sans-serif")
@@ -825,6 +893,161 @@ impl gpui::Render for DetachedRoot {
                     .update(cx, |_, cx| cx.emit(MirrorEvent::AttachRequested));
             }))
             .on_action(cx.listener(|_, _: &CloseWindow, window, _cx| window.remove_window()))
-            .child(self.mirror.clone())
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_2()
+                    .px_2()
+                    .py_1()
+                    .child(rec)
+                    .child(shot)
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(theme::TEXT_DIM))
+                            .child(label),
+                    ),
+            )
+            .child(div().flex_1().min_h_0().child(self.mirror.clone()))
+    }
+}
+
+/// Root view of the standalone `--mirror` window: mirror + capture bar
+/// (record / stop / screenshot) with its own recorder.
+pub struct StandaloneRoot {
+    mirror: gpui::Entity<MirrorView>,
+    recorder: droidkraft_mirror::ScreenRecorder,
+    note: Option<String>,
+    shot: Arc<Mutex<Option<String>>>,
+}
+
+impl StandaloneRoot {
+    pub fn new(mirror: gpui::Entity<MirrorView>, cx: &mut Context<Self>) -> Self {
+        cx.observe(&mirror, |_, _, cx| cx.notify()).detach();
+        Self {
+            mirror,
+            recorder: droidkraft_mirror::ScreenRecorder::new(),
+            note: None,
+            shot: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    fn start(&mut self, serial: &str) {
+        let name = droidkraft_mirror::timestamped_name(serial);
+        self.note = self
+            .recorder
+            .start(
+                serial,
+                &droidkraft_mirror::default_output_dir(),
+                &name,
+                Default::default(),
+            )
+            .err()
+            .map(|e| format!("Cannot record: {e}"));
+    }
+
+    fn screenshot(&mut self, serial: &str) {
+        let path = droidkraft_mirror::default_output_dir().join(format!(
+            "{}.png",
+            droidkraft_mirror::timestamped_name(serial)
+        ));
+        self.note = Some("Capturing screenshot…".into());
+        let slot = self.shot.clone();
+        std::thread::spawn(move || {
+            let mut adb = droidkraft_core::AdbManager::new();
+            let msg = match crate::worker::screenshot(&mut adb, &path) {
+                Ok(p) => format!("Saved {}", p.display()),
+                Err(e) => format!("Screenshot failed: {e}"),
+            };
+            *slot.lock().unwrap() = Some(msg);
+        });
+    }
+}
+
+impl gpui::Render for StandaloneRoot {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        use droidkraft_mirror::RecordStatus;
+        if let Some(m) = self.shot.lock().unwrap().take() {
+            self.note = Some(m);
+        }
+        let status = self.recorder.status();
+        let recording = matches!(status, RecordStatus::Recording { .. });
+        let busy = recording || matches!(status, RecordStatus::Finishing);
+        let serial = self.mirror.read(cx).serial().map(str::to_string);
+        let mk = |id: &'static str, label: &str, bg: u32| {
+            div()
+                .id(id)
+                .px_2()
+                .py_1()
+                .rounded_md()
+                .bg(rgb(bg))
+                .text_xs()
+                .text_color(rgb(0xffffff))
+                .cursor_pointer()
+                .child(label.to_string())
+        };
+        let ser = serial.clone();
+        let rec = if busy {
+            mk("s-stop", "■ Stop", theme::DANGER).on_click(cx.listener(|t, _, _, cx| {
+                t.recorder.stop();
+                cx.notify();
+            }))
+        } else {
+            mk("s-rec", "● Record", theme::ACCENT_DIM).on_click(cx.listener(
+                move |t, _, _, cx| {
+                    if let Some(s) = &ser {
+                        t.start(s);
+                    }
+                    cx.notify();
+                },
+            ))
+        };
+        let ser = serial;
+        let shot = mk("s-shot", "📷 Screenshot", theme::BG_ELEV).on_click(cx.listener(
+            move |t, _, _, cx| {
+                if let Some(s) = &ser {
+                    t.screenshot(s);
+                }
+                cx.notify();
+            },
+        ));
+        let label = if recording {
+            self.recorder
+                .elapsed()
+                .map(|e| format!("● REC {}", crate::fmt::fmt_elapsed(e)))
+                .unwrap_or_default()
+        } else if let RecordStatus::Failed(e) = &status {
+            format!("Recording failed: {e}")
+        } else {
+            self.note.clone().unwrap_or_default()
+        };
+        div()
+            .size_full()
+            .flex()
+            .flex_col()
+            .bg(rgb(theme::BG))
+            .text_color(rgb(theme::TEXT))
+            .font_family("sans-serif")
+            .on_action(cx.listener(|_, _: &CloseWindow, window, _cx| window.remove_window()))
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_2()
+                    .px_2()
+                    .py_1()
+                    .child(rec)
+                    .child(shot)
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(theme::TEXT_DIM))
+                            .child(label),
+                    ),
+            )
+            .child(div().flex_1().min_h_0().child(self.mirror.clone()))
     }
 }
