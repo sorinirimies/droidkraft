@@ -107,6 +107,19 @@ fn tui_cargo_toml_has_binstall_deb_and_rpm_metadata() {
 }
 
 #[test]
+fn snap_template_is_consistent() {
+    let s = text("packaging/snap/snapcraft.yaml.in");
+    for needle in [
+        "@VERSION@",
+        "raw-usb",
+        "name: droidkraft",
+        "bin/droidkraft-tui",
+    ] {
+        assert!(s.contains(needle), "snapcraft.yaml.in missing {needle}");
+    }
+}
+
+#[test]
 fn deb_rpm_assets_exist() {
     for p in [
         "packaging/linux/droidkraft.desktop",
