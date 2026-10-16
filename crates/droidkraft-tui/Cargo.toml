@@ -59,7 +59,7 @@ pkg-fmt = "zip"
 name = "droidkraft-tui"
 section = "utils"
 priority = "optional"
-depends = "$auto"
+depends = "libc6 (>= 2.17)"
 recommends = "android-sdk-platform-tools-common | adb"
 extended-description = "Terminal UI for Android devices: live stats, logcat with fuzzy search, in-terminal screen mirror, fastboot/ADB flashing."
 assets = [
@@ -71,6 +71,7 @@ assets = [
 
 # `cargo generate-rpm -p crates/droidkraft-tui`
 [package.metadata.generate-rpm]
+auto-req = "disabled"
 assets = [
     { source = "target/release/droidkraft-tui", dest = "/usr/bin/droidkraft-tui", mode = "755" },
     { source = "packaging/linux/droidkraft-tui.desktop", dest = "/usr/share/applications/droidkraft-tui.desktop", mode = "644" },

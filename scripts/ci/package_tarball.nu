@@ -13,7 +13,8 @@ def main [version: string, target: string, --gui] {
         let stage = $"dist/($name)-($version)-($target)"
         rm -rf $stage
         mkdir $stage
-        let dir = if $windows { "target/x86_64-pc-windows-msvc/release" } else { "target/release" }
+        let triple_dir = $"target/($target)/release"
+        let dir = if ($triple_dir | path exists) { $triple_dir } else { "target/release" }
         cp $"($dir)/($name)($ext)" LICENSE README.md $stage
         let out = $"($name)-($version)-($target)"
         cd $stage
