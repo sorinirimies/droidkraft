@@ -2,7 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.2] - 2026-10-16
+
+### 📦 Packaging
+
+- **packages:** Setup-zig v2 (v1 URL scheme 404s for zig 0.14.1) - ([ca7666a](https://github.com/sorinirimies/droidkraft/commit/ca7666a4b0ed4ff74bc9e5810084f823e9050e08))
+
+- **packages:** Install zig straight from ziglang.org - ([fa4473a](https://github.com/sorinirimies/droidkraft/commit/fa4473a1e4496f8de856c49de8716abfed2ff07e))
+
+- **packages:** Zvm fallback for zig install - ([fe8aefb](https://github.com/sorinirimies/droidkraft/commit/fe8aefbc895f60b76f3d07d2369f738410ccfa13))
+
+- **packages:** Install zig via zvm - ([34d4c3c](https://github.com/sorinirimies/droidkraft/commit/34d4c3cee0fa71f78f1a8dacfec4819846997a4b))
+
+- **packages:** Direct-download fallback if zvm fails - ([0348416](https://github.com/sorinirimies/droidkraft/commit/0348416d397fb1d50ff557d12dee488baade3512))
+
+
 ## [2.1.1] - 2026-10-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 2.1.1 - ([888486a](https://github.com/sorinirimies/droidkraft/commit/888486a2c60ed4724934c9e49609148ec1c18654))
+
 
 ### 📦 Packaging
 
