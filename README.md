@@ -77,7 +77,7 @@ Every release attaches these, all built on Linux CI:
 | Debian · Ubuntu · Mint | `.deb` | ✅ x86_64 | ✅ x86_64 · arm64 |
 | Fedora · openSUSE · RHEL | `.rpm` | ✅ x86_64 | ✅ x86_64 · aarch64 |
 | Arch | `PKGBUILD` (`droidkraft-bin`, `droidkraft-tui-bin`) | ✅ x86_64 | ✅ x86_64 · aarch64 |
-| Linux | `.tar.gz` (glibc 2.17 TUI) | ✅ x86_64 | ✅ x86_64 · aarch64 |
+| Linux | `.tar.gz` (TUI) | ✅ x86_64 | ✅ x86_64 · aarch64 |
 | Windows | `.zip` | — | ✅ x86_64 |
 | macOS | `cargo install` | ✅ | ✅ |
 

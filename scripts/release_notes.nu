@@ -37,7 +37,7 @@ export def build_release_notes [version: string, cliff_changes: string, last_tag
         "| 🪟 Windows | **`.zip`** | — | ✅ x86_64 |"
         "| 🍎 macOS | `cargo install` | ✅ | ✅ |"
         ""
-        "The Linux TUI builds target glibc 2.17, so they run on old distros as well."
+        "The aarch64 TUI builds target glibc 2.17; x86_64 builds need glibc 2.35+ (Ubuntu 22.04). Older x86_64 distros: use `cargo install` or the Flatpak."
         ""
         "## 🔧 Install"
         ""
