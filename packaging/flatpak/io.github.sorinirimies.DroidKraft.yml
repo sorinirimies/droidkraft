@@ -5,6 +5,8 @@ runtime: org.freedesktop.Platform
 runtime-version: '24.08'
 sdk: org.freedesktop.Sdk
 command: droidkraft
+# The CI runner has no appstream-compose in the sandbox; metainfo is still installed below.
+appstream-compose: false
 finish-args:
   - --share=ipc
   - --share=network
