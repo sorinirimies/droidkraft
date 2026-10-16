@@ -238,6 +238,9 @@ def "test release changelog contains install command" [] {
 
 def "test release notes list every package format and both apps" [] {
     let notes = (build_release_notes "2.0.0" "- x" "v1.0.0")
+    for f in ["cargo install" "Windows" "Linux"] {
+        assert str contains $notes $f
+    }
     for f in ["AppImage" "Flatpak" "Snap" ".deb" ".rpm" "PKGBUILD" ".tar.gz" "Windows" "GUI" "TUI"] {
         assert str contains $notes $f
     }

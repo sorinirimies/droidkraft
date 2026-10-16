@@ -65,6 +65,20 @@ cargo run --release -p droidkraft         # GUI
 - GUI only: Xcode's Metal toolchain on macOS, or Wayland/X11 + Vulkan libs on Linux.
 - Fastboot over USB: on Linux add a udev rule for your device; on Windows install the Google USB driver.
 
+## Platform support 🖥️
+
+| | Linux x86_64 | Linux aarch64 | macOS | Windows x86_64 |
+|---|:-:|:-:|:-:|:-:|
+| **TUI** prebuilt | ✅ | ✅ | — | ✅ `.zip` |
+| **TUI** `cargo install` | ✅ | ✅ | ✅ | ✅ |
+| **GUI** prebuilt | ✅ | — | — | — |
+| **GUI** `cargo install` | ✅ | ✅ | ✅ | ⚠️ builds on Windows only |
+
+- **Linux:** AppImage, Flatpak, Snap, `.deb`, `.rpm`, `.tar.gz`, AUR, Nix, Homebrew.
+- **macOS:** no prebuilt binaries (CI is Linux-only); use `cargo install` / Homebrew-from-source. The GUI needs Xcode's Metal toolchain.
+- **Windows:** prebuilt TUI zip, cross-compiled with `cargo-xwin`. The GUI can only be built natively on Windows (gpui compiles its shaders with `fxc.exe`).
+- **Fastboot:** Linux needs a udev rule; Windows needs the Google USB driver.
+
 ## Downloads 📥
 
 Every release attaches these, all built on Linux CI:
