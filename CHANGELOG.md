@@ -2,7 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.1] - 2026-10-16
+
+### 📦 Packaging
+
+- **flatpak:** Disable appstream-compose (missing in CI sandbox) - ([08f31d4](https://github.com/sorinirimies/droidkraft/commit/08f31d43029ac2eb54d855376f7e130dbca3aaf6))
+
+- **packages:** Linux-only runners — drop macOS/Windows jobs, cross-compile Windows TUI with cargo-xwin - ([fa592b2](https://github.com/sorinirimies/droidkraft/commit/fa592b2b7b4177b9f5c004061623716c3f821a56))
+
+- **packages:** Zigbuild portable TUI (glibc 2.17, x86_64+aarch64) replaces arm runner - ([a61cada](https://github.com/sorinirimies/droidkraft/commit/a61cadaba72f10ea598c71ae57de15c5ae7e8196))
+
+- **packaging:** Snap package - ([8e5aa03](https://github.com/sorinirimies/droidkraft/commit/8e5aa03f5aea8a654f24ee8fcbfb703b7e43e01f))
+
+- **release:** GUI+TUI release notes with per-format downloads table; cliff packaging group; README downloads section - ([39c6357](https://github.com/sorinirimies/droidkraft/commit/39c635779cdbee4c8f3b1127f80b46bad0fb170b))
+
+- **packaging:** TUI and GUI each get their own Flatpak, Snap, AUR, Homebrew, binstall and Nix packages - ([14fdbcc](https://github.com/sorinirimies/droidkraft/commit/14fdbcc9522d89495178f523405b5ea797664f0c))
+
+
+### 🧪 Testing
+
+- Assert flatpak appstream-compose off - ([ce47960](https://github.com/sorinirimies/droidkraft/commit/ce4796055d7a0d440721ee711b5815a8eb17faa8))
+
+
 ## [2.1.0] - 2026-10-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 2.1.0 - ([082c51a](https://github.com/sorinirimies/droidkraft/commit/082c51ad630d7c9ee1cbfb9fe112a48a4a963318))
+
 
 ### 🐛 Bug Fixes
 
@@ -37,8 +64,6 @@ All notable changes to this project will be documented in this file.
 
 - Packaging scripts in nushell, packaging asset tests, prune tests - ([a8fc6f7](https://github.com/sorinirimies/droidkraft/commit/a8fc6f71b230c4579683ac9a226092b1cdfe3917))
 
-- **release:** Publish mirror + fastboot crates before core/tui/gui - ([8370629](https://github.com/sorinirimies/droidkraft/commit/8370629140b7e495f0f8b6b7211792189e78ef52))
-
 - Bump version to 2.0.0 - ([978acb5](https://github.com/sorinirimies/droidkraft/commit/978acb56f069cc47f8645f44c74010520620daba))
 
 
@@ -60,6 +85,13 @@ All notable changes to this project will be documented in this file.
 - Add TUI/GUI install, audit and fuzz badges - ([f054990](https://github.com/sorinirimies/droidkraft/commit/f05499065f2dfb15f25ae00388fe746f8cba5d88))
 
 
+### 📦 Packaging
+
+- **release:** Publish mirror + fastboot crates before core/tui/gui - ([8370629](https://github.com/sorinirimies/droidkraft/commit/8370629140b7e495f0f8b6b7211792189e78ef52))
+
+- **packaging:** Tarballs + binstall, deb, rpm, AUR PKGBUILD, Homebrew formula, Nix flake, aarch64 TUI - ([82b1ec5](https://github.com/sorinirimies/droidkraft/commit/82b1ec5472151cd6d2c1ff28835da281b3a182ab))
+
+
 ### 🚀 Features
 
 - Pure-Rust fastboot crate, device details API, native ADB sideload - ([61bbcae](https://github.com/sorinirimies/droidkraft/commit/61bbcaef1e6a94b5eade173fd17dfa0177382240))
@@ -77,8 +109,6 @@ All notable changes to this project will be documented in this file.
 - Thorough responsive design for TUI (wrapping footer, fitted header/tabs/banner/help) and GUI (adaptive tab bar), with tests - ([b10bcdf](https://github.com/sorinirimies/droidkraft/commit/b10bcdf026787a1d7f4b75a9e0e84a32ad57ce26))
 
 - **logs:** GUI search box, fuzzy search mode in core/TUI/GUI, regex/fuzzy/text cycling - ([022bb91](https://github.com/sorinirimies/droidkraft/commit/022bb91df4afed54e7da016033ab0877b7f93628))
-
-- **packaging:** Tarballs + binstall, deb, rpm, AUR PKGBUILD, Homebrew formula, Nix flake, aarch64 TUI - ([82b1ec5](https://github.com/sorinirimies/droidkraft/commit/82b1ec5472151cd6d2c1ff28835da281b3a182ab))
 
 
 ## [1.2.0] - 2026-07-19
