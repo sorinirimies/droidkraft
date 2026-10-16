@@ -90,7 +90,7 @@ jobs:
           cargo deb -p droidkraft-tui --no-build --target aarch64-unknown-linux-gnu -o dist/
           cargo generate-rpm -p crates/droidkraft-tui --target aarch64-unknown-linux-gnu -o dist/
           cargo deb -p droidkraft --no-build -o dist/
-          cargo generate-rpm -p crates/droidkraft -o dist/
+          cargo generate-rpm -p crates/droidkraft-gui -o dist/
       - uses: snapcore/action-build@v1
         id: snap-gui
         with: { path: snapbuild-gui }
