@@ -405,15 +405,9 @@ fuzz-check:
 
 # ── Memory / leak checks ──────────────────────────────────────────────────────
 
-# TUI soak: drive the Screen tab in a pty and sample RSS (needs a device). just soak-tui 120
-soak-tui secs="60":
-    cargo build --release -p droidkraft-tui
-    python3 scripts/soak_tui.py {{secs}}
-
-# GUI soak: sample RSS of the running GUI every 10s. just soak-gui 120
-soak-gui secs="60":
-    cargo build -p droidkraft
-    bash scripts/soak_gui.sh {{secs}}
+# Sample memory of a running process: just soak droidkraft-tui 120 (start it first; open the Screen tab)
+soak name="droidkraft" secs="60":
+    nu scripts/soak.nu {{name}} {{secs}}
 
 # macOS: report leaked allocations in a running process (leaks <name>). just leaks droidkraft-tui
 leaks name="droidkraft-tui":
@@ -463,9 +457,6 @@ coverage:
 # Run benchmarks, if any (cargo bench)
 bench:
     cargo bench --workspace
-
-# Soak both frontends' memory (needs a device): just soak 60
-soak secs="60": (soak-tui secs) (soak-gui secs)
 
 # ── Publishing (order: mirror/fastboot → core → tui → gui) ────────────────────
 
