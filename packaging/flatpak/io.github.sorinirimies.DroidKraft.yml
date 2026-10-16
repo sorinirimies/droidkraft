@@ -1,4 +1,4 @@
-# Built from the prebuilt release binary (see scripts/ci/package_flatpak.sh);
+# Built from the prebuilt release binary (see scripts/ci/package_flatpak.nu);
 # the Rust toolchain is not needed inside the sandbox.
 app-id: io.github.sorinirimies.DroidKraft
 runtime: org.freedesktop.Platform

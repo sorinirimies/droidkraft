@@ -64,13 +64,13 @@ fn flatpak_manifest_matches_metainfo() {
     assert!(m.contains("command: droidkraft"));
     let info = text(&format!("packaging/linux/{APP_ID}.metainfo.xml"));
     assert!(info.contains(&format!("<id>{APP_ID}</id>")));
-    assert!(info.contains("VERSION"), "placeholder replaced by package_flatpak.sh");
+    assert!(info.contains("VERSION"), "placeholder replaced by package_flatpak.nu");
 }
 
 #[test]
 fn release_workflow_builds_every_package_type() {
     let w = text(".github/workflows/packages.yml");
-    for needle in ["AppImage", "flatpak", "windows-latest", "macos-14", "prune_releases.sh"] {
+    for needle in ["AppImage", "flatpak", "windows-latest", "macos-14", "prune_releases.nu"] {
         assert!(w.contains(needle), "packages.yml missing {needle}");
     }
 }

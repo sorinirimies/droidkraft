@@ -1,4 +1,4 @@
-; Built by scripts/ci/package_windows.sh with -DVERSION -DSRC -DOUT
+; Built by scripts/ci/package_windows.nu with -DVERSION -DSRC -DOUT
 !include "MUI2.nsh"
 Name "DroidKraft"
 OutFile "${OUT}"
