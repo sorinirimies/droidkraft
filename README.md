@@ -65,6 +65,19 @@ cargo run --release -p droidkraft         # GUI
 - GUI only: Xcode's Metal toolchain on macOS, or Wayland/X11 + Vulkan libs on Linux.
 - Fastboot over USB: on Linux add a udev rule for your device; on Windows install the Google USB driver.
 
+### Prebuilt packages
+
+Every release page has: AppImage, Flatpak, `.deb`, `.rpm`, Windows zip + installer, macOS `.dmg`, and plain `.tar.gz` archives (x86_64 + aarch64).
+
+```sh
+cargo binstall droidkraft-tui          # prebuilt, no compile
+sudo apt install ./droidkraft-tui_*.deb   # Debian / Ubuntu
+sudo dnf install ./droidkraft-tui-*.rpm    # Fedora / openSUSE
+brew install sorinirimies/tap/droidkraft-tui   # formula rendered into the release (droidkraft-tui.rb)
+yay -S droidkraft-tui-bin              # Arch, PKGBUILD attached to the release
+nix run github:sorinirimies/droidkraft # Nix flake (TUI)
+```
+
 ## Usage 🎮
 
 ```bash

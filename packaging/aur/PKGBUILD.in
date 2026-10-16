@@ -1,0 +1,23 @@
+# Maintainer: Sorin Albu-Irimies <mihaiirimies@gmail.com>
+# Rendered by scripts/ci/render_packaging.nu — do not edit the generated PKGBUILD.
+pkgname=droidkraft-tui-bin
+_name=droidkraft-tui
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc="Terminal UI for Android devices: stats, logcat, mirror, fastboot/ADB flashing"
+arch=('x86_64' 'aarch64')
+url="https://github.com/sorinirimies/droidkraft"
+license=('MIT')
+depends=('glibc' 'gcc-libs')
+optional=('android-tools: adb for some commands' 'ffmpeg: screen mirror')
+provides=('droidkraft-tui')
+conflicts=('droidkraft-tui')
+source_x86_64=("$url/releases/download/v$pkgver/$_name-$pkgver-x86_64-unknown-linux-gnu.tar.gz")
+source_aarch64=("$url/releases/download/v$pkgver/$_name-$pkgver-aarch64-unknown-linux-gnu.tar.gz")
+sha256sums_x86_64=('@SHA_X86_64@')
+sha256sums_aarch64=('@SHA_AARCH64@')
+
+package() {
+  install -Dm755 "$srcdir/$_name" "$pkgdir/usr/bin/$_name"
+  install -Dm644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

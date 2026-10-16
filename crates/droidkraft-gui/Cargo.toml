@@ -28,3 +28,26 @@ gpui = "0.2.2"
 serde      = { workspace = true }
 serde_json = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+
+# ── Packaging metadata ────────────────────────────────────────────────────────
+# `cargo deb -p droidkraft --no-build`
+[package.metadata.deb]
+name = "droidkraft"
+section = "utils"
+priority = "optional"
+depends = "$auto, libxkbcommon0, libvulkan1"
+recommends = "android-sdk-platform-tools-common | adb"
+extended-description = "Per-device workspaces with live stats, screen mirroring and recording, logcat with fuzzy search, and a native fastboot/ADB flashing toolkit."
+assets = [
+    ["target/release/droidkraft", "usr/bin/", "755"],
+    ["../../packaging/linux/droidkraft.desktop", "usr/share/applications/", "644"],
+    ["../../assets/icons/droidkraft.png", "usr/share/icons/hicolor/256x256/apps/droidkraft.png", "644"],
+]
+
+# `cargo generate-rpm -p crates/droidkraft-gui`
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/droidkraft", dest = "/usr/bin/droidkraft", mode = "755" },
+    { source = "packaging/linux/droidkraft.desktop", dest = "/usr/share/applications/droidkraft.desktop", mode = "644" },
+    { source = "assets/icons/droidkraft.png", dest = "/usr/share/icons/hicolor/256x256/apps/droidkraft.png", mode = "644" },
+]

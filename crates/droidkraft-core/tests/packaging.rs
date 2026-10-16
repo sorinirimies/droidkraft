@@ -74,3 +74,26 @@ fn release_workflow_builds_every_package_type() {
         assert!(w.contains(needle), "packages.yml missing {needle}");
     }
 }
+
+#[test]
+fn tui_cargo_toml_has_binstall_deb_and_rpm_metadata() {
+    let t = text("crates/droidkraft-tui/Cargo.toml");
+    for needle in ["[package.metadata.binstall]", "[package.metadata.deb]", "[package.metadata.generate-rpm]"] {
+        assert!(t.contains(needle), "missing {needle}");
+    }
+    // binstall URL must match package_tarball.nu's file naming.
+    assert!(t.contains("{ name }-{ version }-{ target }{ archive-suffix }"));
+    let g = text("crates/droidkraft-gui/Cargo.toml");
+    assert!(g.contains("[package.metadata.deb]") && g.contains("[package.metadata.generate-rpm]"));
+}
+
+#[test]
+fn deb_rpm_assets_exist() {
+    for p in [
+        "packaging/linux/droidkraft.desktop",
+        "packaging/linux/droidkraft-tui.desktop",
+        "assets/icons/droidkraft.png",
+    ] {
+        assert!(root(p).exists(), "{p} missing");
+    }
+}

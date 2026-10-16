@@ -43,3 +43,36 @@ serde             = { workspace = true }
 serde_json        = { workspace = true }
 adb_client        = { workspace = true }
 image             = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+
+# ── Packaging metadata ────────────────────────────────────────────────────────
+# `cargo binstall droidkraft-tui` downloads the prebuilt release tarball.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-{ target }{ archive-suffix }"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+
+# `cargo deb -p droidkraft-tui --no-build`
+[package.metadata.deb]
+name = "droidkraft-tui"
+section = "utils"
+priority = "optional"
+depends = "$auto"
+recommends = "android-sdk-platform-tools-common | adb"
+extended-description = "Terminal UI for Android devices: live stats, logcat with fuzzy search, in-terminal screen mirror, fastboot/ADB flashing."
+assets = [
+    ["target/release/droidkraft-tui", "usr/bin/", "755"],
+    ["../../packaging/linux/droidkraft-tui.desktop", "usr/share/applications/", "644"],
+    ["../../assets/icons/droidkraft.png", "usr/share/icons/hicolor/256x256/apps/droidkraft.png", "644"],
+    ["README.md", "usr/share/doc/droidkraft-tui/README", "644"],
+]
+
+# `cargo generate-rpm -p crates/droidkraft-tui`
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/droidkraft-tui", dest = "/usr/bin/droidkraft-tui", mode = "755" },
+    { source = "packaging/linux/droidkraft-tui.desktop", dest = "/usr/share/applications/droidkraft-tui.desktop", mode = "644" },
+    { source = "assets/icons/droidkraft.png", dest = "/usr/share/icons/hicolor/256x256/apps/droidkraft.png", mode = "644" },
+]

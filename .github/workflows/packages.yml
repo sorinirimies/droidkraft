@@ -46,6 +46,8 @@ jobs:
         run: |
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+      - uses: taiki-e/install-action@v2
+        with: { tool: "cargo-deb,cargo-generate-rpm" }
       - name: appimagetool
         run: |
           curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
@@ -57,12 +59,21 @@ jobs:
           V="${TAG#v}"
           nu scripts/ci/package_appimage.nu "$V"
           nu scripts/ci/package_flatpak.nu "$V"
+          nu scripts/ci/package_tarball.nu "$V" x86_64-unknown-linux-gnu
+          nu scripts/ci/package_tarball.nu "$V" x86_64-unknown-linux-gnu --gui
+          cargo deb -p droidkraft-tui --no-build -o dist/
+          cargo deb -p droidkraft --no-build -o dist/
+          cargo generate-rpm -p crates/droidkraft-tui -o dist/
+          cargo generate-rpm -p crates/droidkraft -o dist/
       - uses: actions/upload-artifact@v4
         with:
           name: linux
           path: |
             dist/*.AppImage
             dist/*.flatpak
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
 
   windows:
     needs: release
@@ -79,6 +90,7 @@ jobs:
       - run: |
           export PATH="$PATH:/c/Program Files (x86)/NSIS"
           nu scripts/ci/package_windows.nu "${TAG#v}"
+          nu scripts/ci/package_tarball.nu "${TAG#v}" x86_64-pc-windows-msvc
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -86,13 +98,38 @@ jobs:
             dist/*.zip
             dist/*-setup.exe
 
+  linux-arm64:
+    needs: release
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-nu@v3
+        with: { version: "0.116.1" }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with: { tool: "cargo-deb,cargo-generate-rpm" }
+      - run: cargo build --release -p droidkraft-tui
+      - run: |
+          V="${TAG#v}"
+          nu scripts/ci/package_tarball.nu "$V" aarch64-unknown-linux-gnu
+          cargo deb -p droidkraft-tui --no-build -o dist/
+          cargo generate-rpm -p crates/droidkraft-tui -o dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64
+          path: |
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+
   macos:
     needs: release
     strategy:
       matrix:
         include:
-          - { os: macos-14, label: arm64 }
-          - { os: macos-13, label: x86_64 }
+          - { os: macos-14, label: arm64, target: aarch64-apple-darwin }
+          - { os: macos-13, label: x86_64, target: x86_64-apple-darwin }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -102,11 +139,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release -p droidkraft -p droidkraft-tui
       - run: nu scripts/ci/package_macos.nu "${TAG#v}" ${{ matrix.label }}
+      - run: nu scripts/ci/package_tarball.nu "${TAG#v}" ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with: { name: "macos-${{ matrix.label }}", path: "dist/*.dmg" }
 
   publish:
-    needs: [linux, windows, macos]
+    needs: [linux, linux-arm64, windows, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -118,5 +156,7 @@ jobs:
         env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
         run: |
           ls -l dist
+          V="${TAG#v}"
+          nu scripts/ci/render_packaging.nu "$V"
           gh release upload "$TAG" dist/* --clobber
           nu scripts/ci/prune_releases.nu "$TAG"
