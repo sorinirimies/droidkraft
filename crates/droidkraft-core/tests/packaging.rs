@@ -6,7 +6,9 @@ use std::path::PathBuf;
 const APP_ID: &str = "io.github.sorinirimies.DroidKraft";
 
 fn root(p: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").join(p)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(p)
 }
 
 fn read(p: &str) -> Vec<u8> {
@@ -45,7 +47,10 @@ fn ico_has_directory_and_valid_offsets() {
 fn icns_length_header_matches_file() {
     let b = read("assets/icons/droidkraft.icns");
     assert_eq!(&b[..4], b"icns");
-    assert_eq!(u32::from_be_bytes(b[4..8].try_into().unwrap()) as usize, b.len());
+    assert_eq!(
+        u32::from_be_bytes(b[4..8].try_into().unwrap()) as usize,
+        b.len()
+    );
 }
 
 #[test]
@@ -64,13 +69,22 @@ fn flatpak_manifest_matches_metainfo() {
     assert!(m.contains("command: droidkraft"));
     let info = text(&format!("packaging/linux/{APP_ID}.metainfo.xml"));
     assert!(info.contains(&format!("<id>{APP_ID}</id>")));
-    assert!(info.contains("VERSION"), "placeholder replaced by package_flatpak.nu");
+    assert!(
+        info.contains("VERSION"),
+        "placeholder replaced by package_flatpak.nu"
+    );
 }
 
 #[test]
 fn release_workflow_builds_every_package_type() {
     let w = text(".github/workflows/packages.yml");
-    for needle in ["AppImage", "flatpak", "windows-latest", "macos-14", "prune_releases.nu"] {
+    for needle in [
+        "AppImage",
+        "flatpak",
+        "windows-latest",
+        "macos-14",
+        "prune_releases.nu",
+    ] {
         assert!(w.contains(needle), "packages.yml missing {needle}");
     }
 }
@@ -78,7 +92,11 @@ fn release_workflow_builds_every_package_type() {
 #[test]
 fn tui_cargo_toml_has_binstall_deb_and_rpm_metadata() {
     let t = text("crates/droidkraft-tui/Cargo.toml");
-    for needle in ["[package.metadata.binstall]", "[package.metadata.deb]", "[package.metadata.generate-rpm]"] {
+    for needle in [
+        "[package.metadata.binstall]",
+        "[package.metadata.deb]",
+        "[package.metadata.generate-rpm]",
+    ] {
         assert!(t.contains(needle), "missing {needle}");
     }
     // binstall URL must match package_tarball.nu's file naming.

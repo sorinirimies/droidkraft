@@ -791,6 +791,7 @@ mod tests {
         for (w, h) in [(80, 24), (200, 60)] {
             let mut m = screen_model();
             m.workspaces.get_mut("TESTSERIAL").unwrap().state = "offline".into();
+            m.screen.state_override = Some(ScreenState::default());
             let out = render(&mut m, w, h);
             assert!(out.contains("Screen"));
             assert!(out.contains("No device connected"));

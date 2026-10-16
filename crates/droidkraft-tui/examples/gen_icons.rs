@@ -73,7 +73,15 @@ fn main() -> std::io::Result<()> {
 
     // .icns: PNG-compressed entries, big-endian lengths
     let mut body = Vec::new();
-    for (tag, s) in [("icp4", 16u32), ("icp5", 32), ("icp6", 64), ("ic07", 128), ("ic08", 256), ("ic09", 512), ("ic10", 1024)] {
+    for (tag, s) in [
+        ("icp4", 16u32),
+        ("icp5", 32),
+        ("icp6", 64),
+        ("ic07", 128),
+        ("ic08", 256),
+        ("ic09", 512),
+        ("ic10", 1024),
+    ] {
         let d = png(&at(s));
         body.extend(tag.as_bytes());
         body.extend((d.len() as u32 + 8).to_be_bytes());
