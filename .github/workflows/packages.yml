@@ -216,11 +216,16 @@ jobs:
               "pacman -Syu --noconfirm base-devel >/dev/null && useradd -m b && chown -R b /pkg && su b -c 'cd /pkg && makepkg -f --noconfirm --nodeps'"
             gh release upload "$TAG" arch/$p/*.pkg.tar.zst --clobber
           done
-      - name: Alpine .apk (x86_64)
+      - uses: docker/setup-qemu-action@v3
+      - name: Alpine .apk (x86_64 + aarch64)
         continue-on-error: true
         env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
         run: |
-          mkdir -p alpine && cp dist/APKBUILD alpine/APKBUILD
-          docker run --rm -v "$PWD/alpine:/w" alpine:3.20 sh -c \
-            "apk add --no-cache alpine-sdk >/dev/null && adduser -D b && addgroup b abuild && chown -R b /w && su b -c 'abuild-keygen -a -n && cd /w && abuild checksum && abuild -r' && cp /home/b/packages/w/x86_64/*.apk /w/"
-          gh release upload "$TAG" alpine/*.apk --clobber
+          for plat in amd64:x86_64 arm64:aarch64; do
+            P="${plat%%:*}"; A="${plat##*:}"
+            mkdir -p "alpine-$A" && cp dist/APKBUILD "alpine-$A/APKBUILD"
+            docker run --rm --platform "linux/$P" -v "$PWD/alpine-$A:/w" alpine:3.20 sh -c \
+              "apk add --no-cache alpine-sdk >/dev/null && adduser -D b && addgroup b abuild && chown -R b /w && su b -c 'abuild-keygen -a -n && cd /w && abuild checksum && abuild -r' && cp /home/b/packages/w/$A/*.apk /w/"
+            for f in alpine-$A/*.apk; do mv "$f" "${f%.apk}-$A.apk"; done
+            gh release upload "$TAG" alpine-$A/*-$A.apk --clobber
+          done

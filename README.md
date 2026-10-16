@@ -91,7 +91,7 @@ Every release attaches these, all built on Linux CI:
 | Debian · Ubuntu · Mint | `.deb` | ✅ x86_64 | ✅ x86_64 · arm64 |
 | Fedora · openSUSE · RHEL | `.rpm` | ✅ x86_64 | ✅ x86_64 · aarch64 |
 | Arch | `.pkg.tar.zst` + `PKGBUILD` (`droidkraft-bin`, `droidkraft-tui-bin`) | ✅ x86_64 | ✅ x86_64 · aarch64 |
-| Alpine | `.apk` (static musl) | — | ✅ x86_64 |
+| Alpine | `.apk` (static musl) | — | ✅ x86_64 · aarch64 |
 | Linux | static musl `.tar.gz` (any distro) | — | ✅ x86_64 · aarch64 |
 | Linux | `.tar.gz` (TUI) | ✅ x86_64 | ✅ x86_64 · aarch64 |
 | Windows | `.zip`, NSIS installer `-setup.exe` | — | ✅ x86_64 |
