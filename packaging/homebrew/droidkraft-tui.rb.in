@@ -1,9 +1,21 @@
-# Linux-only (no macOS CI runners). Rendered by scripts/ci/render_packaging.nu → copy to your tap (homebrew-tap/Formula/).
+# Rendered by scripts/ci/render_packaging.nu → copy to your tap (homebrew-tap/Formula/).
+# macOS binaries are cross-compiled on Linux CI; Linux uses the glibc builds.
 class DroidkraftTui < Formula
   desc "Terminal UI for Android devices: stats, logcat, mirror, fastboot/ADB flashing"
   homepage "https://github.com/sorinirimies/droidkraft"
   version "@VERSION@"
   license "MIT"
+
+  on_macos do
+    on_arm do
+      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-@VERSION@-aarch64-apple-darwin.tar.gz"
+      sha256 "@SHA_MACOS_ARM@"
+    end
+    on_intel do
+      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-@VERSION@-x86_64-apple-darwin.tar.gz"
+      sha256 "@SHA_MACOS_X86@"
+    end
+  end
 
   on_linux do
     on_arm do

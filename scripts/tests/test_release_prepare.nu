@@ -241,7 +241,7 @@ def "test release notes list every package format and both apps" [] {
     for f in ["cargo install" "Windows" "Linux"] {
         assert str contains $notes $f
     }
-    for f in ["AppImage" "Flatpak" "Snap" ".deb" ".rpm" "PKGBUILD" ".tar.gz" "Windows" "GUI" "TUI"] {
+    for f in ["AppImage" "Flatpak" "Snap" ".deb" ".rpm" "PKGBUILD" ".pkg.tar.zst" ".apk" "Scoop" "winget" "Chocolatey" "setup.exe" "macOS" "Homebrew" ".tar.gz" "Windows" "GUI" "TUI"] {
         assert str contains $notes $f
     }
 }

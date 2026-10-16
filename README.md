@@ -69,14 +69,14 @@ cargo run --release -p droidkraft         # GUI
 
 | | Linux x86_64 | Linux aarch64 | macOS | Windows x86_64 |
 |---|:-:|:-:|:-:|:-:|
-| **TUI** prebuilt | ✅ | ✅ | — | ✅ `.zip` |
+| **TUI** prebuilt | ✅ | ✅ | ✅ arm64 · x86_64 | ✅ `.zip` · installer |
 | **TUI** `cargo install` | ✅ | ✅ | ✅ | ✅ |
 | **GUI** prebuilt | ✅ | — | — | — |
 | **GUI** `cargo install` | ✅ | ✅ | ✅ | ⚠️ builds on Windows only |
 
 - **Linux:** AppImage, Flatpak, Snap, `.deb`, `.rpm`, `.tar.gz`, AUR, Nix, Homebrew.
-- **macOS:** no prebuilt binaries (CI is Linux-only); use `cargo install` / Homebrew-from-source. The GUI needs Xcode's Metal toolchain.
-- **Windows:** prebuilt TUI zip, cross-compiled with `cargo-xwin`. The GUI can only be built natively on Windows (gpui compiles its shaders with `fxc.exe`).
+- **macOS:** prebuilt TUI tarballs (arm64 + x86_64, cross-compiled from Linux with zig, best-effort) and a Homebrew formula. The GUI needs `cargo install` and Xcode's Metal toolchain.
+- **Windows:** prebuilt TUI zip and installer (adds `droidkraft-tui` to PATH), cross-compiled with `cargo-xwin`; Scoop, winget and Chocolatey manifests are attached. The GUI can only be built natively on Windows (gpui compiles its shaders with `fxc.exe`).
 - **Fastboot:** Linux needs a udev rule; Windows needs the Google USB driver.
 
 ## Downloads 📥
@@ -90,9 +90,13 @@ Every release attaches these, all built on Linux CI:
 | Linux | Snap (one per app) | ✅ | ✅ |
 | Debian · Ubuntu · Mint | `.deb` | ✅ x86_64 | ✅ x86_64 · arm64 |
 | Fedora · openSUSE · RHEL | `.rpm` | ✅ x86_64 | ✅ x86_64 · aarch64 |
-| Arch | `PKGBUILD` (`droidkraft-bin`, `droidkraft-tui-bin`) | ✅ x86_64 | ✅ x86_64 · aarch64 |
+| Arch | `.pkg.tar.zst` + `PKGBUILD` (`droidkraft-bin`, `droidkraft-tui-bin`) | ✅ x86_64 | ✅ x86_64 · aarch64 |
+| Alpine | `.apk` (static musl) | — | ✅ x86_64 |
+| Linux | static musl `.tar.gz` (any distro) | — | ✅ x86_64 · aarch64 |
 | Linux | `.tar.gz` (TUI) | ✅ x86_64 | ✅ x86_64 · aarch64 |
-| Windows | `.zip` | — | ✅ x86_64 |
+| Windows | `.zip`, NSIS installer `-setup.exe` | — | ✅ x86_64 |
+| Windows | Scoop · winget · Chocolatey manifests | — | ✅ x86_64 |
+| macOS | `.tar.gz` (arm64, x86_64), Homebrew formula | — | ✅ |
 | macOS | `cargo install` | ✅ | ✅ |
 
 ```sh

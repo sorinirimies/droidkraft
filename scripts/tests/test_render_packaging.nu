@@ -5,7 +5,7 @@
 
 use std/assert
 use ./runner.nu *
-use ../ci/render_packaging.nu [render, sha]
+use ../ci/render_packaging.nu [render, sha, outputs]
 
 def "test render replaces every placeholder" [] {
     let out = (render "v@VERSION@ @SHA@ @VERSION@" { VERSION: "1.2.3", SHA: "abc" })
@@ -25,8 +25,8 @@ def "test sha hashes an existing tarball" [] {
 }
 
 def "test templates only use known placeholders" [] {
-    let known = [VERSION SHA_X86_64 SHA_AARCH64 SHA_GUI_X86_64]
-    for f in [packaging/aur/PKGBUILD.in packaging/aur/PKGBUILD-gui.in packaging/homebrew/droidkraft-tui.rb.in packaging/homebrew/droidkraft.rb.in] {
+    let known = [VERSION SHA_X86_64 SHA_AARCH64 SHA_GUI_X86_64 SHA_MACOS_ARM SHA_MACOS_X86 SHA_WIN_ZIP]
+    for f in (outputs | get tpl) {
         let used = (open --raw $f | parse --regex '@(?P<k>[A-Z0-9_]+)@' | get k | uniq)
         for k in $used { assert ($k in $known) $"($f): unknown placeholder @($k)@" }
     }

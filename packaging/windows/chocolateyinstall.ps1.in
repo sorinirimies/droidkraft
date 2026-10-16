@@ -1,0 +1,5 @@
+$ErrorActionPreference = 'Stop'
+Install-ChocolateyZipPackage -PackageName 'droidkraft-tui' `
+  -Url64bit 'https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-@VERSION@-x86_64-pc-windows-msvc.zip' `
+  -Checksum64 '@SHA_WIN_ZIP@' -ChecksumType64 'sha256' `
+  -UnzipLocation "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)"

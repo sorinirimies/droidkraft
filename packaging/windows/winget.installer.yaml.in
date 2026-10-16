@@ -1,0 +1,13 @@
+PackageIdentifier: sorinirimies.DroidKraftTui
+PackageVersion: @VERSION@
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+  - RelativeFilePath: droidkraft-tui.exe
+    PortableCommandAlias: droidkraft-tui
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-@VERSION@-x86_64-pc-windows-msvc.zip
+    InstallerSha256: @SHA_WIN_ZIP@
+ManifestType: installer
+ManifestVersion: 1.6.0

@@ -1,0 +1,21 @@
+{
+    "version": "@VERSION@",
+    "description": "Terminal UI for Android devices: stats, logcat, mirror, fastboot/ADB flashing",
+    "homepage": "https://github.com/sorinirimies/droidkraft",
+    "license": "MIT",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-@VERSION@-x86_64-pc-windows-msvc.zip",
+            "hash": "@SHA_WIN_ZIP@"
+        }
+    },
+    "bin": "droidkraft-tui.exe",
+    "checkver": { "github": "https://github.com/sorinirimies/droidkraft" },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/sorinirimies/droidkraft/releases/download/v$version/droidkraft-tui-$version-x86_64-pc-windows-msvc.zip"
+            }
+        }
+    }
+}

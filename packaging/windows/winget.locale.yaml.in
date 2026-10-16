@@ -1,0 +1,11 @@
+PackageIdentifier: sorinirimies.DroidKraftTui
+PackageVersion: @VERSION@
+PackageLocale: en-US
+Publisher: sorinirimies
+PackageName: DroidKraft (terminal)
+License: MIT
+ShortDescription: Terminal UI for Android devices: stats, logcat, mirror, fastboot/ADB flashing
+PackageUrl: https://github.com/sorinirimies/droidkraft
+Tags: [android, adb, fastboot, logcat, tui]
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

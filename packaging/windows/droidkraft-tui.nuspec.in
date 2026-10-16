@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>droidkraft-tui</id>
+    <version>@VERSION@</version>
+    <title>DroidKraft (terminal)</title>
+    <authors>sorinirimies</authors>
+    <projectUrl>https://github.com/sorinirimies/droidkraft</projectUrl>
+    <licenseUrl>https://github.com/sorinirimies/droidkraft/blob/main/LICENSE</licenseUrl>
+    <tags>android adb fastboot logcat tui cli</tags>
+    <summary>Terminal UI for Android devices</summary>
+    <description>Per-device workspaces with live stats, in-terminal screen mirror, logcat with fuzzy search, and a native fastboot/ADB flashing toolkit.</description>
+  </metadata>
+  <files>
+    <file src="chocolateyinstall.ps1" target="tools" />
+  </files>
+</package>

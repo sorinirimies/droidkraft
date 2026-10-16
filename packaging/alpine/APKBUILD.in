@@ -1,0 +1,17 @@
+# Maintainer: Sorin Albu-Irimies <mihaiirimies@gmail.com>
+# Rendered by scripts/ci/render_packaging.nu. Repackages the static musl release binary.
+pkgname=droidkraft-tui
+pkgver=@VERSION@
+pkgrel=0
+pkgdesc="Terminal UI for Android devices: stats, logcat, mirror, fastboot/ADB flashing"
+url="https://github.com/sorinirimies/droidkraft"
+arch="x86_64 aarch64"
+license="MIT"
+options="!check !strip"
+source="droidkraft-tui-$pkgver-$CARCH.tar.gz::$url/releases/download/v$pkgver/droidkraft-tui-$pkgver-$CARCH-unknown-linux-musl.tar.gz"
+builddir="$srcdir"
+
+package() {
+	install -Dm755 "$srcdir/droidkraft-tui" "$pkgdir/usr/bin/droidkraft-tui"
+	install -Dm644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

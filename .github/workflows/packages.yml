@@ -62,7 +62,7 @@ jobs:
           fi
       - uses: taiki-e/install-action@v2
         with: { tool: cargo-zigbuild }
-      - run: rustup target add aarch64-unknown-linux-gnu
+      - run: rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-musl aarch64-unknown-linux-musl
       - name: appimagetool
         run: |
           curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
@@ -74,9 +74,17 @@ jobs:
         env:
           LIBUDEV_NO_PKG_CONFIG: "1"
         run: cargo zigbuild --release -p droidkraft-tui --target aarch64-unknown-linux-gnu.2.17
+      - name: Static musl TUI builds (Alpine, any distro)
+        env:
+          LIBUDEV_NO_PKG_CONFIG: "1"
+        run: |
+          cargo zigbuild --release -p droidkraft-tui --target x86_64-unknown-linux-musl
+          cargo zigbuild --release -p droidkraft-tui --target aarch64-unknown-linux-musl
       - name: Package
         run: |
           V="${TAG#v}"
+          nu scripts/ci/package_tarball.nu "$V" x86_64-unknown-linux-musl
+          nu scripts/ci/package_tarball.nu "$V" aarch64-unknown-linux-musl
           nu scripts/ci/package_appimage.nu "$V"
           nu scripts/ci/package_flatpak.nu "$V"
           nu scripts/ci/package_flatpak.nu "$V" --tui
@@ -124,15 +132,64 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang lld llvm zip
       - uses: taiki-e/install-action@v2
         with: { tool: cargo-xwin }
+      - run: sudo apt-get install -y --no-install-recommends nsis nsis-pluginapi
       - run: cargo xwin build --release --target x86_64-pc-windows-msvc -p droidkraft-tui
       - run: nu scripts/ci/package_tarball.nu "${TAG#v}" x86_64-pc-windows-msvc
+      - run: nu scripts/ci/package_windows.nu "${TAG#v}"
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*-setup.exe
+
+  # macOS TUI cross-compiled from Linux (zig + Apple SDK). Best-effort: a failure does not block the release.
+  macos:
+    needs: release
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-nu@v3
+        with: { version: "0.116.1" }
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "aarch64-apple-darwin,x86_64-apple-darwin" }
+      - uses: Swatinem/rust-cache@v2
+      - name: Install zig (zvm, direct-download fallback)
+        run: |
+          Z=0.15.2
+          if curl -fsSL --retry 5 https://www.zvm.app/install.sh | bash && PATH="$HOME/.zvm/bin:$HOME/.zvm/self:$PATH" zvm install "$Z"; then
+            echo "$HOME/.zvm/bin" >> "$GITHUB_PATH"
+            echo "$HOME/.zvm/self" >> "$GITHUB_PATH"
+          else
+            echo "::warning::zvm failed, downloading zig from ziglang.org"
+            curl -fsSL --retry 5 "https://ziglang.org/download/$Z/zig-x86_64-linux-$Z.tar.xz" | tar -xJ -C "$RUNNER_TEMP"
+            echo "$RUNNER_TEMP/zig-x86_64-linux-$Z" >> "$GITHUB_PATH"
+          fi
+      - uses: taiki-e/install-action@v2
+        with: { tool: cargo-zigbuild }
+      - name: macOS SDK
+        run: |
+          curl -fsSL --retry 5 https://github.com/joseluisq/macosx-sdks/releases/download/14.5/MacOSX14.5.sdk.tar.xz | tar -xJ -C "$RUNNER_TEMP"
+          echo "SDKROOT=$RUNNER_TEMP/MacOSX14.5.sdk" >> "$GITHUB_ENV"
+      - name: Build
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          cargo zigbuild --release -p droidkraft-tui --target aarch64-apple-darwin
+          cargo zigbuild --release -p droidkraft-tui --target x86_64-apple-darwin
+      - run: |
+          V="${TAG#v}"
+          nu scripts/ci/package_tarball.nu "$V" aarch64-apple-darwin
+          nu scripts/ci/package_tarball.nu "$V" x86_64-apple-darwin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*.tar.gz
 
   publish:
-    needs: [linux, windows]
+    needs: [linux, windows, macos]
+
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -148,3 +205,22 @@ jobs:
           nu scripts/ci/render_packaging.nu "$V"
           gh release upload "$TAG" dist/* --clobber
           nu scripts/ci/prune_releases.nu "$TAG"
+      # Native distro packages built from the rendered manifests (sources are the release assets uploaded above).
+      - name: Arch .pkg.tar.zst
+        continue-on-error: true
+        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          for p in droidkraft-tui-bin droidkraft-bin; do
+            mkdir -p "arch/$p" && cp "dist/PKGBUILD-$p" "arch/$p/PKGBUILD"
+            docker run --rm -v "$PWD/arch/$p:/pkg" archlinux:latest bash -c \
+              "pacman -Syu --noconfirm base-devel >/dev/null && useradd -m b && chown -R b /pkg && su b -c 'cd /pkg && makepkg -f --noconfirm --nodeps'"
+            gh release upload "$TAG" arch/$p/*.pkg.tar.zst --clobber
+          done
+      - name: Alpine .apk (x86_64)
+        continue-on-error: true
+        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          mkdir -p alpine && cp dist/APKBUILD alpine/APKBUILD
+          docker run --rm -v "$PWD/alpine:/w" alpine:3.20 sh -c \
+            "apk add --no-cache alpine-sdk >/dev/null && adduser -D b && addgroup b abuild && chown -R b /w && su b -c 'abuild-keygen -a -n && cd /w && abuild checksum && abuild -r' && cp /home/b/packages/w/x86_64/*.apk /w/"
+          gh release upload "$TAG" alpine/*.apk --clobber

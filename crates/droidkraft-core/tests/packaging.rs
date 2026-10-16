@@ -147,6 +147,31 @@ fn snap_templates_are_consistent() {
 }
 
 #[test]
+fn extra_package_manifests_exist() {
+    for p in [
+        "packaging/alpine/APKBUILD.in",
+        "packaging/windows/installer.nsi",
+        "packaging/windows/droidkraft-tui.scoop.json.in",
+        "packaging/windows/winget.installer.yaml.in",
+        "packaging/windows/droidkraft-tui.nuspec.in",
+        "scripts/ci/package_windows.nu",
+    ] {
+        assert!(root(p).exists(), "{p} missing");
+    }
+    let wf = text(".github/workflows/packages.yml");
+    for needle in [
+        "macos:",
+        "aarch64-apple-darwin",
+        "x86_64-unknown-linux-musl",
+        "package_windows.nu",
+        "makepkg",
+        "abuild",
+    ] {
+        assert!(wf.contains(needle), "packages.yml missing {needle}");
+    }
+}
+
+#[test]
 fn deb_rpm_assets_exist() {
     for p in [
         "packaging/linux/droidkraft.desktop",
