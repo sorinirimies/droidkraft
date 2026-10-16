@@ -136,6 +136,10 @@ fn snap_templates_are_consistent() {
         ),
     ] {
         let s = text(f);
+        assert!(
+            s.lines().any(|l| l == "base: core22"),
+            "{f} needs a top-level base"
+        );
         for needle in ["@VERSION@", "raw-usb", name] {
             assert!(s.contains(needle), "{f} missing {needle}");
         }

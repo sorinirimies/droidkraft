@@ -6,7 +6,7 @@ summary: Android device toolkit — stats, logcat, screen mirror, flashing
 description: |
   Per-device workspaces with live stats, screen mirroring and recording,
   logcat with fuzzy search, and a native fastboot/ADB flashing toolkit.
-  base: core22
+base: core22
 grade: stable
 confinement: strict
 license: MIT
