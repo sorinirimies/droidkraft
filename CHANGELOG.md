@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.3] - 2026-10-16
+
+### 📦 Packaging
+
+- **packages:** Zig 0.15.2 (0.14.1 rejects the .2.17 glibc suffix in cc-rs --target) - ([f6d90d9](https://github.com/sorinirimies/droidkraft/commit/f6d90d92fe3aa344f9c966b0a42669bee7a801be))
+
+
 ## [2.1.2] - 2026-10-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 2.1.2 - ([f1d2c90](https://github.com/sorinirimies/droidkraft/commit/f1d2c903f1a112580faa87c5d823dae6fbc038f9))
+
 
 ### 📦 Packaging
 
