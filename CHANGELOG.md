@@ -2,7 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.4] - 2026-10-16
+
+### 📚 Documentation
+
+- **readme:** GUI crate badge points at droidkraft - ([ae0fb2e](https://github.com/sorinirimies/droidkraft/commit/ae0fb2e960b114e895dee5677503dc02fbf8936f))
+
+
+### 📦 Packaging
+
+- **packages:** X86_64 TUI native, aarch64 via zigbuild (zigbuild breaks libusb cc build on same-arch target) - ([a085699](https://github.com/sorinirimies/droidkraft/commit/a085699367dd9d064c738195b9aaedff2146fa23))
+
+
 ## [2.1.3] - 2026-10-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 2.1.3 - ([0e5bf28](https://github.com/sorinirimies/droidkraft/commit/0e5bf281ca7934ee7f400f97a9c03630ba0b7f37))
+
 
 ### 📦 Packaging
 
