@@ -41,6 +41,7 @@ filter_unconventional = true
 split_commits = false
 
 commit_parsers = [
+  { message = "^[a-z]+\\((packaging|packages|release|flatpak|snap|deb|rpm|aur)\\)", group = "📦 Packaging" },
   { message = "^feat", group = "🚀 Features" },
   { message = "^fix", group = "🐛 Bug Fixes" },
   { message = "^doc", group = "📚 Documentation" },

@@ -65,17 +65,32 @@ cargo run --release -p droidkraft         # GUI
 - GUI only: Xcode's Metal toolchain on macOS, or Wayland/X11 + Vulkan libs on Linux.
 - Fastboot over USB: on Linux add a udev rule for your device; on Windows install the Google USB driver.
 
-### Prebuilt packages
+## Downloads 📥
 
-Every release page has (all built on Linux CI): AppImage, Flatpak, `.deb`, `.rpm`, and plain `.tar.gz` archives (x86_64 + aarch64), plus a cross-compiled Windows TUI `.zip`. macOS: `cargo install droidkraft-tui` / `droidkraft`.
+Every release attaches these, all built on Linux CI:
+
+| Platform | Format | GUI | TUI |
+|---|---|:-:|:-:|
+| Linux | AppImage | ✅ | ✅ |
+| Linux | Flatpak | ✅ | ✅ |
+| Linux | Snap | ✅ | ✅ |
+| Debian · Ubuntu · Mint | `.deb` | ✅ x86_64 | ✅ x86_64 · arm64 |
+| Fedora · openSUSE · RHEL | `.rpm` | ✅ x86_64 | ✅ x86_64 · aarch64 |
+| Arch | `PKGBUILD` (`droidkraft-tui-bin`) | — | ✅ |
+| Linux | `.tar.gz` (glibc 2.17 TUI) | ✅ x86_64 | ✅ x86_64 · aarch64 |
+| Windows | `.zip` | — | ✅ x86_64 |
+| macOS | `cargo install` | ✅ | ✅ |
 
 ```sh
-cargo binstall droidkraft-tui          # prebuilt, no compile
-sudo apt install ./droidkraft-tui_*.deb   # Debian / Ubuntu
-sudo dnf install ./droidkraft-tui-*.rpm    # Fedora / openSUSE
-brew install sorinirimies/tap/droidkraft-tui   # Linuxbrew formula (droidkraft-tui.rb on the release)
-yay -S droidkraft-tui-bin              # Arch, PKGBUILD attached to the release
-nix run github:sorinirimies/droidkraft # Nix flake (TUI)
+cargo binstall droidkraft-tui                  # prebuilt TUI, no compile
+sudo apt install ./droidkraft-tui_*.deb         # Debian / Ubuntu
+sudo dnf install ./droidkraft-tui-*.rpm          # Fedora / openSUSE
+flatpak install --user droidkraft-*.flatpak     # any distro
+sudo snap install --dangerous droidkraft_*.snap && sudo snap connect droidkraft:raw-usb
+chmod +x droidkraft-*.AppImage && ./droidkraft-*.AppImage
+makepkg -si                                     # Arch, with the release PKGBUILD
+nix run github:sorinirimies/droidkraft          # Nix flake (TUI)
+brew install sorinirimies/tap/droidkraft-tui    # Linuxbrew formula (droidkraft-tui.rb on the release)
 ```
 
 ## Usage 🎮

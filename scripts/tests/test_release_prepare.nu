@@ -5,6 +5,7 @@
 
 use std/assert
 use ./runner.nu *
+use ../release_notes.nu [build_release_notes]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -48,42 +49,6 @@ def apply_version_update [dir: string, new_version: string] {
     $updated | save --force $cargo_path
 }
 
-# Build the release notes string the same way release_prepare.nu does.
-def build_release_notes [version: string, cliff_changes: string, last_tag: string] {
-    let changes_header = if ($last_tag | is-empty) {
-        "### Initial Release"
-    } else {
-        $"### Changes since ($last_tag):"
-    }
-
-    [
-        $"# droidkraft ($version)"
-        ""
-        "## What's New"
-        ""
-        $changes_header
-        ""
-        $cliff_changes
-        ""
-        "## Installation"
-        ""
-        "```bash"
-        "cargo install droidkraft-tui"
-        "```"
-        ""
-        "## Quick Start"
-        ""
-        "```bash"
-        "# Run DroidKraft"
-        "droidkraft-tui"
-        ""
-        "# Navigate with vim-style keys"
-        "# Use j/k or arrow keys to navigate"
-        "# Press Enter or → to enter sub-menus"
-        "# Press Esc or q to quit"
-        "```"
-    ] | str join "\n"
-}
 
 # ── Tag stripping tests ────────────────────────────────────────────────────────
 
@@ -192,24 +157,24 @@ def "test last tag is trimmed" [] {
 
 def "test release notes contains version header" [] {
     let notes = build_release_notes "1.2.3" "- fix something" ""
-    assert str contains $notes "# droidkraft 1.2.3"
+    assert str contains $notes "# DroidKraft 1.2.3"
 }
 
 def "test release notes contains whats new section" [] {
     let notes = build_release_notes "1.2.3" "- fix something" ""
-    assert str contains $notes "## What's New"
+    assert str contains $notes "## 🚀 What's New"
 }
 
 def "test release notes initial release has correct header" [] {
     let notes = build_release_notes "1.0.0" "- initial" ""
-    assert str contains $notes "### Initial Release"
-    assert not ($notes | str contains "### Changes since")
+    assert str contains $notes "### 🎉 Initial Release"
+    assert not ($notes | str contains "### 📝 Changes since")
 }
 
 def "test release notes with previous tag has changes-since header" [] {
     let notes = build_release_notes "1.1.0" "- add feature" "v1.0.0"
-    assert str contains $notes "### Changes since v1.0.0:"
-    assert not ($notes | str contains "### Initial Release")
+    assert str contains $notes "### 📝 Changes since v1.0.0:"
+    assert not ($notes | str contains "### 🎉 Initial Release")
 }
 
 def "test release notes contains cliff changes" [] {
@@ -221,13 +186,13 @@ def "test release notes contains cliff changes" [] {
 
 def "test release notes contains installation section" [] {
     let notes = build_release_notes "1.2.3" "- changes" ""
-    assert str contains $notes "## Installation"
+    assert str contains $notes "## 📦 Downloads"
     assert str contains $notes "cargo install droidkraft-tui"
 }
 
 def "test release notes contains quick start section" [] {
     let notes = build_release_notes "1.2.3" "- changes" ""
-    assert str contains $notes "## Quick Start"
+    assert str contains $notes "## 🚀 Quick Start"
     assert str contains $notes "droidkraft"
 }
 
@@ -258,8 +223,8 @@ def "test release changelog file content matches notes" [] {
     $notes | save --force ($tmp | path join "RELEASE_CHANGELOG.md")
     let content = open --raw ($tmp | path join "RELEASE_CHANGELOG.md")
     rm -rf $tmp
-    assert str contains $content "# droidkraft 2.0.0"
-    assert str contains $content "### Changes since v1.0.0:"
+    assert str contains $content "# DroidKraft 2.0.0"
+    assert str contains $content "### 📝 Changes since v1.0.0:"
 }
 
 def "test release changelog contains install command" [] {
@@ -269,6 +234,13 @@ def "test release changelog contains install command" [] {
     let content = open --raw ($tmp | path join "RELEASE_CHANGELOG.md")
     rm -rf $tmp
     assert str contains $content "cargo install droidkraft-tui"
+}
+
+def "test release notes list every package format and both apps" [] {
+    let notes = (build_release_notes "2.0.0" "- x" "v1.0.0")
+    for f in ["AppImage" "Flatpak" "Snap" ".deb" ".rpm" "PKGBUILD" ".tar.gz" "Windows" "GUI" "TUI"] {
+        assert str contains $notes $f
+    }
 }
 
 # ── Runner ────────────────────────────────────────────────────────────────────

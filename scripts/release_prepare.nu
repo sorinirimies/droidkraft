@@ -5,6 +5,8 @@
 # Usage: nu scripts/release_prepare.nu <tag>
 # Example: nu scripts/release_prepare.nu v0.3.0
 
+use ./release_notes.nu [build_release_notes]
+
 def main [
     tag: string,  # The release tag, e.g. "v0.3.0"
 ] {
@@ -79,46 +81,7 @@ def main [
 
     let cliff_changes = open CLIFF_CHANGES.md --raw
 
-    let changes_header = if ($last_tag | is-empty) {
-        "### 🎉 Initial Release"
-    } else {
-        $"### 📝 Changes since ($last_tag):"
-    }
-
-    let notes = [
-        $"# droidkraft ($version)"
-        ""
-        "## 🚀 What's New"
-        ""
-        $changes_header
-        ""
-        $cliff_changes
-        ""
-        "## 📦 Installation"
-        ""
-        "```bash"
-        "cargo install droidkraft-tui"
-        "```"
-        ""
-        "Or download the pre-built binary from the [releases page](https://github.com/sorinirimies/droidkraft/releases)."
-        ""
-        "## 🚀 Quick Start"
-        ""
-        "```bash"
-        "# Run DroidKraft"
-        "droidkraft-tui"
-        ""
-        "# Navigate with vim-style keys"
-        "# Use j/k or arrow keys to navigate"
-        "# Press Enter or → to enter sub-menus"
-        "# Press Esc or q to quit"
-        "```"
-        ""
-        "## 📋 Requirements"
-        ""
-        "- Android SDK platform-tools (`adb`) for full functionality"
-        "- Terminal with 256-color support recommended"
-    ] | str join "\n"
+    let notes = (build_release_notes $version $cliff_changes $last_tag)
 
     $notes | save --force RELEASE_CHANGELOG.md
     print $"($green)✓ RELEASE_CHANGELOG.md written($reset)"
