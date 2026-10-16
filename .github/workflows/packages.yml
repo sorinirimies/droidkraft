@@ -31,6 +31,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+      - uses: hustcer/setup-nu@v3
+        with: { version: "0.116.1" }
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: System deps
@@ -53,8 +55,8 @@ jobs:
       - name: Package
         run: |
           V="${TAG#v}"
-          scripts/ci/package_appimage.sh "$V"
-          scripts/ci/package_flatpak.sh "$V"
+          nu scripts/ci/package_appimage.nu "$V"
+          nu scripts/ci/package_flatpak.nu "$V"
       - uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -68,13 +70,15 @@ jobs:
     defaults: { run: { shell: bash } }
     steps:
       - uses: actions/checkout@v4
+      - uses: hustcer/setup-nu@v3
+        with: { version: "0.116.1" }
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: choco install nsis -y --no-progress
       - run: cargo build --release -p droidkraft -p droidkraft-tui
       - run: |
           export PATH="$PATH:/c/Program Files (x86)/NSIS"
-          scripts/ci/package_windows.sh "${TAG#v}"
+          nu scripts/ci/package_windows.nu "${TAG#v}"
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -92,10 +96,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: hustcer/setup-nu@v3
+        with: { version: "0.116.1" }
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release -p droidkraft -p droidkraft-tui
-      - run: scripts/ci/package_macos.sh "${TAG#v}" ${{ matrix.label }}
+      - run: nu scripts/ci/package_macos.nu "${TAG#v}" ${{ matrix.label }}
       - uses: actions/upload-artifact@v4
         with: { name: "macos-${{ matrix.label }}", path: "dist/*.dmg" }
 
@@ -104,6 +110,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: hustcer/setup-nu@v3
+        with: { version: "0.116.1" }
       - uses: actions/download-artifact@v4
         with: { path: dist, merge-multiple: true }
       - name: Upload to release and prune old versions
@@ -111,4 +119,4 @@ jobs:
         run: |
           ls -l dist
           gh release upload "$TAG" dist/* --clobber
-          scripts/ci/prune_releases.sh "$TAG"
+          nu scripts/ci/prune_releases.nu "$TAG"
