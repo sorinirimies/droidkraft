@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.7] - 2026-10-16
+
+### 📦 Packaging
+
+- **snap:** Base was indented into description in GUI template - ([2aa672a](https://github.com/sorinirimies/droidkraft/commit/2aa672aa7460ffa9745d03948529d0ae4a3c467d))
+
+
 ## [2.1.6] - 2026-10-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 2.1.6 - ([5e4351b](https://github.com/sorinirimies/droidkraft/commit/5e4351b3bf5441b1a6127393380e658dacf38a31))
+
 
 ### 📦 Packaging
 
