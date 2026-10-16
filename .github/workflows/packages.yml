@@ -49,13 +49,17 @@ jobs:
           flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
       - uses: taiki-e/install-action@v2
         with: { tool: "cargo-deb,cargo-generate-rpm" }
-      - name: Install zig (zvm)
+      - name: Install zig (zvm, direct-download fallback)
         run: |
-          curl -fsSL --retry 5 https://www.zvm.app/install.sh | bash
-          export PATH="$HOME/.zvm/bin:$HOME/.zvm/self:$PATH"
-          zvm install 0.14.1
-          echo "$HOME/.zvm/bin" >> "$GITHUB_PATH"
-          echo "$HOME/.zvm/self" >> "$GITHUB_PATH"
+          Z=0.14.1
+          if curl -fsSL --retry 5 https://www.zvm.app/install.sh | bash && PATH="$HOME/.zvm/bin:$HOME/.zvm/self:$PATH" zvm install "$Z"; then
+            echo "$HOME/.zvm/bin" >> "$GITHUB_PATH"
+            echo "$HOME/.zvm/self" >> "$GITHUB_PATH"
+          else
+            echo "::warning::zvm failed, downloading zig from ziglang.org"
+            curl -fsSL --retry 5 "https://ziglang.org/download/$Z/zig-x86_64-linux-$Z.tar.xz" | tar -xJ -C "$RUNNER_TEMP"
+            echo "$RUNNER_TEMP/zig-x86_64-linux-$Z" >> "$GITHUB_PATH"
+          fi
       - uses: taiki-e/install-action@v2
         with: { tool: cargo-zigbuild }
       - run: rustup target add x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu
