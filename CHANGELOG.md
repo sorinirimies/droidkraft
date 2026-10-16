@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.5] - 2026-10-16
+
+### 📦 Packaging
+
+- **flatpak:** Drop invalid --socket=pty from TUI manifest - ([74e5cb9](https://github.com/sorinirimies/droidkraft/commit/74e5cb9a4b60ec809356b28f4be4167bee7a6513))
+
+
 ## [2.1.4] - 2026-10-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 2.1.4 - ([7ff0fb1](https://github.com/sorinirimies/droidkraft/commit/7ff0fb191715b6b48990a09b84e97fdac9aedd80))
+
 
 ### 📚 Documentation
 

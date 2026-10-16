@@ -18,7 +18,7 @@ default-members = [
 resolver = "2"
 
 [workspace.package]
-version      = "2.1.4"
+version      = "2.1.5"
 edition    = "2021"
 authors    = ["Sorin Albu-Irimies <mihaiirimies@gmail.com>"]
 license    = "MIT"
@@ -58,9 +58,9 @@ tui-checkbox      = "0.5"
 ratatui-image     = { version = "12.0.0-rc.2", default-features = false, features = ["crossterm"] }
 
 # Internal crates
-droidkraft-core = { path = "crates/droidkraft-core", version = "2.1.4" }
-droidkraft-mirror = { path = "crates/droidkraft-mirror", version = "2.1.4" }
-droidkraft-fastboot = { path = "crates/droidkraft-fastboot", version = "2.1.4" }
+droidkraft-core = { path = "crates/droidkraft-core", version = "2.1.5" }
+droidkraft-mirror = { path = "crates/droidkraft-mirror", version = "2.1.5" }
+droidkraft-fastboot = { path = "crates/droidkraft-fastboot", version = "2.1.5" }
 
 [profile.release]
 opt-level     = 3
