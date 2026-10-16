@@ -1,12 +1,18 @@
 #!/usr/bin/env nu
-# Stage a snapcraft project from the prebuilt binaries (build it with snapcore/action-build, path: snapbuild).
-# usage: nu scripts/ci/package_snap.nu <version>   -> snapbuild/{snap/snapcraft.yaml,stage/*}
-def main [version: string] {
-    rm -rf snapbuild
-    mkdir snapbuild/snap snapbuild/stage
-    cp target/release/droidkraft target/release/droidkraft-tui assets/icons/droidkraft.png snapbuild/stage/
-    open --raw packaging/linux/droidkraft.desktop
-    | str replace --regex '(?m)^Icon=.*' 'Icon=${SNAP}/usr/share/icons/hicolor/256x256/apps/droidkraft.png'
-    | save -f snapbuild/stage/droidkraft.desktop
-    open --raw packaging/snap/snapcraft.yaml.in | str replace --all "@VERSION@" $version | save -f snapbuild/snap/snapcraft.yaml
+# Stage a snapcraft project from the prebuilt binary (build with snapcore/action-build).
+# usage: nu scripts/ci/package_snap.nu <version> [--tui]
+#   -> snapbuild-gui/ or snapbuild-tui/  {snap/snapcraft.yaml, stage/*}
+def main [version: string, --tui] {
+    let kind = if $tui { "tui" } else { "gui" }
+    let bin = if $tui { "droidkraft-tui" } else { "droidkraft" }
+    let dir = $"snapbuild-($kind)"
+    rm -rf $dir
+    mkdir $"($dir)/snap" $"($dir)/stage"
+    cp $"target/release/($bin)" assets/icons/droidkraft.png $"($dir)/stage/"
+    if not $tui {
+        open --raw packaging/linux/droidkraft.desktop
+        | str replace --regex '(?m)^Icon=.*' 'Icon=${SNAP}/usr/share/icons/hicolor/256x256/apps/droidkraft.png'
+        | save -f $"($dir)/stage/droidkraft.desktop"
+    }
+    open --raw $"packaging/snap/snapcraft-($kind).yaml.in" | str replace --all "@VERSION@" $version | save -f $"($dir)/snap/snapcraft.yaml"
 }

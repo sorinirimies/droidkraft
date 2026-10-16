@@ -19,7 +19,6 @@ modules:
     buildsystem: simple
     build-commands:
       - install -Dm755 droidkraft /app/bin/droidkraft
-      - install -Dm755 droidkraft-tui /app/bin/droidkraft-tui
       - install -Dm644 droidkraft.png /app/share/icons/hicolor/256x256/apps/io.github.sorinirimies.DroidKraft.png
       - install -Dm644 io.github.sorinirimies.DroidKraft.desktop /app/share/applications/io.github.sorinirimies.DroidKraft.desktop
       - install -Dm644 io.github.sorinirimies.DroidKraft.metainfo.xml /app/share/metainfo/io.github.sorinirimies.DroidKraft.metainfo.xml

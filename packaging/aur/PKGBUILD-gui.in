@@ -1,0 +1,26 @@
+# Maintainer: Sorin Albu-Irimies <mihaiirimies@gmail.com>
+# Rendered by scripts/ci/render_packaging.nu — do not edit the generated file.
+pkgname=droidkraft-bin
+_name=droidkraft
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc="Android device toolkit (desktop app): stats, logcat, screen mirror, fastboot/ADB flashing"
+arch=('x86_64')
+url="https://github.com/sorinirimies/droidkraft"
+license=('MIT')
+depends=('glibc' 'gcc-libs' 'libxkbcommon' 'libxkbcommon-x11' 'wayland' 'vulkan-icd-loader' 'libx11' 'libxcb' 'fontconfig' 'alsa-lib')
+optdepends=('android-tools: adb for some commands' 'ffmpeg: screen recording')
+provides=('droidkraft')
+conflicts=('droidkraft')
+source=("$url/releases/download/v$pkgver/$_name-$pkgver-x86_64-unknown-linux-gnu.tar.gz"
+        "$_name.desktop::$url/raw/v$pkgver/packaging/linux/droidkraft.desktop"
+        "$_name.png::$url/raw/v$pkgver/assets/icons/droidkraft.png")
+noextract=()
+sha256sums=('@SHA_GUI_X86_64@' 'SKIP' 'SKIP')
+
+package() {
+  install -Dm755 "$srcdir/$_name" "$pkgdir/usr/bin/$_name"
+  install -Dm644 "$srcdir/$_name.desktop" "$pkgdir/usr/share/applications/$_name.desktop"
+  install -Dm644 "$srcdir/$_name.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/$_name.png"
+  install -Dm644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

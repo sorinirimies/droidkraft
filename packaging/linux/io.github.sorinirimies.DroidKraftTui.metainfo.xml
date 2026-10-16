@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.sorinirimies.DroidKraftTui</id>
+  <name>DroidKraft (terminal)</name>
+  <summary>Terminal UI for your Android devices, in pure Rust</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>Per-device workspaces with live stats, screen mirroring and recording, logcat with fuzzy search, and a native fastboot / ADB flashing toolkit. No Android SDK or scrcpy required.</p>
+  </description>
+  <launchable type="desktop-id">io.github.sorinirimies.DroidKraft.desktop</launchable>
+  <url type="homepage">https://github.com/sorinirimies/droidkraft</url>
+  <content_rating type="oars-1.1"/>
+  <releases><release version="VERSION" date="DATE"/></releases>
+</component>

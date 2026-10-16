@@ -1,0 +1,24 @@
+# Rendered by scripts/ci/package_snap.nu --tui (@VERSION@). Repackages the prebuilt release binary.
+name: droidkraft-tui
+title: DroidKraft (terminal)
+version: "@VERSION@"
+summary: Android device toolkit, terminal UI — stats, logcat, mirror, flashing
+description: |
+  Terminal UI with per-device workspaces, live stats, in-terminal screen
+  mirror, logcat with fuzzy search, and a native fastboot/ADB flashing toolkit.
+base: core22
+grade: stable
+confinement: strict
+license: MIT
+
+apps:
+  droidkraft-tui:
+    command: bin/droidkraft-tui
+    plugs: [home, network, raw-usb, removable-media]
+
+parts:
+  droidkraft-tui:
+    plugin: dump
+    source: stage
+    organize:
+      droidkraft-tui: bin/droidkraft-tui

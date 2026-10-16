@@ -1,0 +1,23 @@
+# Terminal UI. Built from the prebuilt release binary (see scripts/ci/package_flatpak.nu --tui).
+app-id: io.github.sorinirimies.DroidKraftTui
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: droidkraft-tui
+appstream-compose: false
+finish-args:
+  - --share=network
+  - --socket=pty
+  - --device=all          # USB access for adb / fastboot
+  - --filesystem=xdg-download
+modules:
+  - name: droidkraft-tui
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 droidkraft-tui /app/bin/droidkraft-tui
+      - install -Dm644 droidkraft.png /app/share/icons/hicolor/256x256/apps/io.github.sorinirimies.DroidKraftTui.png
+      - install -Dm644 io.github.sorinirimies.DroidKraftTui.desktop /app/share/applications/io.github.sorinirimies.DroidKraftTui.desktop
+      - install -Dm644 io.github.sorinirimies.DroidKraftTui.metainfo.xml /app/share/metainfo/io.github.sorinirimies.DroidKraftTui.metainfo.xml
+    sources:
+      - type: dir
+        path: stage

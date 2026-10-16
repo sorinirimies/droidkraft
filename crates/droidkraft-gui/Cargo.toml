@@ -51,3 +51,9 @@ assets = [
     { source = "packaging/linux/droidkraft.desktop", dest = "/usr/share/applications/droidkraft.desktop", mode = "644" },
     { source = "assets/icons/droidkraft.png", dest = "/usr/share/icons/hicolor/256x256/apps/droidkraft.png", mode = "644" },
 ]
+
+# `cargo binstall droidkraft` downloads the prebuilt x86_64 Linux tarball.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-{ target }{ archive-suffix }"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"

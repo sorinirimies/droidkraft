@@ -22,6 +22,24 @@
             mainProgram = "droidkraft-tui";
           };
         };
+        # Desktop app (gpui). Untested on NixOS: needs GPU/windowing libs at runtime.
+        droidkraft = pkgs.rustPlatform.buildRustPackage {
+          pname = "droidkraft";
+          version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
+          src = self;
+          cargoLock.lockFile = ./Cargo.lock;
+          cargoBuildFlags = [ "-p" "droidkraft" ];
+          doCheck = false;
+          nativeBuildInputs = [ pkgs.pkg-config pkgs.makeWrapper ];
+          buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux (with pkgs; [ libxkbcommon wayland vulkan-loader libx11 libxcb fontconfig alsa-lib ]);
+          postFixup = pkgs.lib.optionalString pkgs.stdenv.isLinux "wrapProgram $out/bin/droidkraft --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [ pkgs.vulkan-loader pkgs.wayland pkgs.libxkbcommon ]}";
+          meta = {
+            description = "Android device toolkit (desktop app)";
+            homepage = "https://github.com/sorinirimies/droidkraft";
+            license = pkgs.lib.licenses.mit;
+            mainProgram = "droidkraft";
+          };
+        };
         default = droidkraft-tui;
       });
       devShells = forAll (pkgs: {

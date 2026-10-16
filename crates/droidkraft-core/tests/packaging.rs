@@ -107,15 +107,38 @@ fn tui_cargo_toml_has_binstall_deb_and_rpm_metadata() {
 }
 
 #[test]
-fn snap_template_is_consistent() {
-    let s = text("packaging/snap/snapcraft.yaml.in");
-    for needle in [
-        "@VERSION@",
-        "raw-usb",
-        "name: droidkraft",
-        "bin/droidkraft-tui",
+fn tui_and_gui_each_have_flatpak_snap_and_brew_packaging() {
+    for p in [
+        "packaging/flatpak/io.github.sorinirimies.DroidKraft.yml",
+        "packaging/flatpak/io.github.sorinirimies.DroidKraftTui.yml",
+        "packaging/snap/snapcraft-gui.yaml.in",
+        "packaging/snap/snapcraft-tui.yaml.in",
+        "packaging/aur/PKGBUILD.in",
+        "packaging/aur/PKGBUILD-gui.in",
+        "packaging/homebrew/droidkraft.rb.in",
+        "packaging/homebrew/droidkraft-tui.rb.in",
     ] {
-        assert!(s.contains(needle), "snapcraft.yaml.in missing {needle}");
+        assert!(root(p).exists(), "{p} missing");
+    }
+    let tui = text("packaging/flatpak/io.github.sorinirimies.DroidKraftTui.yml");
+    assert!(tui.contains("command: droidkraft-tui"));
+    let info = text("packaging/linux/io.github.sorinirimies.DroidKraftTui.metainfo.xml");
+    assert!(info.contains("<id>io.github.sorinirimies.DroidKraftTui</id>"));
+}
+
+#[test]
+fn snap_templates_are_consistent() {
+    for (f, name) in [
+        ("packaging/snap/snapcraft-gui.yaml.in", "name: droidkraft\n"),
+        (
+            "packaging/snap/snapcraft-tui.yaml.in",
+            "name: droidkraft-tui\n",
+        ),
+    ] {
+        let s = text(f);
+        for needle in ["@VERSION@", "raw-usb", name] {
+            assert!(s.contains(needle), "{f} missing {needle}");
+        }
     }
 }
 

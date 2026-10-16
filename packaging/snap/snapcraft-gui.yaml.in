@@ -6,8 +6,7 @@ summary: Android device toolkit — stats, logcat, screen mirror, flashing
 description: |
   Per-device workspaces with live stats, screen mirroring and recording,
   logcat with fuzzy search, and a native fastboot/ADB flashing toolkit.
-  Use `droidkraft` (GUI) or `droidkraft.tui` (terminal UI).
-base: core22
+  base: core22
 grade: stable
 confinement: strict
 license: MIT
@@ -19,9 +18,6 @@ apps:
     plugs: [home, network, network-bind, raw-usb, x11, wayland, opengl, audio-playback, removable-media]
     environment:
       LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET:$LD_LIBRARY_PATH
-  tui:
-    command: bin/droidkraft-tui
-    plugs: [home, network, raw-usb, removable-media]
 
 parts:
   droidkraft:
@@ -29,7 +25,6 @@ parts:
     source: stage
     organize:
       droidkraft: bin/droidkraft
-      droidkraft-tui: bin/droidkraft-tui
       droidkraft.desktop: usr/share/applications/droidkraft.desktop
       droidkraft.png: usr/share/icons/hicolor/256x256/apps/droidkraft.png
     stage-packages:

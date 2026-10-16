@@ -72,11 +72,11 @@ Every release attaches these, all built on Linux CI:
 | Platform | Format | GUI | TUI |
 |---|---|:-:|:-:|
 | Linux | AppImage | ✅ | ✅ |
-| Linux | Flatpak | ✅ | ✅ |
-| Linux | Snap | ✅ | ✅ |
+| Linux | Flatpak (one per app) | ✅ | ✅ |
+| Linux | Snap (one per app) | ✅ | ✅ |
 | Debian · Ubuntu · Mint | `.deb` | ✅ x86_64 | ✅ x86_64 · arm64 |
 | Fedora · openSUSE · RHEL | `.rpm` | ✅ x86_64 | ✅ x86_64 · aarch64 |
-| Arch | `PKGBUILD` (`droidkraft-tui-bin`) | — | ✅ |
+| Arch | `PKGBUILD` (`droidkraft-bin`, `droidkraft-tui-bin`) | ✅ x86_64 | ✅ x86_64 · aarch64 |
 | Linux | `.tar.gz` (glibc 2.17 TUI) | ✅ x86_64 | ✅ x86_64 · aarch64 |
 | Windows | `.zip` | — | ✅ x86_64 |
 | macOS | `cargo install` | ✅ | ✅ |
@@ -88,9 +88,10 @@ sudo dnf install ./droidkraft-tui-*.rpm          # Fedora / openSUSE
 flatpak install --user droidkraft-*.flatpak     # any distro
 sudo snap install --dangerous droidkraft_*.snap && sudo snap connect droidkraft:raw-usb
 chmod +x droidkraft-*.AppImage && ./droidkraft-*.AppImage
-makepkg -si                                     # Arch, with the release PKGBUILD
-nix run github:sorinirimies/droidkraft          # Nix flake (TUI)
+makepkg -si                                     # Arch: rename PKGBUILD-droidkraft-bin (or -tui-bin) to PKGBUILD
+nix run github:sorinirimies/droidkraft          # Nix flake (TUI; `#droidkraft` for the GUI)
 brew install sorinirimies/tap/droidkraft-tui    # Linuxbrew formula (droidkraft-tui.rb on the release)
+brew install sorinirimies/tap/droidkraft       # GUI formula (droidkraft.rb on the release)
 ```
 
 ## Usage 🎮

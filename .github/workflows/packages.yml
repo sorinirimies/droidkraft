@@ -69,7 +69,9 @@ jobs:
           V="${TAG#v}"
           nu scripts/ci/package_appimage.nu "$V"
           nu scripts/ci/package_flatpak.nu "$V"
+          nu scripts/ci/package_flatpak.nu "$V" --tui
           nu scripts/ci/package_snap.nu "$V"
+          nu scripts/ci/package_snap.nu "$V" --tui
           nu scripts/ci/package_tarball.nu "$V" x86_64-unknown-linux-gnu
           nu scripts/ci/package_tarball.nu "$V" x86_64-unknown-linux-gnu --gui
           nu scripts/ci/package_tarball.nu "$V" aarch64-unknown-linux-gnu
@@ -80,9 +82,14 @@ jobs:
           cargo deb -p droidkraft --no-build -o dist/
           cargo generate-rpm -p crates/droidkraft -o dist/
       - uses: snapcore/action-build@v1
-        id: snap
-        with: { path: snapbuild }
-      - run: cp "${{ steps.snap.outputs.snap }}" "dist/droidkraft_${TAG#v}_amd64.snap"
+        id: snap-gui
+        with: { path: snapbuild-gui }
+      - uses: snapcore/action-build@v1
+        id: snap-tui
+        with: { path: snapbuild-tui }
+      - run: |
+          cp "${{ steps.snap-gui.outputs.snap }}" "dist/droidkraft_${TAG#v}_amd64.snap"
+          cp "${{ steps.snap-tui.outputs.snap }}" "dist/droidkraft-tui_${TAG#v}_amd64.snap"
       - uses: actions/upload-artifact@v4
         with:
           name: linux
