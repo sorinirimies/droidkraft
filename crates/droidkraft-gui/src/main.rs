@@ -12,6 +12,8 @@ fn main() {
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 window_min_size: Some(size(px(640.), px(420.))),
+                // Wayland app_id / X11 WM_CLASS: must match the .desktop file.
+                app_id: Some("droidkraft".into()),
                 ..Default::default()
             },
             |_, cx| cx.new(DroidGui::new),

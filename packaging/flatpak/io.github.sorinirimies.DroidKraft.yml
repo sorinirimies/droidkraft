@@ -1,0 +1,26 @@
+# Built from the prebuilt release binary (see scripts/ci/package_flatpak.sh);
+# the Rust toolchain is not needed inside the sandbox.
+app-id: io.github.sorinirimies.DroidKraft
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: droidkraft
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=all          # USB access for adb / fastboot
+  - --filesystem=xdg-download
+modules:
+  - name: droidkraft
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 droidkraft /app/bin/droidkraft
+      - install -Dm755 droidkraft-tui /app/bin/droidkraft-tui
+      - install -Dm644 droidkraft.png /app/share/icons/hicolor/256x256/apps/io.github.sorinirimies.DroidKraft.png
+      - install -Dm644 io.github.sorinirimies.DroidKraft.desktop /app/share/applications/io.github.sorinirimies.DroidKraft.desktop
+      - install -Dm644 io.github.sorinirimies.DroidKraft.metainfo.xml /app/share/metainfo/io.github.sorinirimies.DroidKraft.metainfo.xml
+    sources:
+      - type: dir
+        path: stage

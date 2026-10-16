@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=DroidKraft
+GenericName=Android device toolkit
+Comment=Mirror, log, flash and manage Android devices
+Exec=droidkraft
+Icon=droidkraft
+Terminal=false
+Categories=Development;Utility;
+Keywords=android;adb;fastboot;mirror;logcat;flash;
+StartupWMClass=droidkraft
+StartupNotify=true

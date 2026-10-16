@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=DroidKraft (terminal)
+Comment=Terminal UI for Android devices
+Exec=droidkraft-tui
+Icon=droidkraft
+Terminal=true
+Categories=Development;Utility;ConsoleOnly;

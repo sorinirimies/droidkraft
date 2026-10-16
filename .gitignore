@@ -7,3 +7,5 @@
 fuzz/target/
 fuzz/artifacts/
 fuzz/corpus/
+dist/
+fp/

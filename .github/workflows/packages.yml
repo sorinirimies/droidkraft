@@ -1,0 +1,114 @@
+name: Packages
+
+# Builds AppImage, Flatpak, Windows (zip + installer) and macOS (dmg) packages,
+# attaches them to the GitHub release and removes files of older releases.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.2.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure release exists
+        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --generate-notes
+
+  linux:
+    needs: release
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: System deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake clang pkg-config libfontconfig-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libxcb1-dev libx11-xcb-dev \
+            libvulkan-dev libasound2-dev libssl-dev libdrm-dev libgbm-dev libudev-dev \
+            flatpak flatpak-builder desktop-file-utils
+      - name: Flatpak runtime
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+      - name: appimagetool
+        run: |
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          sudo install -m755 appimagetool /usr/local/bin/appimagetool
+      - name: Build
+        run: cargo build --release -p droidkraft -p droidkraft-tui
+      - name: Package
+        run: |
+          V="${TAG#v}"
+          scripts/ci/package_appimage.sh "$V"
+          scripts/ci/package_flatpak.sh "$V"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist/*.AppImage
+            dist/*.flatpak
+
+  windows:
+    needs: release
+    runs-on: windows-latest
+    defaults: { run: { shell: bash } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: choco install nsis -y --no-progress
+      - run: cargo build --release -p droidkraft -p droidkraft-tui
+      - run: |
+          export PATH="$PATH:/c/Program Files (x86)/NSIS"
+          scripts/ci/package_windows.sh "${TAG#v}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/*.zip
+            dist/*-setup.exe
+
+  macos:
+    needs: release
+    strategy:
+      matrix:
+        include:
+          - { os: macos-14, label: arm64 }
+          - { os: macos-13, label: x86_64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release -p droidkraft -p droidkraft-tui
+      - run: scripts/ci/package_macos.sh "${TAG#v}" ${{ matrix.label }}
+      - uses: actions/upload-artifact@v4
+        with: { name: "macos-${{ matrix.label }}", path: "dist/*.dmg" }
+
+  publish:
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - name: Upload to release and prune old versions
+        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          ls -l dist
+          gh release upload "$TAG" dist/* --clobber
+          scripts/ci/prune_releases.sh "$TAG"
