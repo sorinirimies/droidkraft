@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2026-10-16
+
+### 🐛 Bug Fixes
+
+- **deps:** Pin libc 0.2.189 — 0.2.190 drops ENOATTR and breaks xattr 0.2.3 (gpui) on Linux - ([fd403ac](https://github.com/sorinirimies/droidkraft/commit/fd403ac0aca23cd2fd241384a42d999629e368af))
+
+
 ## [2.0.0] - 2026-10-16
 
 ### ⚙️ Miscellaneous Tasks
@@ -31,6 +38,8 @@ All notable changes to this project will be documented in this file.
 - Packaging scripts in nushell, packaging asset tests, prune tests - ([a8fc6f7](https://github.com/sorinirimies/droidkraft/commit/a8fc6f71b230c4579683ac9a226092b1cdfe3917))
 
 - **release:** Publish mirror + fastboot crates before core/tui/gui - ([8370629](https://github.com/sorinirimies/droidkraft/commit/8370629140b7e495f0f8b6b7211792189e78ef52))
+
+- Bump version to 2.0.0 - ([978acb5](https://github.com/sorinirimies/droidkraft/commit/978acb56f069cc47f8645f44c74010520620daba))
 
 
 ### 🐛 Bug Fixes
