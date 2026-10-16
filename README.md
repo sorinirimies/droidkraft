@@ -67,13 +67,13 @@ cargo run --release -p droidkraft         # GUI
 
 ### Prebuilt packages
 
-Every release page has: AppImage, Flatpak, `.deb`, `.rpm`, Windows zip + installer, macOS `.dmg`, and plain `.tar.gz` archives (x86_64 + aarch64).
+Every release page has (all built on Linux CI): AppImage, Flatpak, `.deb`, `.rpm`, and plain `.tar.gz` archives (x86_64 + aarch64), plus a cross-compiled Windows TUI `.zip`. macOS: `cargo install droidkraft-tui` / `droidkraft`.
 
 ```sh
 cargo binstall droidkraft-tui          # prebuilt, no compile
 sudo apt install ./droidkraft-tui_*.deb   # Debian / Ubuntu
 sudo dnf install ./droidkraft-tui-*.rpm    # Fedora / openSUSE
-brew install sorinirimies/tap/droidkraft-tui   # formula rendered into the release (droidkraft-tui.rb)
+brew install sorinirimies/tap/droidkraft-tui   # Linuxbrew formula (droidkraft-tui.rb on the release)
 yay -S droidkraft-tui-bin              # Arch, PKGBUILD attached to the release
 nix run github:sorinirimies/droidkraft # Nix flake (TUI)
 ```

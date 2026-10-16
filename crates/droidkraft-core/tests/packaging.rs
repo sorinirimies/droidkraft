@@ -82,8 +82,8 @@ fn release_workflow_builds_every_package_type() {
     for needle in [
         "AppImage",
         "flatpak",
-        "windows-latest",
-        "macos-14",
+        "x86_64-pc-windows-msvc",
+        "cargo-xwin",
         "prune_releases.nu",
     ] {
         assert!(w.contains(needle), "packages.yml missing {needle}");

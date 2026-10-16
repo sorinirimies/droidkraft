@@ -13,11 +13,12 @@ def main [version: string, target: string, --gui] {
         let stage = $"dist/($name)-($version)-($target)"
         rm -rf $stage
         mkdir $stage
-        cp $"target/release/($name)($ext)" LICENSE README.md $stage
+        let dir = if $windows { "target/x86_64-pc-windows-msvc/release" } else { "target/release" }
+        cp $"($dir)/($name)($ext)" LICENSE README.md $stage
         let out = $"($name)-($version)-($target)"
         cd $stage
         if $windows {
-            ^7z a -tzip $"../($out).zip" . | ignore
+            ^zip -qr ("../" + $out + ".zip") .
         } else {
             ^tar -czf $"../($out).tar.gz" .
         }

@@ -18,8 +18,6 @@ def main [version: string, --dir: string = "dist"] {
         VERSION: $version
         SHA_X86_64: (sha $dir $version "x86_64-unknown-linux-gnu")
         SHA_AARCH64: (sha $dir $version "aarch64-unknown-linux-gnu")
-        SHA_MAC_ARM: (sha $dir $version "aarch64-apple-darwin")
-        SHA_MAC_X86: (sha $dir $version "x86_64-apple-darwin")
     }
     mkdir $dir
     render (open --raw packaging/aur/PKGBUILD.in) $vars | save -f $"($dir)/PKGBUILD"

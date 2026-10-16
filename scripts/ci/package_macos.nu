@@ -1,4 +1,5 @@
 #!/usr/bin/env nu
+# Local use only (CI has no macOS runners).
 # usage: nu scripts/ci/package_macos.nu <version> <arch-label>  -> dist/DroidKraft-<v>-macos-<arch>.dmg
 def main [version: string, arch: string] {
     mkdir dist

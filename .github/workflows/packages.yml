@@ -1,7 +1,8 @@
 name: Packages
 
-# Builds AppImage, Flatpak, Windows (zip + installer) and macOS (dmg) packages,
-# attaches them to the GitHub release and removes files of older releases.
+# Linux-only CI: AppImage, Flatpak, deb, rpm, tarballs (x86_64 + aarch64) and a
+# cross-compiled Windows TUI zip (cargo-xwin). Attached to the GitHub release;
+# files of older releases are removed. (No macOS/Windows runners are used.)
 on:
   push:
     tags: ["v*"]
@@ -77,26 +78,23 @@ jobs:
 
   windows:
     needs: release
-    runs-on: windows-latest
-    defaults: { run: { shell: bash } }
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: hustcer/setup-nu@v3
         with: { version: "0.116.1" }
       - uses: dtolnay/rust-toolchain@stable
+        with: { targets: x86_64-pc-windows-msvc }
       - uses: Swatinem/rust-cache@v2
-      - run: choco install nsis -y --no-progress
-      - run: cargo build --release -p droidkraft -p droidkraft-tui
-      - run: |
-          export PATH="$PATH:/c/Program Files (x86)/NSIS"
-          nu scripts/ci/package_windows.nu "${TAG#v}"
-          nu scripts/ci/package_tarball.nu "${TAG#v}" x86_64-pc-windows-msvc
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang lld llvm zip
+      - uses: taiki-e/install-action@v2
+        with: { tool: cargo-xwin }
+      - run: cargo xwin build --release --target x86_64-pc-windows-msvc -p droidkraft-tui
+      - run: nu scripts/ci/package_tarball.nu "${TAG#v}" x86_64-pc-windows-msvc
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: |
-            dist/*.zip
-            dist/*-setup.exe
+          path: dist/*.zip
 
   linux-arm64:
     needs: release
@@ -123,28 +121,8 @@ jobs:
             dist/*.deb
             dist/*.rpm
 
-  macos:
-    needs: release
-    strategy:
-      matrix:
-        include:
-          - { os: macos-14, label: arm64, target: aarch64-apple-darwin }
-          - { os: macos-13, label: x86_64, target: x86_64-apple-darwin }
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hustcer/setup-nu@v3
-        with: { version: "0.116.1" }
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release -p droidkraft -p droidkraft-tui
-      - run: nu scripts/ci/package_macos.nu "${TAG#v}" ${{ matrix.label }}
-      - run: nu scripts/ci/package_tarball.nu "${TAG#v}" ${{ matrix.target }}
-      - uses: actions/upload-artifact@v4
-        with: { name: "macos-${{ matrix.label }}", path: "dist/*.dmg" }
-
   publish:
-    needs: [linux, linux-arm64, windows, macos]
+    needs: [linux, linux-arm64, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

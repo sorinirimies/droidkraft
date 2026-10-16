@@ -25,7 +25,7 @@ def "test sha hashes an existing tarball" [] {
 }
 
 def "test templates only use known placeholders" [] {
-    let known = [VERSION SHA_X86_64 SHA_AARCH64 SHA_MAC_ARM SHA_MAC_X86]
+    let known = [VERSION SHA_X86_64 SHA_AARCH64]
     for f in [packaging/aur/PKGBUILD.in packaging/homebrew/droidkraft-tui.rb.in] {
         let used = (open --raw $f | parse --regex '@(?P<k>[A-Z0-9_]+)@' | get k | uniq)
         for k in $used { assert ($k in $known) $"($f): unknown placeholder @($k)@" }
