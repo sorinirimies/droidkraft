@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.6] - 2026-10-16
+
+### 📦 Packaging
+
+- **packages:** GUI rpm path is crates/droidkraft-gui - ([8360782](https://github.com/sorinirimies/droidkraft/commit/8360782cdb340349f9d65b38b414493f1df4bba8))
+
+
 ## [2.1.5] - 2026-10-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 2.1.5 - ([1bb9565](https://github.com/sorinirimies/droidkraft/commit/1bb95656e44331fa902255c060651737d5b6f308))
+
 
 ### 📦 Packaging
 
