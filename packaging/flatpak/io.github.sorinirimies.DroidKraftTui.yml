@@ -7,7 +7,6 @@ command: droidkraft-tui
 appstream-compose: false
 finish-args:
   - --share=network
-  - --socket=pty
   - --device=all          # USB access for adb / fastboot
   - --filesystem=xdg-download
 modules:
