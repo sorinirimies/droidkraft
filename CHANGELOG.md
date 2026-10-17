@@ -2,7 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.9] - 2026-10-17
+
+### ⚙️ Miscellaneous Tasks
+
+- **just:** Fast-fail ssh, setup-remotes, force variants - ([5f95c8a](https://github.com/sorinirimies/droidkraft/commit/5f95c8a84917e7f61955a418fdd15988839f57da))
+
+
+### ⚡ Performance
+
+- **core:** Fast details poll (static fields cached, full refresh every 5m), suppress transient poll failures; shared DetailsCollector for GUI+TUI - ([8156edc](https://github.com/sorinirimies/droidkraft/commit/8156edc2d15030d66a982ea7a53efd1fa091e16c))
+
+
+### 🐛 Bug Fixes
+
+- **gui:** Bootloader chip flicker — keep last flash_locked, stable chip order - ([d88164b](https://github.com/sorinirimies/droidkraft/commit/d88164ba0efea32a8c9fe4a103e0eb9661751792))
+
+- **responsive:** TUI tiny-size fallback, help scroll, devices guard; GUI mirror side panel stacks when narrow, commands output max height - ([f0a8c37](https://github.com/sorinirimies/droidkraft/commit/f0a8c3790b88bc8b98d5d7cdcce28066b7dcf54a))
+
+- **tui:** Responsive hardening — clear stale hit rects, cancel invisible modals, help swallows mouse, flash list scroll, cell-width aware truncation, auto-size modals, prompt tail; matrix tests - ([734c343](https://github.com/sorinirimies/droidkraft/commit/734c34359a4347c1a0281fc6e44581bdd8511bed))
+
+- **gui:** Responsive hardening — scrollable mirror side panel, container-aware stacking, viewport floor, wrapping capture bars, ellipsis for chips/kv/cards, log row flex, scrollable tabs, bigger hit targets - ([8a49b6e](https://github.com/sorinirimies/droidkraft/commit/8a49b6ee0e8157c41dbdfa267fc0c8b10a8e26ab))
+
+- **tui:** Modal clip guard via draw_modal result, logs degrade + filter tail, footer keeps ? q, overview max-scroll/page, nav follows active, logcat scroll clamp persisted - ([7f70a4c](https://github.com/sorinirimies/droidkraft/commit/7f70a4c96a2a926f8049d7c54ac81e05b22319a6))
+
+- **gui:** Zoom-consistent sizing (rems, scaled nav/cards), clamp zoom to window, scrollable wrapping Settings, flash rows wrap, button min height; tui PgUp - ([16d23d5](https://github.com/sorinirimies/droidkraft/commit/16d23d573d127ca3f50c2c71998ffc01dac7caec))
+
+- **tui:** Flash/root/rom short-pane layouts, log truncation+paging, rec panel overflow, wrapped msgs, banner cap - ([84ffae5](https://github.com/sorinirimies/droidkraft/commit/84ffae59ad3f5eeae61dc60e750d374ca63f6d4b))
+
+- **gui:** Zoom in detached/standalone windows, rem-based tab padding, quick actions + charts on short windows (scrolling); tui screen clippy - ([e075d3d](https://github.com/sorinirimies/droidkraft/commit/e075d3d744662f5a16df41515c8e27ef1e6a2117))
+
+
+### 🚀 Features
+
+- **gui:** Log pause/save; connection kind in TUI header via core; tests - ([f266777](https://github.com/sorinirimies/droidkraft/commit/f266777220596f670c11ac059745463fc10e60ff))
+
+- **gui:** Fastboot slot A/B + reboot bootloader/fastbootd/recovery buttons (TUI parity) - ([88cad04](https://github.com/sorinirimies/droidkraft/commit/88cad043443a1a8ffae8533bb7299ca11335b446))
+
+- **gui:** MacOS shortcuts — Cmd+/-/0 UI zoom, Cmd+Q quit, Cmd+W close, menu bar; bind keys in main app (were mirror-only) - ([2582741](https://github.com/sorinirimies/droidkraft/commit/258274160a23e7a62800bf3a7d39e06c979af0e7))
+
+- Screen is now the 2nd tab (GUI + TUI), docs/help updated - ([3f0d658](https://github.com/sorinirimies/droidkraft/commit/3f0d6584883076873bbe709d437dd2247ffc05fd))
+
+
 ## [2.1.8] - 2026-10-17
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 2.1.8 - ([69d2c39](https://github.com/sorinirimies/droidkraft/commit/69d2c3938a31964abd84586b62facb1a5fe8e53c))
+
 
 ### 🎨 Styling
 
