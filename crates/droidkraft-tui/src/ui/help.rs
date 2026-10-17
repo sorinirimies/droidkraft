@@ -11,7 +11,7 @@ pub const LINES: &[&str] = &[
     "1-9                     open the n-th device workspace (keeps current tab)",
     "[ / ]                   previous / next device",
     "Tab / Shift-Tab         cycle tabs in a workspace (or click the tab bar)",
-    "o l c f s               Overview/Logs/Commands/Flash/Screen (alt-<key> always works)",
+    "o s l c f               Overview/Screen/Logs/Commands/Flash (alt-<key> always works)",
     "t                       cycle theme      r  refresh devices now",
     "> / <                   graphs faster / slower (0.5s-10s; + / - too, except on Screen)",
     "?                       toggle this help q / Ctrl-C  quit",

@@ -28,10 +28,10 @@ pub const MAX_LOG_ENTRIES: usize = 20_000;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
     Overview,
+    Screen,
     Logs,
     Commands,
     Flash,
-    Screen,
 }
 
 impl Tab {
@@ -70,10 +70,10 @@ impl Tab {
     pub fn all() -> &'static [Tab] {
         &[
             Tab::Overview,
+            Tab::Screen,
             Tab::Logs,
             Tab::Commands,
             Tab::Flash,
-            Tab::Screen,
         ]
     }
 }

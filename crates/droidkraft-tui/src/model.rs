@@ -22,10 +22,10 @@ pub enum Panel {
 impl Panel {
     pub const ALL: [Panel; 5] = [
         Panel::Overview,
+        Panel::Screen,
         Panel::Logs,
         Panel::Commands,
         Panel::Flash,
-        Panel::Screen,
     ];
     pub fn label(self) -> &'static str {
         match self {
@@ -45,7 +45,7 @@ impl Panel {
     pub fn prev(self) -> Panel {
         Self::ALL[(self.index() + Self::ALL.len() - 1) % Self::ALL.len()]
     }
-    /// Mnemonic key (`o l c f s`).
+    /// Mnemonic key (`o s l c f`).
     pub fn from_key(c: char) -> Option<Panel> {
         match c {
             'o' => Some(Panel::Overview),

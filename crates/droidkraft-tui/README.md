@@ -7,7 +7,7 @@ Terminal UI for Android development over ADB. Mirrors the DroidKraft GUI: a nav 
 Everything is organised **per device**.
 
 - **Devices home** (`d`): fleet summary + one card per device (battery, RAM/CPU/storage gauges, sparkline). Click a card to open its workspace.
-- **Device workspace** with tabs `Overview | Logs | Commands | Flash & Root | Screen`, all scoped to that device and with state kept per device:
+- **Device workspace** with tabs `Overview | Screen | Logs | Commands | Flash & Root`, all scoped to that device and with state kept per device:
   - **Overview**: battery, memory/CPU history charts, storage pie, thermal, display, network, system info.
   - **Logs**: live logcat with level/tag/text filters, pause, clear, scroll.
   - **Commands**: ADB / dev-tool commands with scrollable output.
@@ -17,7 +17,7 @@ Everything is organised **per device**.
 
 ## Keys
 
-Global: `d` devices home · `1`–`9` open nth device · `[` / `]` previous/next device · `Tab` / `Shift-Tab` cycle tabs · `o l c f s` jump to tab · `t` theme · `r` refresh · `>` / `<` graphs faster / slower (0.5 s–10 s) · `?` help · `q` / `Ctrl-C` quit.
+Global: `d` devices home · `1`–`9` open nth device · `[` / `]` previous/next device · `Tab` / `Shift-Tab` cycle tabs · `o s l c f` jump to tab · `t` theme · `r` refresh · `>` / `<` graphs faster / slower (0.5 s–10 s) · `?` help · `q` / `Ctrl-C` quit.
 
 | Tab | Keys |
 |---|---|

@@ -14,7 +14,7 @@ with a **terminal UI**, a **GPU desktop app** and reusable **libraries**. No
 Android SDK, no `scrcpy`, no Java: ADB is spoken natively through
 [`adb_client`](https://crates.io/crates/adb_client), fastboot natively over USB.
 
-- 📱 **Per-device workspaces**: every connected device gets its own Overview, Logs, Commands, Flash & Root and Screen tabs.
+- 📱 **Per-device workspaces**: every connected device gets its own Overview, Screen, Logs, Commands and Flash & Root tabs.
 - 📊 **Live statistics**: battery, memory, CPU, storage, thermals, display, network and system info with history charts.
 - 📺 **Screen mirroring**: low-latency H.264 mirror with touch, swipe, keyboard and scroll input; sharp image rendering in Kitty/Ghostty/WezTerm/iTerm2/Sixel terminals.
 - 🎥 **Screen recording** to MP4 on your computer, plus screenshots.
@@ -125,7 +125,7 @@ droidkraft --mirror --serial S       # standalone GUI mirror window
 ```
 
 Key bindings (TUI): `d` devices home · `1`-`9` open device · `[` `]` previous/next
-device · `Tab` cycle tabs · `o l c f s` jump to tab · `R` record · `S` screenshot ·
+device · `Tab` cycle tabs · `o s l c f` jump to tab · `R` record · `S` screenshot ·
 `t` theme · `?` help. Everything is also clickable with the mouse. See the
 [TUI README](crates/droidkraft-tui/README.md) and [GUI README](crates/droidkraft-gui/README.md).
 
