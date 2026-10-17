@@ -84,6 +84,8 @@ fn draw_main(f: &mut Frame, area: Rect, m: &mut Model) {
         banner_text(m)
             .map(|t| layout::wrapped_height(&t, area.width as usize).min(3) as u16)
             .unwrap_or(1)
+            // Never let the banner eat the panel on short terminals.
+            .min(area.height.saturating_sub(5) / 2)
     } else {
         0
     };
@@ -284,6 +286,22 @@ mod render_tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn flash_tabs_and_logs_survive_tiny_panels() {
+        for tab in crate::ui::flash::Tab::ALL {
+            for (w, h) in MATRIX {
+                let mut m = with_device(Panel::Flash);
+                m.flash.tab = tab;
+                m.flash.log = (0..50).map(|i| format!("line {i} ✔ 漢字")).collect();
+                render(&mut m, w, h);
+            }
+        }
+        for (w, h) in MATRIX {
+            let mut m = with_device(Panel::Logs);
+            render(&mut m, w, h);
         }
     }
 

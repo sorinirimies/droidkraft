@@ -54,7 +54,8 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
                     "Plug in a device with USB debugging enabled; press r to refresh.",
                     t.muted(),
                 ),
-            ]),
+            ])
+            .wrap(ratatui::widgets::Wrap { trim: false }),
             inner,
         );
         return;

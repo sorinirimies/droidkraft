@@ -32,7 +32,7 @@ pub enum Tab {
 }
 
 impl Tab {
-    const ALL: [Tab; 3] = [Tab::Fastboot, Tab::Root, Tab::Rom];
+    pub(crate) const ALL: [Tab; 3] = [Tab::Fastboot, Tab::Root, Tab::Rom];
     fn label(self) -> &'static str {
         match self {
             Tab::Fastboot => "Fastboot",
@@ -391,9 +391,10 @@ fn draw_log(f: &mut Frame, area: Rect, m: &mut Model) {
     m.flash.log_scroll = m.flash.log_scroll.min(max_up as u16);
     let end = total - m.flash.log_scroll as usize;
     let start = end.saturating_sub(h);
+    let w = area.width as usize;
     let lines: Vec<Line> = m.flash.log[start..end]
         .iter()
-        .map(|l| Line::raw(l.clone()))
+        .map(|l| Line::raw(super::layout::truncate_to(l, w)))
         .collect();
     f.render_widget(Paragraph::new(lines), area);
 }
@@ -421,9 +422,14 @@ fn draw_fastboot(f: &mut Frame, area: Rect, m: &mut Model) {
         f.render_widget(Paragraph::new(format!(" {label}")).style(st), r);
         m.flash.hits.push((Hit::Action(i), r));
     }
+    // Short panes: shrink the info block first, then drop the progress row,
+    // so the log always keeps at least one row.
+    let rh = cols[1].height;
+    let info_h = rh.saturating_sub(2).clamp(1, 3);
+    let prog_h = u16::from(rh > info_h + 1);
     let right = Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Length(1),
+        Constraint::Length(info_h),
+        Constraint::Length(prog_h),
         Constraint::Min(1),
     ])
     .split(cols[1]);
@@ -438,7 +444,9 @@ fn draw_fastboot(f: &mut Frame, area: Rect, m: &mut Model) {
         m.flash.devices.join(", ")
     };
     let cursor = if m.flash.editing_partition { "▏" } else { "" };
-    let info = vec![
+    let pw = (cols[1].width as usize).saturating_sub(11 + 13);
+    let part = super::layout::tail_to(&m.flash.partition, pw.max(4));
+    let mut info = vec![
         Line::from(vec![
             Span::styled("fastboot: ", m.themes.title()),
             Span::raw(avail),
@@ -449,10 +457,15 @@ fn draw_fastboot(f: &mut Frame, area: Rect, m: &mut Model) {
         ]),
         Line::from(vec![
             Span::styled("partition: ", m.themes.title()),
-            Span::raw(format!("{}{cursor}", m.flash.partition)),
+            Span::raw(format!("{part}{cursor}")),
             Span::styled("  (p to edit)", m.themes.muted()),
         ]),
     ];
+    if info_h < 3 {
+        // Keep fastboot status and the editable partition; drop the device list.
+        info.remove(1);
+        info.truncate(info_h as usize);
+    }
     f.render_widget(Paragraph::new(info), right[0]);
     if let Some((d, t)) = m.flash.progress {
         let ratio = if t == 0 {
@@ -480,7 +493,8 @@ fn draw_fastboot(f: &mut Frame, area: Rect, m: &mut Model) {
 }
 
 fn draw_root(f: &mut Frame, area: Rect, m: &mut Model) {
-    let rows = Layout::vertical([Constraint::Length(5), Constraint::Min(1)]).split(area);
+    let top = 5u16.min(area.height.saturating_sub(1).max(1));
+    let rows = Layout::vertical([Constraint::Length(top), Constraint::Min(1)]).split(area);
     let mut lines = vec![];
     match &m.flash.root {
         None => lines.push(Line::raw("Detecting root…")),
@@ -497,10 +511,20 @@ fn draw_root(f: &mut Frame, area: Rect, m: &mut Model) {
             )));
         }
     }
-    lines.push(Line::styled(
-        "d re-detect   m remount (needs root)",
+    // Keep the first (status) line and the key hint; drop the middle on short panes.
+    let hint = Line::styled(
+        super::layout::truncate_to("d re-detect   m remount (needs root)", area.width as usize),
         m.themes.muted(),
-    ));
+    );
+    while lines.len() + 1 > top as usize && lines.len() > 1 {
+        lines.remove(lines.len() - 1);
+    }
+    if top as usize >= 2 {
+        lines.truncate(top as usize - 1);
+        lines.push(hint);
+    } else {
+        lines.truncate(1);
+    }
     f.render_widget(Paragraph::new(lines), rows[0]);
     if let Some(l) = m.flash.running.clone() {
         spinner(f, m, rows[1].x, rows[1].y);
@@ -528,7 +552,9 @@ fn draw_rom(f: &mut Frame, area: Rect, m: &mut Model) {
         );
         return;
     };
-    let list_h = (rom.builds.len() as u16).clamp(1, 6);
+    let list_h = (rom.builds.len() as u16)
+        .clamp(1, 6)
+        .min(area.height.saturating_sub(4).max(1));
     let rows = Layout::vertical([
         Constraint::Length(2),
         Constraint::Length(list_h),
@@ -593,6 +619,20 @@ fn draw_rom(f: &mut Frame, area: Rect, m: &mut Model) {
                 Line::raw(format!("{mark} {}", step.label()))
             })
             .collect();
+        // Follow the running step on short panes.
+        let vis = rows[3].height as usize;
+        let focus = s
+            .statuses
+            .iter()
+            .position(|st| matches!(st, StepStatus::Running))
+            .unwrap_or_else(|| {
+                s.statuses
+                    .iter()
+                    .rposition(|st| matches!(st, StepStatus::Done))
+                    .map_or(0, |i| i + 1)
+            });
+        let off = (focus + 1).saturating_sub(vis.max(1));
+        let lines: Vec<Line> = lines.into_iter().skip(off).take(vis).collect();
         f.render_widget(Paragraph::new(lines), rows[3]);
     }
     m.flash.hits.extend(hits);
@@ -690,8 +730,14 @@ fn fb_key(m: &mut Model, k: KeyEvent) -> (Vec<Cmd>, bool) {
                 true,
             )
         }
-        KeyCode::PageUp => scroll_by(&mut m.flash.log_scroll, 5, usize::MAX),
-        KeyCode::PageDown => scroll_by(&mut m.flash.log_scroll, -5, usize::MAX),
+        KeyCode::PageUp => {
+            let n = i32::from(m.flash.log_rect.height.max(2)) - 1;
+            scroll_by(&mut m.flash.log_scroll, n, usize::MAX)
+        }
+        KeyCode::PageDown => {
+            let n = i32::from(m.flash.log_rect.height.max(2)) - 1;
+            scroll_by(&mut m.flash.log_scroll, -n, usize::MAX)
+        }
         _ => return (vec![], false),
     }
     (vec![], true)

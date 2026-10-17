@@ -338,7 +338,9 @@ pub fn on_key(m: &mut Model, k: KeyEvent) -> (Vec<Cmd>, bool) {
                 let pos = m
                     .cmds
                     .hist_pos
-                    .map_or(m.cmds.history.len() - 1, |p| p.saturating_sub(1));
+                    .map_or(m.cmds.history.len().saturating_sub(1), |p| {
+                        p.saturating_sub(1)
+                    });
                 m.cmds.hist_pos = Some(pos);
                 m.cmds.input = Some((kind, m.cmds.history[pos].clone()));
             }

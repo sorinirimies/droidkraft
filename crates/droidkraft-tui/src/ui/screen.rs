@@ -448,6 +448,20 @@ fn draw_rec(f: &mut Frame, area: Rect, m: &mut Model) {
             Some(RecAction::Open(i)),
         ));
     }
+    // Short panel: drop section headers, then fall back to a key-hint row so
+    // the hidden options stay discoverable.
+    let mut rows = rows;
+    if rows.len() > inner.height as usize {
+        let mut i = 0;
+        rows.retain(|(l, a)| {
+            i += 1;
+            i == 1 || a.is_some() || !l.to_string().starts_with('─')
+        });
+    }
+    if rows.len() > inner.height as usize && inner.height >= 2 {
+        rows.truncate(inner.height as usize - 1);
+        rows.push((Line::styled("keys: B H T O", m.themes.muted()), None));
+    }
     for (i, (line, act)) in rows.into_iter().enumerate() {
         if i as u16 >= inner.height {
             break;
@@ -489,11 +503,18 @@ fn draw_mirror(f: &mut Frame, area: Rect, m: &mut Model) {
     let t = &m.themes;
 
     if let Some(err) = &st.error {
-        let mut lines = vec![Line::styled("Screen stream error", t.status(Status::Error))];
+        // Retry hint first so it survives short panels.
+        let mut lines = vec![Line::styled(
+            "Screen stream error · s retry",
+            t.status(Status::Error),
+        )];
         lines.extend(fmt_err(err).into_iter().map(Line::raw));
-        lines.push(Line::raw(""));
-        lines.push(Line::styled("Press s to retry.", t.muted()));
-        f.render_widget(Paragraph::new(lines).style(t.base()), inner);
+        f.render_widget(
+            Paragraph::new(lines)
+                .style(t.base())
+                .wrap(ratatui::widgets::Wrap { trim: false }),
+            inner,
+        );
         return;
     }
     let Some(frame) = st.frame.as_ref() else {
@@ -504,7 +525,12 @@ fn draw_mirror(f: &mut Frame, area: Rect, m: &mut Model) {
         } else {
             "Waiting for first frame…"
         };
-        f.render_widget(Paragraph::new(msg).style(t.muted()), inner);
+        f.render_widget(
+            Paragraph::new(msg)
+                .style(t.muted())
+                .wrap(ratatui::widgets::Wrap { trim: false }),
+            inner,
+        );
         return;
     };
 
