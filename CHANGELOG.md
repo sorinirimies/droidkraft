@@ -2,7 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.8] - 2026-10-17
+
+### 🎨 Styling
+
+- Fmt; test: TUI detach args parse to mirror mode - ([d80bc46](https://github.com/sorinirimies/droidkraft/commit/d80bc46f691a54d40a429b72575d072bc7b7111f))
+
+
+### 📚 Documentation
+
+- Platform support section, cargo install for Linux/Windows in release notes - ([d83e1f1](https://github.com/sorinirimies/droidkraft/commit/d83e1f1b86fb850cd6b859b51e99f8a25974e0f4))
+
+
+### 📦 Packaging
+
+- **packaging:** MacOS TUI, Windows installer, Scoop/winget/Chocolatey, Arch .pkg.tar.zst, Alpine .apk, static musl tarballs - ([d3eab5d](https://github.com/sorinirimies/droidkraft/commit/d3eab5d9df27b8fd3d3f839354dd52cbb3b081ae))
+
+- **packages:** Alpine .apk for aarch64 via qemu - ([1db1e43](https://github.com/sorinirimies/droidkraft/commit/1db1e436eb7e865e27b85dfa3c56ce5f1bb785cc))
+
+
+### 🚀 Features
+
+- **gui:** Record/screenshot controls in detached + standalone mirror windows; wire --mirror; best-effort Windows GUI cross-build - ([d7a445e](https://github.com/sorinirimies/droidkraft/commit/d7a445e3ac1c395a375a9d5285792a83d568764e))
+
+
 ## [2.1.7] - 2026-10-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 2.1.7 - ([497423e](https://github.com/sorinirimies/droidkraft/commit/497423e6b25464c45fff2713501dd09885d5d3e7))
+
 
 ### 📦 Packaging
 
