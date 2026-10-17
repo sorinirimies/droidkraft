@@ -142,6 +142,18 @@ pub fn copy_to_clipboard(text: &str) -> Result<(), String> {
     }
 }
 
+/// `USB` unless the serial looks like a network endpoint (`ip:port`, mDNS).
+pub fn connection_kind(serial: &str) -> &'static str {
+    if serial.contains(':')
+        || serial.contains("_adb-tls")
+        || serial.starts_with("adb-") && serial.contains("._")
+    {
+        "Wi-Fi"
+    } else {
+        "USB"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

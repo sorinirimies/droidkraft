@@ -122,17 +122,7 @@ pub fn temp_color(c: f32) -> u32 {
     }
 }
 
-/// `USB` unless the serial looks like a network endpoint (`ip:port`, mDNS).
-pub fn connection_kind(serial: &str) -> &'static str {
-    if serial.contains(':')
-        || serial.contains("_adb-tls")
-        || serial.starts_with("adb-") && serial.contains("._")
-    {
-        "Wi-Fi"
-    } else {
-        "USB"
-    }
-}
+pub use droidkraft_core::connection_kind;
 
 /// Explanation + fix for devices that are not usable yet.
 pub fn state_hint(state: &str) -> Option<&'static str> {

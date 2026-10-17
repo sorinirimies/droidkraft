@@ -23,6 +23,7 @@ impl DroidGui {
             serial.to_string(),
             serial.to_string(),
         );
+        let (sp, sv) = (serial.to_string(), serial.to_string());
         let streaming = d.log_streaming;
         let toolbar = div()
             .flex()
@@ -50,6 +51,42 @@ impl DroidGui {
                 move |this, _cx| {
                     if let Some(d) = this.dev(&s2) {
                         d.log_entries.clear();
+                    }
+                },
+            ))
+            .child(button(
+                "log-pause",
+                if d.log_paused { "Resume" } else { "Pause" },
+                if d.log_paused {
+                    theme::WARN
+                } else {
+                    theme::BG_ELEV
+                },
+                theme::TEXT,
+                cx,
+                move |this, _cx| {
+                    if let Some(d) = this.dev(&sp) {
+                        d.log_paused = !d.log_paused;
+                    }
+                },
+            ))
+            .child(button(
+                "log-save",
+                "Save",
+                theme::BG_ELEV,
+                theme::TEXT,
+                cx,
+                move |this, _cx| {
+                    if let Some(d) = this.dev(&sv) {
+                        let secs = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|t| t.as_secs())
+                            .unwrap_or(0);
+                        let path = d.out_dir.join(format!("logcat_{secs}.txt"));
+                        d.log_note = Some(match d.save_logs(&path) {
+                            Ok(n) => format!("Saved {n} lines → {}", path.display()),
+                            Err(e) => format!("Save failed: {e}"),
+                        });
                     }
                 },
             ))
@@ -144,6 +181,16 @@ impl DroidGui {
                 .text_color(rgb(theme::TEXT_DIM))
                 .child(format!("{shown_n} / {total}")),
         );
+        let toolbar = match d.log_note.clone() {
+            Some(n) => toolbar.child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(theme::TEXT_DIM))
+                    .overflow_hidden()
+                    .child(n),
+            ),
+            None => toolbar,
+        };
 
         let mut rows: Vec<AnyElement> = d
             .log_entries

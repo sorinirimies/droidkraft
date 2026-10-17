@@ -29,8 +29,9 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
             Span::styled(ws.name(), t.title()),
             Span::styled(
                 format!(
-                    "  {}  {}",
+                    "  {}  {}  {}",
                     crate::format::truncate(&ws.serial, 16),
+                    droidkraft_core::connection_kind(&ws.serial),
                     ws.state
                 ),
                 t.muted(),

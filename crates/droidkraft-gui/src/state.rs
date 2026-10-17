@@ -163,6 +163,10 @@ pub struct DeviceState {
     pub log_entries: Vec<LogEntry>,
     pub log_filter: LogcatFilter,
     pub log_streaming: bool,
+    /// Ingestion paused (stream keeps running, lines are dropped).
+    pub log_paused: bool,
+    /// Last log toolbar message (e.g. save result).
+    pub log_note: Option<String>,
 
     // Commands / flash
     pub last_output: Option<(String, Result<String, String>)>,
@@ -205,6 +209,8 @@ impl DeviceState {
             log_entries: Vec::new(),
             log_filter: LogcatFilter::default(),
             log_streaming: false,
+            log_paused: false,
+            log_note: None,
             last_output: None,
             root_status: None,
             busy_label: None,
@@ -252,6 +258,9 @@ impl DeviceState {
 
     /// Append raw logcat lines, capping retained entries.
     pub fn push_log_lines(&mut self, lines: &[String]) {
+        if self.log_paused {
+            return;
+        }
         for l in lines {
             self.log_entries.push(LogEntry::parse(l));
         }
@@ -259,6 +268,26 @@ impl DeviceState {
             let excess = self.log_entries.len() - MAX_LOG_ENTRIES;
             self.log_entries.drain(0..excess);
         }
+    }
+
+    /// Write the entries matching the current filter to `path` (raw lines).
+    pub fn save_logs(&self, path: &std::path::Path) -> std::io::Result<usize> {
+        use std::io::Write;
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let mut w = std::io::BufWriter::new(std::fs::File::create(path)?);
+        let mut n = 0;
+        for e in self
+            .log_entries
+            .iter()
+            .filter(|e| self.log_filter.matches(e))
+        {
+            writeln!(w, "{}", e.raw)?;
+            n += 1;
+        }
+        w.flush()?;
+        Ok(n)
     }
 
     /// Record finished recording files (deduplicated).
@@ -537,6 +566,20 @@ mod tests {
         assert_eq!(f.online_count(), 2);
         assert_eq!(f.avg_battery(), Some(60));
         assert_eq!(f.ram_totals(), (3000, 6000));
+    }
+
+    #[test]
+    fn paused_logs_are_dropped_and_save_writes_filtered() {
+        let mut d = DeviceState::new("S");
+        d.log_paused = true;
+        d.push_log_lines(&["I/Tag( 1): hi".to_string()]);
+        assert!(d.log_entries.is_empty());
+        d.log_paused = false;
+        d.push_log_lines(&["I/Tag( 1): hi".to_string()]);
+        let p = std::env::temp_dir().join(format!("dk-logs-{}.txt", std::process::id()));
+        assert_eq!(d.save_logs(&p).unwrap(), 1);
+        assert!(std::fs::read_to_string(&p).unwrap().contains("hi"));
+        std::fs::remove_file(p).ok();
     }
 
     #[test]

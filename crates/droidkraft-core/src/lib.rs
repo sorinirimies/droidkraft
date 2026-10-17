@@ -47,6 +47,7 @@ pub mod utils;
 pub use client::{AdbManager, ADB_PORT};
 pub use color::{hash_tag, level_text_color, tag_color, Rgb, TAG_PALETTE};
 pub use error::{AdbError, AdbResult};
+pub use utils::connection_kind;
 
 pub use features::device::{
     collect_device_details, collect_device_details_with, list_all_details, BatteryInfo,
