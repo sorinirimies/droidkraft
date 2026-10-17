@@ -599,14 +599,15 @@ impl MirrorView {
         vp.into_any_element()
     }
 
-    fn side_panel(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn side_panel(&self, narrow: bool, cx: &mut Context<Self>) -> AnyElement {
         let st = self.stream.state();
         let res = resolution(&st);
         div()
             .flex()
             .flex_col()
             .gap_3()
-            .w(px(220.))
+            .when(narrow, |d| d.w_full())
+            .when(!narrow, |d| d.w(px(220.)))
             .flex_none()
             .child(self.toggle_button(cx))
             .child(Self::section_title("Navigation"))
@@ -713,14 +714,19 @@ impl gpui::Render for MirrorView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let viewport = self.viewport(window, cx);
         match self.chrome {
-            Chrome::Full => div()
-                .flex()
-                .flex_1()
-                .min_h_0()
-                .size_full()
-                .gap_4()
-                .child(viewport)
-                .child(self.side_panel(cx)),
+            Chrome::Full => {
+                // Below ~560px the 220px side panel would crush the video: stack it.
+                let narrow = window.viewport_size().width < px(560.);
+                div()
+                    .flex()
+                    .when(narrow, |d| d.flex_col())
+                    .flex_1()
+                    .min_h_0()
+                    .size_full()
+                    .gap_4()
+                    .child(viewport)
+                    .child(self.side_panel(narrow, cx))
+            }
             _ => div()
                 .flex()
                 .flex_col()

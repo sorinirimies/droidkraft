@@ -44,10 +44,26 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
     let block = super::panel_block(m, "Help");
     let inner = block.inner(r);
     f.render_widget(block, r);
+    let total = super::layout::wrapped_height(&text, inner.width as usize) as u16;
+    let max_scroll = total.saturating_sub(inner.height);
+    m.help_scroll = m.help_scroll.min(max_scroll);
     f.render_widget(
         Paragraph::new(text)
             .style(m.themes.base())
-            .wrap(ratatui::widgets::Wrap { trim: false }),
+            .wrap(ratatui::widgets::Wrap { trim: false })
+            .scroll((m.help_scroll, 0)),
         inner,
     );
+    if max_scroll > 0 && r.width > 12 {
+        let hint = if m.help_scroll < max_scroll {
+            " ↓ j/k scroll "
+        } else {
+            " ↑ j/k scroll "
+        };
+        let w = (hint.chars().count() as u16).min(r.width.saturating_sub(2));
+        f.render_widget(
+            Paragraph::new(hint).style(m.themes.muted()),
+            Rect::new(r.x + r.width - w - 1, r.y + r.height - 1, w, 1),
+        );
+    }
 }

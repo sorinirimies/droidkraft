@@ -172,7 +172,7 @@ fn cards(f: &mut Frame, area: Rect, m: &mut Model) {
     if order.len() > cols * vis_rows {
         let hint = format!(" ▼ {} devices — arrows scroll ", order.len());
         let w = hint.chars().count() as u16;
-        if w < area.width {
+        if w < area.width && area.height > 0 {
             f.render_widget(
                 Paragraph::new(hint).style(m.themes.muted()),
                 Rect::new(area.x + area.width - w, area.y + area.height - 1, w, 1),

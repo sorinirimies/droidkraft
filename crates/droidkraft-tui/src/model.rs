@@ -202,6 +202,8 @@ pub struct Model {
     pub loading: bool,
     pub tick: u64,
     pub help: bool,
+    /// Vertical scroll of the help overlay (small terminals).
+    pub help_scroll: u16,
     pub message: Option<String>,
     /// Filled while drawing, for mouse hit-testing.
     pub nav_rects: Vec<(NavTarget, Rect)>,
@@ -233,6 +235,7 @@ impl Default for Model {
             loading: true,
             tick: 0,
             help: false,
+            help_scroll: 0,
             message: None,
             nav_rects: Vec::new(),
             tab_rects: Vec::new(),

@@ -79,6 +79,7 @@ pub fn render_output(d: &DeviceState) -> AnyElement {
         .id("cmd-output")
         .p_3()
         .h(px(240.))
+        .max_h(gpui::relative(0.5))
         .flex_shrink_0()
         .w_full()
         .rounded_md()

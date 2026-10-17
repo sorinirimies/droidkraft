@@ -41,6 +41,18 @@ fn on_key(m: &mut Model, k: KeyEvent) -> Vec<Cmd> {
             KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')
         ) {
             m.help = false;
+            m.help_scroll = 0;
+        } else {
+            match k.code {
+                KeyCode::Down | KeyCode::Char('j') => {
+                    m.help_scroll = m.help_scroll.saturating_add(1)
+                }
+                KeyCode::Up | KeyCode::Char('k') => m.help_scroll = m.help_scroll.saturating_sub(1),
+                KeyCode::PageDown => m.help_scroll = m.help_scroll.saturating_add(5),
+                KeyCode::PageUp => m.help_scroll = m.help_scroll.saturating_sub(5),
+                KeyCode::Home => m.help_scroll = 0,
+                _ => {}
+            }
         }
         return vec![];
     }

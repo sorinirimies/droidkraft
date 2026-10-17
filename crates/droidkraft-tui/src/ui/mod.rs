@@ -39,6 +39,14 @@ pub fn draw(f: &mut Frame, m: &mut Model) {
     let area = f.area();
     m.screen.gfx.begin_frame();
     f.render_widget(Block::default().style(m.themes.base()), area);
+    if area.height < 5 || area.width < 12 {
+        let msg = "Too small (min 12x5)";
+        f.render_widget(
+            Paragraph::new(layout::truncate_to(msg, area.width as usize)).style(m.themes.base()),
+            area,
+        );
+        return;
+    }
     let footer_h = statusbar::plan(m, area.width, area.height)
         .height()
         .min(area.height.saturating_sub(4).max(1));
@@ -251,7 +259,16 @@ mod size_tests {
     use super::test_util::*;
     use crate::model::{DeviceWorkspace, Model, Panel};
 
-    const SIZES: [(u16, u16); 5] = [(40, 12), (60, 20), (80, 24), (120, 30), (200, 60)];
+    const SIZES: [(u16, u16); 8] = [
+        (1, 1),
+        (10, 3),
+        (20, 5),
+        (40, 12),
+        (60, 20),
+        (80, 24),
+        (120, 30),
+        (200, 60),
+    ];
 
     fn home(n: usize) -> Model {
         let mut m = Model {
