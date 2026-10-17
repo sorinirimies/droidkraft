@@ -232,6 +232,9 @@ vhs-check:
 # Show current git remotes
 REMOTES := "origin gitea-starscream"
 
+# Fail fast (5 s) instead of hanging when a remote host is unreachable.
+export GIT_SSH_COMMAND := "ssh -o ConnectTimeout=5 -o BatchMode=yes"
+
 remotes:
     @echo "Configured git remotes:"
     @git remote -v
@@ -563,3 +566,33 @@ deps-update-now:
 # List available VHS tapes
 vhs-list:
     @ls docs/tapes/*.tape | sed 's|.*/||; s|\.tape||' | sed 's/^/  /'
+
+# Add any missing remotes
+setup-remotes:
+    #!/usr/bin/env sh
+    git remote get-url origin >/dev/null 2>&1 || git remote add origin git@github.com:sorinirimies/droidkraft.git
+    git remote get-url gitea-starscream >/dev/null 2>&1 || git remote add gitea-starscream gitea@192.168.1.44:sorin/droidkraft.git
+    git remote -v
+
+# Force-push the current branch to GitHub (origin). No lease!
+push-force:
+    git push --force origin "$(git branch --show-current)"
+
+# Force-push the current branch to Gitea Starscream. No lease!
+push-gitea-starscream-force:
+    git push --force gitea-starscream "$(git branch --show-current)"
+
+# Force-push all tags to GitHub (moves existing tags)
+push-tags-force:
+    git push --force origin --tags
+
+# Force-push all tags to every remote (continues on failure)
+push-tags-all-force:
+    #!/usr/bin/env sh
+    failed=""
+    for r in {{REMOTES}}; do
+        git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r (not configured)"; continue; }
+        git push --force "$r" --tags || failed="$failed $r"
+    done
+    if [ -n "$failed" ]; then echo "⚠️  Failed to force-push tags to:$failed"; exit 1; fi
+    echo "✅ Tags force-pushed to every configured remote"
