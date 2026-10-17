@@ -25,7 +25,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Ensure release exists
         env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
-        run: gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --generate-notes
+        # The Release workflow may create it concurrently, and a just-pushed tag
+        # can be briefly invisible to the API: retry, then accept an existing release.
+        run: |
+          for i in 1 2 3 4 5; do
+            gh release view "$TAG" >/dev/null 2>&1 && exit 0
+            gh release create "$TAG" --title "$TAG" --generate-notes && exit 0
+            sleep 10
+          done
+          gh release view "$TAG" >/dev/null
 
   linux:
     needs: release
