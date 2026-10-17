@@ -61,6 +61,11 @@ impl DroidGui {
         };
         let stack = lay.stack_panes();
         let detached = d.detached.is_some();
+        // Width left for the mirror next to the (side-by-side) recording panel.
+        let mirror_w = lay.content_width() - 32.0 - if stack { 0.0 } else { 292.0 };
+        if let Some(m) = &d.mirror {
+            m.update(cx, |v, _| v.set_avail_width(mirror_w));
+        }
 
         let mirror_area: AnyElement = if detached {
             let (s1, s2) = (serial.to_string(), serial.to_string());
@@ -136,7 +141,7 @@ impl DroidGui {
             root.flex_row()
         };
         root.child(mirror_area)
-            .child(self.render_recording(serial, d, stack, cx))
+            .child(self.render_recording(serial, d, stack, lay.height < 560.0, cx))
             .into_any_element()
     }
 
@@ -145,6 +150,7 @@ impl DroidGui {
         serial: &str,
         d: &DeviceState,
         stack: bool,
+        lay_short: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let status = d.recorder.status();
@@ -320,7 +326,7 @@ impl DroidGui {
 
         let mut panel = card().id("rec-panel").flex_shrink_0().overflow_y_scroll();
         panel = if stack {
-            panel.w_full().max_h(px(150.))
+            panel.w_full().max_h(px(if lay_short { 96. } else { 150. }))
         } else {
             panel.w(px(280.))
         };

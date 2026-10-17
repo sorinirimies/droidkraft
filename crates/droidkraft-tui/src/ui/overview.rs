@@ -174,7 +174,14 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
     let mut y = area.y;
     for (ri, h) in &placed {
         for (ci, card) in grid[*ri].1.iter().enumerate() {
-            let r = Rect::new(area.x + ci as u16 * card_w, y, card_w, *h);
+            let x0 = ci as u16 * card_w;
+            // The last column absorbs the remainder so no dead strip is left.
+            let w = if ci + 1 == grid[*ri].1.len() && grid[*ri].1.len() == cols {
+                area.width - x0
+            } else {
+                card_w
+            };
+            let r = Rect::new(area.x + x0, y, w, *h);
             draw_card(f, r, m, *card, &d, &hist);
         }
         y += h;

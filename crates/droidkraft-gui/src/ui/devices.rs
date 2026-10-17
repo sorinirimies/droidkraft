@@ -76,7 +76,7 @@ impl DroidGui {
             let mut grid = div().flex().flex_row().flex_wrap().gap_3().items_start();
             let ncols = lay.card_columns();
             let cw = ((lay.content_width() - 32.0 - 12.0 * (ncols as f32 - 1.0)) / ncols as f32)
-                .clamp(200.0, 460.0);
+                .max(200.0);
             let detail = lay.card_detail();
             for (i, d) in fleet.ordered().into_iter().enumerate() {
                 grid = grid.child(self.device_card(d, i, cw, detail, cx));
@@ -149,7 +149,16 @@ impl DroidGui {
                     )
                     .child(chip(d.adb_state.clone(), status_color)),
             )
-            .child(div().text_xs().text_color(rgb(theme::TEXT_DIM)).child(sub));
+            .child(
+                div()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
+                    .text_xs()
+                    .text_color(rgb(theme::TEXT_DIM))
+                    .child(sub),
+            );
 
         match (online, d.details.as_ref().filter(|x| x.online)) {
             (true, Some(det)) => {

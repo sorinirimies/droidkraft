@@ -78,6 +78,8 @@ pub struct MirrorView {
     zoom: Zoom,
     pan: (f32, f32),
     last_scroll: Instant,
+    /// Width (px) the embedding layout gives this view; `None` = use the window.
+    avail_width: Option<f32>,
 }
 
 impl MirrorView {
@@ -136,6 +138,7 @@ impl MirrorView {
             zoom: Zoom::Fit,
             pan: (0.0, 0.0),
             last_scroll: Instant::now(),
+            avail_width: None,
         }
     }
 
@@ -160,6 +163,12 @@ impl MirrorView {
     }
 
     /// Standalone mode: pick the first connected device if no serial is set.
+    /// Tell the view how much width its container really has (side panel
+    /// stacks below the video when narrow).
+    pub fn set_avail_width(&mut self, w: f32) {
+        self.avail_width = Some(w);
+    }
+
     pub fn set_discover(&mut self, on: bool) {
         self.discover = on;
     }
@@ -521,7 +530,7 @@ impl MirrorView {
             .relative()
             .flex_1()
             .min_w_0()
-            .min_h_0()
+            .min_h(px(140.))
             .rounded_lg()
             .bg(rgb(0x05060a))
             .border_1()
@@ -570,6 +579,10 @@ impl MirrorView {
                     .absolute()
                     .top_2()
                     .left_2()
+                    .max_w(gpui::relative(0.55))
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
                     .px_2()
                     .py_1()
                     .rounded_md()
@@ -586,7 +599,10 @@ impl MirrorView {
                         "stopped".to_string()
                     }),
             );
-        if self.chrome == Chrome::Compact && self.show_stats {
+        if self.chrome == Chrome::Compact
+            && self.show_stats
+            && self.bounds.get().size.width >= px(400.)
+        {
             vp = vp.child(
                 div()
                     .absolute()
@@ -603,11 +619,14 @@ impl MirrorView {
         let st = self.stream.state();
         let res = resolution(&st);
         div()
+            .id("mirror-side")
             .flex()
             .flex_col()
             .gap_3()
-            .when(narrow, |d| d.w_full())
-            .when(!narrow, |d| d.w(px(220.)))
+            .when(narrow, |d| d.w_full().max_h(px(180.)))
+            .when(!narrow, |d| d.w(px(220.)).h_full())
+            .min_h_0()
+            .overflow_y_scroll()
             .flex_none()
             .child(self.toggle_button(cx))
             .child(Self::section_title("Navigation"))
@@ -656,7 +675,7 @@ impl MirrorView {
             .into_any_element()
     }
 
-    fn control_bar(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn control_bar(&self, tight: bool, cx: &mut Context<Self>) -> AnyElement {
         let compact = self.chrome == Chrome::Compact;
         let mut bar = div()
             .flex()
@@ -667,10 +686,10 @@ impl MirrorView {
             .child(self.toggle_button(cx))
             .child(self.key_btn("k-back", "◀", "KEYCODE_BACK", cx))
             .child(self.key_btn("k-home", "●", "KEYCODE_HOME", cx));
-        if compact {
+        if compact && !tight {
             bar = bar.child(self.key_btn("k-recent", "▣", "KEYCODE_APP_SWITCH", cx));
         }
-        let presets: &[(&str, &str, Zoom)] = if compact {
+        let presets: &[(&str, &str, Zoom)] = if compact && !tight {
             &[
                 ("z-fit", "Fit", Zoom::Fit),
                 ("z-100", "1:1", Zoom::Scale(1.0)),
@@ -678,10 +697,8 @@ impl MirrorView {
         } else {
             &[("z-fit", "Fit", Zoom::Fit)]
         };
-        bar = bar
-            .child(div().w(px(8.)))
-            .children(self.zoom_buttons(presets, cx));
-        if compact {
+        bar = bar.children(self.zoom_buttons(presets, cx));
+        if compact && !tight {
             let on = self.show_stats;
             bar = bar.child(self.btn(
                 "stats-toggle",
@@ -716,7 +733,10 @@ impl gpui::Render for MirrorView {
         match self.chrome {
             Chrome::Full => {
                 // Below ~560px the 220px side panel would crush the video: stack it.
-                let narrow = window.viewport_size().width < px(560.);
+                let narrow = self
+                    .avail_width
+                    .map(|w| w < 520.0)
+                    .unwrap_or_else(|| window.viewport_size().width < px(560.));
                 div()
                     .flex()
                     .when(narrow, |d| d.flex_col())
@@ -733,7 +753,7 @@ impl gpui::Render for MirrorView {
                 .size_full()
                 .gap_2()
                 .p_2()
-                .child(self.control_bar(cx))
+                .child(self.control_bar(window.viewport_size().width < px(360.), cx))
                 .child(viewport),
         }
     }
@@ -911,6 +931,7 @@ impl gpui::Render for DetachedRoot {
                 div()
                     .flex()
                     .flex_row()
+                    .flex_wrap()
                     .items_center()
                     .gap_2()
                     .px_2()
@@ -919,6 +940,11 @@ impl gpui::Render for DetachedRoot {
                     .child(shot)
                     .child(
                         div()
+                            .flex_1()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
                             .text_xs()
                             .text_color(rgb(theme::TEXT_DIM))
                             .child(label),
@@ -993,6 +1019,7 @@ impl gpui::Render for StandaloneRoot {
         let mk = |id: &'static str, label: &str, bg: u32| {
             div()
                 .id(id)
+                .flex_none()
                 .px_2()
                 .py_1()
                 .rounded_md()
@@ -1047,6 +1074,7 @@ impl gpui::Render for StandaloneRoot {
                 div()
                     .flex()
                     .flex_row()
+                    .flex_wrap()
                     .items_center()
                     .gap_2()
                     .px_2()
@@ -1055,6 +1083,11 @@ impl gpui::Render for StandaloneRoot {
                     .child(shot)
                     .child(
                         div()
+                            .flex_1()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
                             .text_xs()
                             .text_color(rgb(theme::TEXT_DIM))
                             .child(label),

@@ -283,6 +283,7 @@ fn log_row(entry: &LogEntry) -> AnyElement {
     row = row.child(
         div()
             .w(px(14.))
+            .flex_none()
             .text_xs()
             .text_color(theme::level_color(entry.level))
             .child(entry.level.as_char().to_string()),
@@ -290,9 +291,11 @@ fn log_row(entry: &LogEntry) -> AnyElement {
     if let Some(tag) = &entry.tag {
         row = row.child(
             div()
-                .min_w(px(120.))
-                .max_w(px(180.))
+                .flex_none()
+                .w(px(96.))
                 .text_xs()
+                .whitespace_nowrap()
+                .text_ellipsis()
                 .text_color(theme::tag_color(tag))
                 .overflow_hidden()
                 .child(tag.clone()),
@@ -300,7 +303,8 @@ fn log_row(entry: &LogEntry) -> AnyElement {
     }
     row.child(
         div()
-            .flex_grow()
+            .flex_1()
+            .min_w_0()
             .font_family("monospace")
             .text_xs()
             .text_color(theme::level_color(entry.level))

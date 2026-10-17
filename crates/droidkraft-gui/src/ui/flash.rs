@@ -226,6 +226,7 @@ impl DroidGui {
                 col = col.child(
                     div()
                         .flex()
+                        .flex_wrap()
                         .items_center()
                         .justify_between()
                         .gap_2()
@@ -233,7 +234,14 @@ impl DroidGui {
                         .py_1()
                         .rounded_md()
                         .bg(rgb(theme::BG_ELEV))
-                        .child(div().text_sm().text_color(rgb(theme::TEXT)).child(label))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .text_sm()
+                                .text_color(rgb(theme::TEXT))
+                                .child(label),
+                        )
                         .child(button(
                             ("rom-dl", i),
                             "Download",

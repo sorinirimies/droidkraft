@@ -72,6 +72,7 @@ impl DroidGui {
             .child(
                 div()
                     .id("back")
+                    .flex_none()
                     .text_sm()
                     .text_color(rgb(theme::TEXT_DIM))
                     .cursor_pointer()
@@ -84,6 +85,10 @@ impl DroidGui {
             .child(dot(status_color))
             .child(
                 div()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
                     .text_xl()
                     .text_color(rgb(theme::TEXT))
                     .child(d.display_name()),
@@ -108,7 +113,12 @@ impl DroidGui {
         let short: Vec<&str> = Tab::all().iter().map(|t| t.short_label()).collect();
         let init: Vec<&str> = Tab::all().iter().map(|t| t.initial()).collect();
         let bar = lay.tab_bar(&full, &short, &init);
-        let mut tab_row = div().flex().gap_1().overflow_hidden();
+        let mut tab_row = div()
+            .id("tab-row")
+            .flex()
+            .gap_1()
+            .min_w_0()
+            .overflow_x_scroll();
         for tab in Tab::all() {
             let tab = *tab;
             let active = tab == d.tab;
@@ -116,6 +126,8 @@ impl DroidGui {
             tab_row = tab_row.child(
                 div()
                     .id(("tab", tab as usize))
+                    .flex_none()
+                    .min_w(gpui::px(36.))
                     .px(gpui::px(if bar.tabs == TabStyle::Full { 12. } else { 8. }))
                     .py_2()
                     .text_sm()
