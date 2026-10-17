@@ -1,6 +1,6 @@
 //! Commands tab: one-click catalogue + this device's last output.
 
-use gpui::{div, prelude::*, px, rgb, AnyElement, Context};
+use gpui::{div, prelude::*, rgb, AnyElement, Context};
 
 use crate::app::DroidGui;
 use crate::commands::{by_category, CommandCategory};
@@ -78,7 +78,7 @@ pub fn render_output(d: &DeviceState) -> AnyElement {
     div()
         .id("cmd-output")
         .p_3()
-        .h(px(240.))
+        .h(gpui::rems(15.))
         .max_h(gpui::relative(0.5))
         .flex_shrink_0()
         .w_full()

@@ -48,7 +48,7 @@ impl DroidGui {
             .flex()
             .flex_col()
             .gap_1()
-            .w(px(lay.nav_width()))
+            .w(px(lay.nav_width() * self.scale))
             .flex_shrink_0()
             .h_full()
             .overflow_hidden()
@@ -77,7 +77,7 @@ impl DroidGui {
                         .flex()
                         .flex_shrink_0()
                         .justify_center()
-                        .w(px(24.0))
+                        .w(gpui::rems(1.5))
                         .text_sm()
                         .child("▦"),
                 )
@@ -188,7 +188,7 @@ impl DroidGui {
                         .flex()
                         .flex_shrink_0()
                         .justify_center()
-                        .w(px(24.0))
+                        .w(gpui::rems(1.5))
                         .text_sm()
                         .child("⚙"),
                 )
@@ -208,39 +208,52 @@ impl DroidGui {
     }
 
     pub(crate) fn render_settings(&self) -> AnyElement {
-        use crate::ui::widgets::{card, heading, kv, panel};
+        use crate::ui::widgets::{card, heading, kv_wrap as kv, panel};
         panel()
             .child(heading("Settings & Help"))
             .child(
-                card()
-                    .child(section_title("About"))
-                    .child(kv("Version", env!("CARGO_PKG_VERSION")))
-                    .child(kv(
-                        "Polling",
-                        "all devices every ~3 s, open workspace every ~1.5 s",
-                    )),
-            )
-            .child(
-                card()
-                    .child(section_title("Shortcuts"))
-                    .child(kv("⌘/Ctrl + D", "Detach / attach the open device's mirror"))
-                    .child(kv("⌘/Ctrl + W", "Close the detached mirror window")),
-            )
-            .child(
-                card()
-                    .child(section_title("Tips"))
-                    .child(kv(
-                        "Devices",
-                        "Click a card or one of its quick actions to open its workspace.",
-                    ))
-                    .child(kv(
-                        "Recording",
-                        "Screen tab → Record; files go to the chosen output folder.",
-                    ))
-                    .child(kv(
-                        "Standalone",
-                        "`droidkraft --mirror [--serial S]` opens only a mirror window.",
-                    )),
+                div()
+                    .id("settings-scroll")
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .child(
+                        card()
+                            .child(section_title("About"))
+                            .child(kv("Version", env!("CARGO_PKG_VERSION")))
+                            .child(kv(
+                                "Polling",
+                                "all devices every ~3 s, open workspace every ~1.5 s",
+                            )),
+                    )
+                    .child(
+                        card()
+                            .child(section_title("Shortcuts"))
+                            .child(kv("⌘/Ctrl + D", "Detach / attach the open device's mirror"))
+                            .child(kv("⌘/Ctrl + W", "Close the detached mirror window"))
+                            .child(kv("⌘/Ctrl + + / −", "Zoom the interface in / out"))
+                            .child(kv("⌘/Ctrl + 0", "Reset zoom"))
+                            .child(kv("⌘/Ctrl + Q", "Quit")),
+                    )
+                    .child(
+                        card()
+                            .child(section_title("Tips"))
+                            .child(kv(
+                                "Devices",
+                                "Click a card or one of its quick actions to open its workspace.",
+                            ))
+                            .child(kv(
+                                "Recording",
+                                "Screen tab → Record; files go to the chosen output folder.",
+                            ))
+                            .child(kv(
+                                "Standalone",
+                                "`droidkraft --mirror [--serial S]` opens only a mirror window.",
+                            )),
+                    ),
             )
             .into_any_element()
     }

@@ -127,7 +127,7 @@ impl DroidGui {
             .flex()
             .items_center()
             .flex_1()
-            .min_w(px(120.))
+            .min_w(gpui::rems(7.5))
             .px_2()
             .py_1()
             .rounded_md()
@@ -282,7 +282,7 @@ fn log_row(entry: &LogEntry) -> AnyElement {
     let mut row = div().flex().flex_row().gap_2().py(px(1.));
     row = row.child(
         div()
-            .w(px(14.))
+            .w(gpui::rems(0.875))
             .flex_none()
             .text_xs()
             .text_color(theme::level_color(entry.level))
@@ -292,7 +292,7 @@ fn log_row(entry: &LogEntry) -> AnyElement {
         row = row.child(
             div()
                 .flex_none()
-                .w(px(96.))
+                .w(gpui::rems(6.))
                 .text_xs()
                 .whitespace_nowrap()
                 .text_ellipsis()

@@ -661,9 +661,7 @@ pub fn on_key(m: &mut Model, k: KeyEvent) -> (Vec<Cmd>, bool) {
         KeyCode::PageDown => m.ov_scroll += m.ov_page,
         KeyCode::PageUp => m.ov_scroll = m.ov_scroll.saturating_sub(m.ov_page),
         KeyCode::Char('j') | KeyCode::Down => m.ov_scroll += 1,
-        KeyCode::Char('k') | KeyCode::Up | KeyCode::PageUp => {
-            m.ov_scroll = m.ov_scroll.saturating_sub(1)
-        }
+        KeyCode::Char('k') | KeyCode::Up => m.ov_scroll = m.ov_scroll.saturating_sub(1),
         KeyCode::Home | KeyCode::Char('g') => m.ov_scroll = 0,
         _ => return (vec![], false),
     }

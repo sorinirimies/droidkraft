@@ -34,6 +34,8 @@ pub struct DroidGui {
     pub(crate) log_focus: gpui::FocusHandle,
     /// UI zoom multiplier (Cmd/Ctrl +/−/0); scales rem-based sizes.
     pub(crate) ui_scale: f32,
+    /// Effective zoom after clamping to the window (see `render`).
+    pub(crate) scale: f32,
 }
 
 impl DroidGui {
@@ -74,6 +76,7 @@ impl DroidGui {
             rate: Default::default(),
             log_focus: cx.focus_handle(),
             ui_scale: 1.0,
+            scale: 1.0,
         }
     }
 
@@ -594,11 +597,17 @@ impl Render for DroidGui {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let route = self.fleet.resolve(&self.route);
         let vp = window.viewport_size();
-        window.set_rem_size(px(16.0 * self.ui_scale));
+        // Never zoom so far that the effective window drops below 480x360.
+        self.scale = self
+            .ui_scale
+            .min(f32::from(vp.width) / 480.0)
+            .min(f32::from(vp.height) / 360.0)
+            .clamp(0.7, 2.0);
+        window.set_rem_size(px(16.0 * self.scale));
         // Breakpoints are in unscaled px: zooming in behaves like a smaller window.
         let lay = crate::layout::Layout::new(
-            f32::from(vp.width) / self.ui_scale,
-            f32::from(vp.height) / self.ui_scale,
+            f32::from(vp.width) / self.scale,
+            f32::from(vp.height) / self.scale,
         );
         let content = match &route {
             Route::Devices => self.render_devices(&lay, cx),

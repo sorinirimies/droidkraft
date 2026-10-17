@@ -114,6 +114,7 @@ impl DroidGui {
             .child(
                 div()
                     .flex()
+                    .flex_wrap()
                     .items_center()
                     .gap_2()
                     .child(button(
@@ -169,6 +170,7 @@ impl DroidGui {
         col = col.child(
             div()
                 .flex()
+                .flex_wrap()
                 .items_center()
                 .gap_2()
                 .child(button(
@@ -272,6 +274,7 @@ impl DroidGui {
                 col = col.child(
                     div()
                         .flex()
+                        .flex_wrap()
                         .items_center()
                         .gap_2()
                         .child(div().text_sm().text_color(rgb(color)).child(icon))

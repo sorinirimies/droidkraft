@@ -21,6 +21,8 @@ pub fn button<V: 'static>(
         .flex()
         .items_center()
         .justify_center()
+        .max_w_full()
+        .min_h(gpui::rems(1.75))
         .px_3()
         .py_2()
         .rounded_md()
@@ -57,7 +59,7 @@ pub fn small_button<V: 'static>(
         .flex()
         .items_center()
         .flex_none()
-        .min_h(px(28.))
+        .min_h(gpui::rems(1.75))
         .px_2()
         .py_1()
         .rounded_md()
@@ -143,7 +145,7 @@ pub fn chip(label: impl Into<String>, color: u32) -> AnyElement {
         .bg(rgb(theme::BG_PANEL))
         .border_1()
         .border_color(rgb(theme::BORDER))
-        .max_w(px(220.))
+        .max_w(gpui::rems(13.75))
         .overflow_hidden()
         .whitespace_nowrap()
         .text_ellipsis()
@@ -212,6 +214,29 @@ pub fn gauge(label: &str, value: impl Into<String>, pct: f32, color: u32) -> Any
 }
 
 /// Key/value row used in info tables.
+/// Like [`kv`] but the value wraps (for sentences / help text).
+pub fn kv_wrap(key: &str, value: impl Into<String>) -> AnyElement {
+    div()
+        .flex()
+        .gap_2()
+        .text_xs()
+        .child(
+            div()
+                .w(gpui::rems(6.))
+                .flex_shrink_0()
+                .text_color(rgb(theme::TEXT_FAINT))
+                .child(key.to_string()),
+        )
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .text_color(rgb(theme::TEXT))
+                .child(value.into()),
+        )
+        .into_any_element()
+}
+
 pub fn kv(key: &str, value: impl Into<String>) -> AnyElement {
     div()
         .flex()
@@ -219,7 +244,7 @@ pub fn kv(key: &str, value: impl Into<String>) -> AnyElement {
         .text_xs()
         .child(
             div()
-                .w(px(96.))
+                .w(gpui::rems(6.))
                 .flex_shrink_0()
                 .text_color(rgb(theme::TEXT_FAINT))
                 .child(key.to_string()),

@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use gpui::{div, prelude::*, px, rgb, AnyElement, Context};
+use gpui::{div, prelude::*, rgb, AnyElement, Context};
 
 use droidkraft_mirror::RecordStatus;
 
@@ -326,9 +326,11 @@ impl DroidGui {
 
         let mut panel = card().id("rec-panel").flex_shrink_0().overflow_y_scroll();
         panel = if stack {
-            panel.w_full().max_h(px(if lay_short { 96. } else { 150. }))
+            panel
+                .w_full()
+                .max_h(gpui::rems(if lay_short { 8. } else { 9.4 }))
         } else {
-            panel.w(px(280.))
+            panel.w(gpui::rems(17.5))
         };
         panel = panel
             .child(section_title("Recording"))

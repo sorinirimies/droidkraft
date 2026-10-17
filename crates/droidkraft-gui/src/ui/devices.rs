@@ -130,7 +130,7 @@ impl DroidGui {
 
         let mut c = card()
             .id(("card", idx))
-            .w(px(cw))
+            .w(px(cw * self.scale))
             .overflow_hidden()
             .cursor_pointer()
             .hover(|s| s.border_color(rgb(theme::ACCENT_DIM)))
@@ -144,6 +144,9 @@ impl DroidGui {
                         div()
                             .flex_1()
                             .min_w_0()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
                             .text_color(rgb(theme::TEXT))
                             .child(d.display_name()),
                     )
