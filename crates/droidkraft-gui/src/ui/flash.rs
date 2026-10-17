@@ -67,6 +67,27 @@ impl DroidGui {
             ("fb-wipe", "Wipe Data", FastbootCommand::WipeData),
             ("fb-reboot", "Fastboot Reboot", FastbootCommand::Reboot),
             ("fb-getvar", "Get Variables", FastbootCommand::GetVarAll),
+            (
+                "fb-slot-a",
+                "Active Slot A",
+                FastbootCommand::SetActiveSlot { slot: "a".into() },
+            ),
+            (
+                "fb-slot-b",
+                "Active Slot B",
+                FastbootCommand::SetActiveSlot { slot: "b".into() },
+            ),
+            (
+                "fb-bl",
+                "Reboot Bootloader",
+                FastbootCommand::RebootBootloader,
+            ),
+            (
+                "fb-fbd",
+                "Reboot Fastbootd",
+                FastbootCommand::RebootFastbootd,
+            ),
+            ("fb-rec", "Reboot Recovery", FastbootCommand::RebootRecovery),
         ];
         let mut fb_row = div().flex().flex_row().flex_wrap().gap_2();
         for (id, label, cmd) in fastboot_cmds {
