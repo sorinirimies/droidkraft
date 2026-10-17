@@ -256,7 +256,10 @@ impl LogcatState {
             self.scroll_position = s;
             s
         } else {
-            self.scroll_position.min(total.saturating_sub(height))
+            let s = self.scroll_position.min(total.saturating_sub(height));
+            // Persist the clamp so later scroll keys act on what is shown.
+            self.scroll_position = s;
+            s
         };
         let end = (start + height).min(total);
         self.filtered_indices[start..end].to_vec()

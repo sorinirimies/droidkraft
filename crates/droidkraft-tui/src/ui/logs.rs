@@ -117,47 +117,69 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
     let block = super::panel_block(m, title);
     let inner = block.inner(area);
     f.render_widget(block, area);
-    if inner.height < 4 {
+    if inner.height == 0 || inner.width == 0 {
         m.logs.explorer = None;
         return;
     }
+    if inner.height < 4 {
+        // Too short for a safe explorer popup; still show the list.
+        m.logs.explorer = None;
+    }
+    // Degrade: filter row, level row, stats row are dropped as space runs out.
+    let full = inner.height >= 4;
     let rows = Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Length(1),
+        Constraint::Length(u16::from(full)),
+        Constraint::Length(u16::from(full)),
         Constraint::Min(1),
-        Constraint::Length(1),
+        Constraint::Length(u16::from(inner.height >= 3)),
     ])
     .split(inner);
 
     // filter row
-    let fl = &m.logs.state.filter;
-    let mut spans = input_span(
-        "search",
-        &fl.search_query,
-        fl.active_field == crate::logcat::FilterField::Search,
-        m,
-    );
-    spans.extend(input_span(
-        "tag",
-        &fl.tag_filter,
-        fl.active_field == crate::logcat::FilterField::Tag,
-        m,
-    ));
-    spans.push(Span::styled(
-        format!(
+    if rows[0].height > 0 {
+        let fl = &m.logs.state.filter;
+        let w = rows[0].width as usize;
+        // Tail-scroll values so the cursor stays visible on narrow panels.
+        let cap = if w >= 70 {
+            usize::MAX
+        } else {
+            (w / 2).saturating_sub(9).max(4)
+        };
+        let q = super::layout::tail_to(&fl.search_query, cap);
+        let t = super::layout::tail_to(&fl.tag_filter, cap);
+        let mut spans = input_span(
+            "search",
+            &q,
+            fl.active_field == crate::logcat::FilterField::Search,
+            m,
+        );
+        spans.extend(input_span(
+            "tag",
+            &t,
+            fl.active_field == crate::logcat::FilterField::Tag,
+            m,
+        ));
+        // The verbose mode/format tail is the first thing to go.
+        let used: usize = spans.iter().map(|s| super::layout::cells(&s.content)).sum();
+        let tail = format!(
             "  mode:{} (z / ^F fuzzy · ^R regex)  fmt:{}",
             fl.mode_label(),
             m.logs.fmt.label()
-        ),
-        m.themes.muted(),
-    ));
-    f.render_widget(Paragraph::new(Line::from(spans)), rows[0]);
+        );
+        if used + super::layout::cells(&tail) <= w {
+            spans.push(Span::styled(tail, m.themes.muted()));
+        }
+        f.render_widget(Paragraph::new(Line::from(spans)), rows[0]);
+    }
 
     // level checkboxes (checked = level passes min_level)
     m.logs.level_rects.clear();
     let min = m.logs.state.filter.min_level;
     let mut x = rows[1].x + 1;
     for lv in LogLevel::all() {
+        if rows[1].height == 0 {
+            break;
+        }
         let r = Rect::new(x, rows[1].y, 6.min(rows[1].right().saturating_sub(x)), 1);
         if r.width == 0 {
             break;

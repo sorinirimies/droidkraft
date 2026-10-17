@@ -282,7 +282,9 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
             Line::from(""),
             Line::from("Y / Enter = yes     N / Esc = cancel"),
         ];
-        draw_modal(f, area, m, "Confirm", body, 44, 6);
+        if !draw_modal(f, area, m, "Confirm", body, 44, 6) {
+            m.cmds.confirm = None;
+        }
     }
     if let Some(ex) = m.cmds.explorer.as_mut() {
         draw_explorer(f, area, ex);

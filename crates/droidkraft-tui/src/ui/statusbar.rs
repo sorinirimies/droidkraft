@@ -67,9 +67,15 @@ pub fn plan(m: &Model, width: u16, height: u16) -> Plan {
         .map(|s| truncate_to(s, w.saturating_sub(2)));
     if let (Some(msg), 1) = (&msg, max) {
         // One row: the transient message wins over the hints.
+        // ...but keep the essential "? q" escape hatch visible.
+        let line = if w >= 12 {
+            format!("{}  ? q", truncate_to(msg, w.saturating_sub(6)))
+        } else {
+            msg.clone()
+        };
         return Plan {
             hints: vec![],
-            message: Some(msg.clone()),
+            message: Some(line),
         };
     }
     let budget = if msg.is_some() { max - 1 } else { max };

@@ -214,6 +214,8 @@ pub struct Model {
     pub home_cols: usize,
     /// First visible row on the device Overview.
     pub ov_scroll: usize,
+    /// Rows shown on the last Overview frame (PgUp/PgDn step).
+    pub ov_page: usize,
     /// How often stats/graphs are polled (`+` / `-`).
     pub refresh: droidkraft_core::RefreshRate,
     pub quit: bool,
@@ -242,6 +244,7 @@ impl Default for Model {
             card_rects: Vec::new(),
             home_cols: 1,
             ov_scroll: 0,
+            ov_page: 1,
             refresh: Default::default(),
             quit: false,
             logs: Default::default(),

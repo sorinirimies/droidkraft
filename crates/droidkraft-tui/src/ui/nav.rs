@@ -74,11 +74,17 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
         ));
     }
     let list_h = inner.height.saturating_sub(bottom);
-    for (i, (target, line, active)) in entries.into_iter().enumerate() {
-        if i as u16 >= list_h {
+    // Keep the active entry in view when the list outgrows the rail.
+    let first = entries
+        .iter()
+        .position(|e| e.2)
+        .map_or(0, |a| (a + 1).saturating_sub(list_h as usize));
+    for (i, (target, line, active)) in entries.into_iter().enumerate().skip(first) {
+        let row = (i - first) as u16;
+        if row >= list_h {
             break;
         }
-        let r = Rect::new(inner.x, inner.y + i as u16, inner.width, 1);
+        let r = Rect::new(inner.x, inner.y + row, inner.width, 1);
         let style = if active {
             m.themes.selected()
         } else {

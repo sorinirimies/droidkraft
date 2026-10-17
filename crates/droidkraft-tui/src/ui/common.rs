@@ -50,7 +50,7 @@ pub fn draw_modal(
     body: Vec<Line<'static>>,
     w: u16,
     h: u16,
-) {
+) -> bool {
     // Grow to fit the wrapped body (so the key hint never falls off the
     // bottom), bounded by the available area.
     let w = w.min(area.width);
@@ -69,6 +69,8 @@ pub fn draw_modal(
     let inner = block.inner(r);
     f.render_widget(block, r);
     f.render_widget(Paragraph::new(body).wrap(Wrap { trim: false }), inner);
+    // `false` = clipped: callers must cancel the pending action.
+    need <= area.height
 }
 
 /// Build a file explorer. `exts` filters files; `mode` picks what can be selected.

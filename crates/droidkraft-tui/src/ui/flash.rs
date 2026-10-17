@@ -374,7 +374,9 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
             Line::from("⚠ Destructive. Type “yes” + Enter, or press Y. Esc/N cancels."),
             Line::from(format!("> {}▏", c.typed)),
         ];
-        draw_modal(f, area, m, "Confirm", body, 70, 9);
+        if !draw_modal(f, area, m, "Confirm", body, 70, 9) {
+            m.flash.confirm = None;
+        }
     }
     if let Some((ex, _)) = m.flash.explorer.as_mut() {
         draw_explorer(f, area, ex);

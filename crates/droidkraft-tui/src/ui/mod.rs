@@ -40,8 +40,8 @@ pub fn draw(f: &mut Frame, m: &mut Model) {
     m.screen.gfx.begin_frame();
     m.clear_hits();
     f.render_widget(Block::default().style(m.themes.base()), area);
-    if area.height < 5 || area.width < 12 {
-        let msg = "Too small (min 12x5)";
+    if area.height < 8 || area.width < 12 {
+        let msg = "Too small (min 12x8)";
         f.render_widget(
             Paragraph::new(layout::truncate_to(msg, area.width as usize)).style(m.themes.base()),
             area,
@@ -297,7 +297,7 @@ mod render_tests {
             text: "wipe".into(),
             typed: String::new(),
         });
-        render(&mut m, 14, 6);
+        render(&mut m, 14, 8);
         assert!(
             m.flash.confirm.is_none(),
             "invisible confirm must be cancelled"

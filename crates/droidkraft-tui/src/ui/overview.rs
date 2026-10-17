@@ -91,6 +91,18 @@ fn rows(cols: usize) -> Vec<(u16, Vec<Card>)> {
         .collect()
 }
 
+/// Largest useful scroll: the first row from which everything below fits.
+pub fn max_scroll(heights: &[u16], avail: u16) -> usize {
+    let mut sum = 0u32;
+    for i in (0..heights.len()).rev() {
+        sum += u32::from(heights[i]);
+        if sum > u32::from(avail) {
+            return (i + 1).min(heights.len().saturating_sub(1));
+        }
+    }
+    0
+}
+
 /// Rows that fit starting at `scroll`; the last may be clipped. Returns `(first, rect heights)`.
 pub fn layout_rows(heights: &[u16], scroll: usize, avail: u16) -> Vec<(usize, u16)> {
     let mut out = Vec::new();
@@ -168,8 +180,9 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
     let cols = columns(area.width);
     let grid = rows(cols);
     let heights: Vec<u16> = grid.iter().map(|r| r.0).collect();
-    m.ov_scroll = m.ov_scroll.min(grid.len().saturating_sub(1));
+    m.ov_scroll = m.ov_scroll.min(max_scroll(&heights, area.height));
     let placed = layout_rows(&heights, m.ov_scroll, area.height);
+    m.ov_page = placed.len().max(1);
     let card_w = area.width / cols as u16;
     let mut y = area.y;
     for (ri, h) in &placed {
@@ -645,7 +658,9 @@ fn system(f: &mut Frame, inner: Rect, m: &Model, d: &DeviceDetails) {
 
 pub fn on_key(m: &mut Model, k: KeyEvent) -> (Vec<Cmd>, bool) {
     match k.code {
-        KeyCode::Char('j') | KeyCode::Down | KeyCode::PageDown => m.ov_scroll += 1,
+        KeyCode::PageDown => m.ov_scroll += m.ov_page,
+        KeyCode::PageUp => m.ov_scroll = m.ov_scroll.saturating_sub(m.ov_page),
+        KeyCode::Char('j') | KeyCode::Down => m.ov_scroll += 1,
         KeyCode::Char('k') | KeyCode::Up | KeyCode::PageUp => {
             m.ov_scroll = m.ov_scroll.saturating_sub(1)
         }
@@ -693,5 +708,18 @@ mod tests {
         );
         assert_eq!(layout_rows(&[11, 11, 17], 2, 25), vec![(2, 17)]);
         assert_eq!(layout_rows(&[11], 0, 0), vec![]);
+    }
+}
+
+#[cfg(test)]
+mod scroll_tests {
+    use super::max_scroll;
+
+    #[test]
+    fn max_scroll_leaves_no_blank_tail() {
+        assert_eq!(max_scroll(&[5, 5, 5], 20), 0);
+        assert_eq!(max_scroll(&[5, 5, 5], 10), 1);
+        assert_eq!(max_scroll(&[5, 5, 5], 7), 2);
+        assert_eq!(max_scroll(&[], 7), 0);
     }
 }
