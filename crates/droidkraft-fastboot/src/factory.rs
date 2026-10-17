@@ -252,7 +252,12 @@ pub(crate) fn flash_dir(
         .map_err(|e| cmd_err(format!("read {inner:?}: {e}")))?;
     let mut physical = Vec::new();
     let mut logical = Vec::new();
-    for n in zip.file_names().map(String::from).collect::<Vec<_>>() {
+    for n in zip
+        .file_names()
+        .filter_map(Result::ok)
+        .map(|n| n.into_owned())
+        .collect::<Vec<_>>()
+    {
         let Some(part) = n
             .strip_suffix(".img")
             .filter(|p| !p.contains('/') && *p != "super_empty")
