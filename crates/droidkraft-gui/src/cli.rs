@@ -133,4 +133,17 @@ mod tests {
         assert!(p(&["--mirror", "--size", "10x10"]).is_err());
         assert!(p(&["--serial", "X"]).is_err());
     }
+
+    #[test]
+    fn tui_detach_args_parse_to_mirror() {
+        // Same shape as droidkraft-tui's mirror_cmd::build_args.
+        assert_eq!(
+            p(&["--mirror", "--serial", "ABC", "--size", "800x600"]),
+            Ok(Cli::Mirror(MirrorArgs {
+                serial: Some("ABC".into()),
+                size: Some((800, 600)),
+                title: None,
+            }))
+        );
+    }
 }

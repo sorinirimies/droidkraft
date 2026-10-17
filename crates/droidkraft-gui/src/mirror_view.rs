@@ -819,7 +819,11 @@ impl DetachedRoot {
     ) -> Self {
         // Repaint (elapsed timer) whenever the mirror repaints.
         cx.observe(&mirror, |_, _, cx| cx.notify()).detach();
-        Self { mirror, app, serial }
+        Self {
+            mirror,
+            app,
+            serial,
+        }
     }
 }
 
@@ -842,26 +846,27 @@ impl gpui::Render for DetachedRoot {
         let recording = matches!(status, RecordStatus::Recording { .. });
         let busy = recording || matches!(status, RecordStatus::Finishing);
 
-        let bar_btn = |id: &'static str, label: String, bg: u32, cb: fn(&mut crate::app::DroidGui, &str)| {
-            let app = self.app.clone();
-            let ser = self.serial.clone();
-            div()
-                .id(id)
-                .px_2()
-                .py_1()
-                .rounded_md()
-                .bg(rgb(bg))
-                .text_xs()
-                .text_color(rgb(0xffffff))
-                .cursor_pointer()
-                .child(label)
-                .on_click(move |_, _, cx| {
-                    let _ = app.update(cx, |t, cx| {
-                        cb(t, &ser);
-                        cx.notify();
-                    });
-                })
-        };
+        let bar_btn =
+            |id: &'static str, label: String, bg: u32, cb: fn(&mut crate::app::DroidGui, &str)| {
+                let app = self.app.clone();
+                let ser = self.serial.clone();
+                div()
+                    .id(id)
+                    .px_2()
+                    .py_1()
+                    .rounded_md()
+                    .bg(rgb(bg))
+                    .text_xs()
+                    .text_color(rgb(0xffffff))
+                    .cursor_pointer()
+                    .child(label)
+                    .on_click(move |_, _, cx| {
+                        let _ = app.update(cx, |t, cx| {
+                            cb(t, &ser);
+                            cx.notify();
+                        });
+                    })
+            };
         let rec = if busy {
             bar_btn("d-stop", "■ Stop".into(), theme::DANGER, |t, s| {
                 t.stop_recording(s)
@@ -871,9 +876,12 @@ impl gpui::Render for DetachedRoot {
                 t.start_recording(s)
             })
         };
-        let shot = bar_btn("d-shot", "📷 Screenshot".into(), theme::BG_ELEV, |t, s| {
-            t.take_screenshot(s)
-        });
+        let shot = bar_btn(
+            "d-shot",
+            "📷 Screenshot".into(),
+            theme::BG_ELEV,
+            |t, s| t.take_screenshot(s),
+        );
         let label = if recording {
             elapsed
                 .map(|e| format!("● REC {}", crate::fmt::fmt_elapsed(e)))
@@ -995,14 +1003,12 @@ impl gpui::Render for StandaloneRoot {
                 cx.notify();
             }))
         } else {
-            mk("s-rec", "● Record", theme::ACCENT_DIM).on_click(cx.listener(
-                move |t, _, _, cx| {
-                    if let Some(s) = &ser {
-                        t.start(s);
-                    }
-                    cx.notify();
-                },
-            ))
+            mk("s-rec", "● Record", theme::ACCENT_DIM).on_click(cx.listener(move |t, _, _, cx| {
+                if let Some(s) = &ser {
+                    t.start(s);
+                }
+                cx.notify();
+            }))
         };
         let ser = serial;
         let shot = mk("s-shot", "📷 Screenshot", theme::BG_ELEV).on_click(cx.listener(
