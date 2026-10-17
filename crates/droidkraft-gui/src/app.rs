@@ -32,6 +32,8 @@ pub struct DroidGui {
     pub(crate) rate: droidkraft_core::RefreshRate,
     /// Focus for the log search box (receives typed keys).
     pub(crate) log_focus: gpui::FocusHandle,
+    /// UI zoom multiplier (Cmd/Ctrl +/−/0); scales rem-based sizes.
+    pub(crate) ui_scale: f32,
 }
 
 impl DroidGui {
@@ -71,6 +73,7 @@ impl DroidGui {
             route: Route::Devices,
             rate: Default::default(),
             log_focus: cx.focus_handle(),
+            ui_scale: 1.0,
         }
     }
 
@@ -591,7 +594,12 @@ impl Render for DroidGui {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let route = self.fleet.resolve(&self.route);
         let vp = window.viewport_size();
-        let lay = crate::layout::Layout::new(f32::from(vp.width), f32::from(vp.height));
+        window.set_rem_size(px(16.0 * self.ui_scale));
+        // Breakpoints are in unscaled px: zooming in behaves like a smaller window.
+        let lay = crate::layout::Layout::new(
+            f32::from(vp.width) / self.ui_scale,
+            f32::from(vp.height) / self.ui_scale,
+        );
         let content = match &route {
             Route::Devices => self.render_devices(&lay, cx),
             Route::Device(s) => self.render_workspace(s, &lay, cx),
@@ -605,6 +613,27 @@ impl Render for DroidGui {
             .bg(rgb(theme::BG))
             .text_color(rgb(theme::TEXT))
             .font_family("sans-serif")
+            .on_action(cx.listener(|this, _: &crate::mirror_view::ZoomIn, _w, cx| {
+                this.ui_scale = crate::mirror_view::step_zoom(this.ui_scale, 1);
+                cx.notify();
+            }))
+            .on_action(
+                cx.listener(|this, _: &crate::mirror_view::ZoomOut, _w, cx| {
+                    this.ui_scale = crate::mirror_view::step_zoom(this.ui_scale, -1);
+                    cx.notify();
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &crate::mirror_view::ZoomReset, _w, cx| {
+                    this.ui_scale = 1.0;
+                    cx.notify();
+                }),
+            )
+            .on_action(
+                cx.listener(|_, _: &crate::mirror_view::CloseWindow, window, _cx| {
+                    window.remove_window()
+                }),
+            )
             .on_action(cx.listener(|this, _: &ToggleDetach, _w, cx| {
                 if let Some(s) = this.fleet.open_serial(&this.route) {
                     this.toggle_detach(&s, cx);

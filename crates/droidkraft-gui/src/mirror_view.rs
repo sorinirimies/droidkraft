@@ -22,14 +22,52 @@ use gpui::{
 use crate::screen::{layout, map_to_device, oriented_device, ScreenStream, Zoom};
 use crate::theme;
 
-actions!(droidkraft, [ToggleDetach, CloseWindow]);
+actions!(
+    droidkraft,
+    [ToggleDetach, CloseWindow, ZoomIn, ZoomOut, ZoomReset, Quit]
+);
 
-/// Register the mirror-related key bindings (Cmd/Ctrl+D, Cmd/Ctrl+W).
+/// Register app-wide key bindings and the macOS menu bar:
+/// Cmd/Ctrl+D detach, +W close, +Q quit, +/-/0 UI zoom.
 pub fn init(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("secondary-d", ToggleDetach, None),
         KeyBinding::new("secondary-w", CloseWindow, None),
+        KeyBinding::new("secondary-q", Quit, None),
+        KeyBinding::new("secondary-=", ZoomIn, None),
+        KeyBinding::new("secondary-+", ZoomIn, None),
+        KeyBinding::new("secondary--", ZoomOut, None),
+        KeyBinding::new("secondary-0", ZoomReset, None),
     ]);
+    cx.on_action(|_: &Quit, cx| cx.quit());
+    cx.set_menus(vec![
+        gpui::Menu {
+            name: "DroidKraft".into(),
+            items: vec![gpui::MenuItem::action("Quit DroidKraft", Quit)],
+        },
+        gpui::Menu {
+            name: "View".into(),
+            items: vec![
+                gpui::MenuItem::action("Zoom In", ZoomIn),
+                gpui::MenuItem::action("Zoom Out", ZoomOut),
+                gpui::MenuItem::action("Actual Size", ZoomReset),
+                gpui::MenuItem::separator(),
+                gpui::MenuItem::action("Detach / Attach Mirror", ToggleDetach),
+            ],
+        },
+        gpui::Menu {
+            name: "Window".into(),
+            items: vec![gpui::MenuItem::action("Close Window", CloseWindow)],
+        },
+    ]);
+}
+
+/// UI zoom steps (rem-size multiplier), clamped to a sane range.
+pub fn step_zoom(cur: f32, dir: i32) -> f32 {
+    if dir == 0 {
+        return 1.0;
+    }
+    ((cur + 0.1 * dir as f32) * 10.0).round().clamp(7.0, 20.0) / 10.0
 }
 
 /// How much control UI surrounds the viewport.
@@ -1094,5 +1132,19 @@ impl gpui::Render for StandaloneRoot {
                     ),
             )
             .child(div().flex_1().min_h_0().child(self.mirror.clone()))
+    }
+}
+
+#[cfg(test)]
+mod zoom_tests {
+    use super::step_zoom;
+
+    #[test]
+    fn zoom_steps_clamp_and_reset() {
+        assert_eq!(step_zoom(1.0, 1), 1.1);
+        assert_eq!(step_zoom(1.0, -1), 0.9);
+        assert_eq!(step_zoom(2.0, 1), 2.0);
+        assert_eq!(step_zoom(0.7, -1), 0.7);
+        assert_eq!(step_zoom(1.7, 0), 1.0);
     }
 }

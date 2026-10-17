@@ -23,8 +23,8 @@ fn main() {
         return;
     }
     Application::new().run(move |cx| {
+        mirror_view::init(cx);
         if let Cli::Mirror(m) = parsed {
-            mirror_view::init(cx);
             let (w, h) = m.size.unwrap_or((400, 860));
             let bounds = Bounds::centered(None, size(px(w as f32), px(h as f32)), cx);
             cx.open_window(
