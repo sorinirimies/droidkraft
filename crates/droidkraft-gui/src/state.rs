@@ -375,6 +375,12 @@ impl Fleet {
     ) -> bool {
         match self.devices.get_mut(serial) {
             Some(d) => {
+                let mut details = details;
+                // Static prop: a partial/failed poll must not make the chip vanish.
+                if details.online && details.system.flash_locked.is_none() {
+                    details.system.flash_locked =
+                        d.details.as_ref().and_then(|p| p.system.flash_locked);
+                }
                 d.details = Some(details);
                 d.history = history;
                 true

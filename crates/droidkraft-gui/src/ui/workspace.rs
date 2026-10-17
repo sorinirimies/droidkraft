@@ -38,6 +38,11 @@ impl DroidGui {
                 format!("Android {}", nonempty(&det.system.android_release, "?")),
                 theme::TEXT_DIM,
             ));
+            match det.system.flash_locked {
+                Some(true) => chips.push(chip("bootloader locked", theme::WARN)),
+                Some(false) => chips.push(chip("bootloader unlocked", theme::OK)),
+                None => {}
+            }
             chips.push(chip(
                 format!("{}%", det.battery.level),
                 battery_color(det.battery.level),
@@ -53,11 +58,6 @@ impl DroidGui {
             match root {
                 Some(true) => chips.push(chip("root", theme::OK)),
                 Some(false) => chips.push(chip("no root", theme::TEXT_DIM)),
-                None => {}
-            }
-            match det.system.flash_locked {
-                Some(true) => chips.push(chip("bootloader locked", theme::WARN)),
-                Some(false) => chips.push(chip("bootloader unlocked", theme::OK)),
                 None => {}
             }
         }
