@@ -13,9 +13,7 @@ use std::time::{Duration, Instant};
 use droidkraft_core::features::fastboot::{FastbootCommand, FastbootManager};
 use droidkraft_core::features::flash::{RebootTarget, RootStatus};
 use droidkraft_core::features::rom::{self, DeviceProfile, DownloadProgress, FlashStep, RomBuild};
-use droidkraft_core::{
-    collect_device_details, AdbDeviceEntry, AdbManager, CpuSample, DeviceDetails, DeviceHistory,
-};
+use droidkraft_core::{AdbDeviceEntry, AdbManager, DetailsCollector, DeviceDetails, DeviceHistory};
 
 use crate::commands::CommandAction;
 
@@ -167,7 +165,7 @@ impl Worker {
 
 /// Per-device polling state.
 struct PollEntry {
-    cpu: CpuSample,
+    collector: DetailsCollector,
     history: DeviceHistory,
     last: Option<Instant>,
 }
@@ -239,25 +237,25 @@ impl Poller {
                 .entries
                 .entry(serial.clone())
                 .or_insert_with(|| PollEntry {
-                    cpu: CpuSample::default(),
+                    collector: DetailsCollector::default(),
                     history: DeviceHistory::default(),
                     last: None,
                 });
             if entry.last.is_some_and(|t| t.elapsed() < every) {
                 continue;
             }
-            let prev = entry.last.map(|_| entry.cpu);
-            let (details, sample) = collect_device_details(&serial, prev.as_ref());
+            let polled = entry.collector.poll(&serial);
             entry.last = Some(Instant::now());
-            entry.cpu = sample;
-            if details.online {
-                entry.history.record(&details);
+            if let Some(details) = polled {
+                if details.online {
+                    entry.history.record(&details);
+                }
+                let _ = self.tx.send(WorkerResponse::Details {
+                    serial: serial.clone(),
+                    details: Box::new(details),
+                    history: Box::new(entry.history.clone()),
+                });
             }
-            let _ = self.tx.send(WorkerResponse::Details {
-                serial: serial.clone(),
-                details: Box::new(details),
-                history: Box::new(entry.history.clone()),
-            });
             loop {
                 match req_rx.try_recv() {
                     Ok(req) => self.handle(req),

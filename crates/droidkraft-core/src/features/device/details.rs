@@ -601,6 +601,48 @@ const SCRIPT: &str = concat!(
     "dumpsys thermalservice 2>/dev/null | grep -E 'Thermal Status:|mValue='"
 );
 
+/// Cheap variant of [`SCRIPT`]: same segment layout, but segments that never
+/// change while a device stays connected (props, `wm`, kernel, display fps,
+/// su probe) are left empty and restored via [`merge_static`].
+const FAST_SCRIPT: &str = concat!(
+    "echo \"[gsm.operator.alpha]: [$(getprop gsm.operator.alpha)]\"; echo ---SEP---;",
+    "dumpsys battery; echo ---SEP---;",
+    "cat /proc/meminfo; echo ---SEP---;",
+    "df -k /data; echo ---SEP---;",
+    "head -1 /proc/stat; echo ---SEP---;",
+    "cat /proc/loadavg; echo ---SEP---;",
+    "echo ---SEP---;",
+    "dumpsys wifi | grep -m2 -E 'mWifiInfo|SSID:'; echo ---SEP---;",
+    "for z in /sys/class/thermal/thermal_zone*; do echo \"$(cat $z/type 2>/dev/null) $(cat $z/temp 2>/dev/null)\"; done; echo ---SEP---;",
+    "cat /proc/uptime; echo ---SEP---;",
+    "nproc; cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq; cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq; echo ---SEP---;",
+    "echo ---SEP---;",
+    "settings get global airplane_mode_on; settings get system screen_brightness; echo ---SEP---;",
+    "echo ---SEP---;",
+    "echo ---SEP---;",
+    "dumpsys thermalservice 2>/dev/null | grep -E 'Thermal Status:|mValue='"
+);
+
+/// Copy slow-changing fields from a previous full collection into a fast one.
+pub(crate) fn merge_static(d: &mut DeviceDetails, prev: &DeviceDetails) {
+    let uptime = d.system.uptime_secs;
+    d.system = SystemInfo {
+        uptime_secs: uptime,
+        ..prev.system.clone()
+    };
+    d.cpu.abi = prev.cpu.abi.clone();
+    d.cpu.hardware = prev.cpu.hardware.clone();
+    d.display.width = prev.display.width;
+    d.display.height = prev.display.height;
+    d.display.density = prev.display.density;
+    d.display.refresh_hz = prev.display.refresh_hz;
+}
+
+/// Whether `prev` is a trustworthy base for a fast collection.
+fn usable_base(prev: &DeviceDetails) -> bool {
+    prev.online && prev.errors.is_empty() && !prev.system.model.is_empty()
+}
+
 fn pick<'a>(parts: &[&'a str], i: usize) -> &'a str {
     parts.get(i).copied().unwrap_or("")
 }
@@ -721,6 +763,18 @@ pub fn collect_device_details(
     serial: &str,
     prev_cpu: Option<&CpuSample>,
 ) -> (DeviceDetails, CpuSample) {
+    collect_device_details_with(serial, prev_cpu, None)
+}
+
+/// Like [`collect_device_details`], but when `fast_base` is a previous good
+/// full collection, runs the much cheaper [`FAST_SCRIPT`] and reuses its
+/// static fields. Pass `None` for a full refresh.
+pub fn collect_device_details_with(
+    serial: &str,
+    prev_cpu: Option<&CpuSample>,
+    fast_base: Option<&DeviceDetails>,
+) -> (DeviceDetails, CpuSample) {
+    let base = fast_base.filter(|b| usable_base(b));
     let fail = |msg: String| {
         let d = DeviceDetails {
             serial: serial.to_string(),
@@ -737,10 +791,71 @@ pub fn collect_device_details(
         Err(e) => return fail(format!("connect: {e}")),
     };
     let mut buf = Vec::new();
-    if let Err(e) = dev.shell_command(&["sh", "-c", SCRIPT], &mut buf) {
+    let script = if base.is_some() { FAST_SCRIPT } else { SCRIPT };
+    if let Err(e) = dev.shell_command(&["sh", "-c", script], &mut buf) {
         return fail(format!("shell: {e}"));
     }
-    assemble(serial, &String::from_utf8_lossy(&buf), prev_cpu)
+    let (mut d, sample) = assemble(serial, &String::from_utf8_lossy(&buf), prev_cpu);
+    if let Some(b) = base {
+        if d.errors.is_empty() {
+            merge_static(&mut d, b);
+        }
+    }
+    (d, sample)
+}
+
+/// How long a full (slow) collection stays valid before the next one.
+pub const FULL_REFRESH: std::time::Duration = std::time::Duration::from_secs(300);
+/// Consecutive failed polls tolerated before reporting the device as down.
+pub const MAX_TRANSIENT_FAILS: u32 = 2;
+
+/// Stateful per-device collector shared by the GUI and TUI pollers: cheap
+/// fast polls between periodic full ones, CPU deltas, and suppression of
+/// one-off failures so the UI doesn't flicker.
+#[derive(Debug, Default)]
+pub struct DetailsCollector {
+    last_good: Option<DeviceDetails>,
+    cpu: CpuSample,
+    has_cpu: bool,
+    full_at: Option<std::time::Instant>,
+    fails: u32,
+}
+
+impl DetailsCollector {
+    /// Poll `serial`. `None` = transient failure, keep showing previous data.
+    pub fn poll(&mut self, serial: &str) -> Option<DeviceDetails> {
+        let full_due = self.full_at.is_none_or(|t| t.elapsed() >= FULL_REFRESH);
+        let base = if full_due {
+            None
+        } else {
+            self.last_good.as_ref()
+        };
+        let prev_cpu = self.has_cpu.then_some(self.cpu);
+        let was_fast = base.is_some();
+        let (d, sample) = collect_device_details_with(serial, prev_cpu.as_ref(), base);
+        if d.online && d.errors.is_empty() {
+            self.cpu = sample;
+            self.has_cpu = true;
+            self.fails = 0;
+            if !was_fast {
+                self.full_at = Some(std::time::Instant::now());
+            }
+            self.last_good = Some(d.clone());
+            return Some(d);
+        }
+        self.fails += 1;
+        // Force a full collection next time; hide a one-off blip.
+        self.full_at = None;
+        if self.last_good.is_some() && self.fails <= MAX_TRANSIENT_FAILS {
+            return None;
+        }
+        Some(d)
+    }
+
+    /// Drop cached data (e.g. after reboot) so the next poll is a full one.
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 /// Collect details for several devices (no CPU delta).
@@ -754,6 +869,30 @@ pub fn list_all_details(serials: &[String]) -> Vec<DeviceDetails> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fast_script_keeps_segment_layout() {
+        assert_eq!(
+            FAST_SCRIPT.matches("---SEP---").count(),
+            SCRIPT.matches("---SEP---").count()
+        );
+    }
+
+    #[test]
+    fn merge_static_restores_slow_fields_keeps_uptime() {
+        let mut prev = DeviceDetails::default();
+        prev.system.model = "Pixel".into();
+        prev.system.flash_locked = Some(true);
+        prev.system.uptime_secs = 5;
+        prev.display.width = 1080;
+        let mut d = DeviceDetails::default();
+        d.system.uptime_secs = 99;
+        merge_static(&mut d, &prev);
+        assert_eq!(d.system.model, "Pixel");
+        assert_eq!(d.system.flash_locked, Some(true));
+        assert_eq!(d.system.uptime_secs, 99);
+        assert_eq!(d.display.width, 1080);
+    }
 
     #[test]
     fn battery() {

@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use droidkraft_core::features::fastboot::{FastbootCommand, FastbootManager};
 use droidkraft_core::features::flash::RootStatus;
-use droidkraft_core::{collect_device_details, AdbCommand, AdbManager, CpuSample, DeviceDetails};
+use droidkraft_core::{AdbCommand, AdbManager, DetailsCollector, DeviceDetails};
 
 use crate::commands::CmdAction;
 
@@ -157,7 +157,7 @@ struct Poller {
     last_list: Option<Instant>,
     devices: Vec<ListedDevice>,
     last_poll: HashMap<String, Instant>,
-    prev_cpu: HashMap<String, CpuSample>,
+    collectors: HashMap<String, DetailsCollector>,
     force: bool,
     rate: droidkraft_core::RefreshRate,
 }
@@ -211,7 +211,7 @@ fn poll(adb: &mut AdbManager, rx: &Receiver<Req>, tx: &Sender<Res>, p: &mut Poll
         .map(|d| d.serial.clone())
         .collect();
     p.last_poll.retain(|k, _| serials.contains(k));
-    p.prev_cpu.retain(|k, _| serials.contains(k));
+    p.collectors.retain(|k, _| serials.contains(k));
     for s in serials {
         let focused = p.focus.as_deref() == Some(s.as_str());
         let since = p.last_poll.get(&s).map(|t| now.duration_since(*t));
@@ -219,9 +219,9 @@ fn poll(adb: &mut AdbManager, rx: &Receiver<Req>, tx: &Sender<Res>, p: &mut Poll
             continue;
         }
         p.last_poll.insert(s.clone(), Instant::now());
-        let (d, cpu) = collect_device_details(&s, p.prev_cpu.get(&s));
-        p.prev_cpu.insert(s, cpu);
-        let _ = tx.send(Res::Details(Box::new(d)));
+        if let Some(d) = p.collectors.entry(s.clone()).or_default().poll(&s) {
+            let _ = tx.send(Res::Details(Box::new(d)));
+        }
         // Keep the UI responsive: serve queued requests between devices.
         while let Ok(req) = rx.try_recv() {
             handle(adb, tx, p, req);

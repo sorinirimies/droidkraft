@@ -49,9 +49,9 @@ pub use color::{hash_tag, level_text_color, tag_color, Rgb, TAG_PALETTE};
 pub use error::{AdbError, AdbResult};
 
 pub use features::device::{
-    collect_device_details, list_all_details, BatteryInfo, BatteryStatus, CpuInfo, CpuSample,
-    DeviceDetails, DeviceHistory, DisplayInfo, MemoryInfo, NetworkInfo, PlugType, RefreshRate,
-    Ring, StorageInfo, SystemInfo, ThermalInfo,
+    collect_device_details, collect_device_details_with, list_all_details, BatteryInfo,
+    BatteryStatus, CpuInfo, CpuSample, DetailsCollector, DeviceDetails, DeviceHistory, DisplayInfo,
+    MemoryInfo, NetworkInfo, PlugType, RefreshRate, Ring, StorageInfo, SystemInfo, ThermalInfo,
 };
 pub use features::device::{AdbDeviceEntry, DeviceInfo, DeviceStatus};
 pub use features::fastboot::{FastbootCommand, FastbootError, FastbootManager, FastbootResult};
