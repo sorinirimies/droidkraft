@@ -2,11 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2026-10-17
+
+### ⚙️ Miscellaneous Tasks
+
+- **deps:** Zip 2.4 -> 9 (RUSTSEC-2026-0367/0368/0369) - ([f6a9cd7](https://github.com/sorinirimies/droidkraft/commit/f6a9cd70a5c0afd77fbccdc47ccea81638787d56))
+
+
 ## [2.1.9] - 2026-10-17
 
 ### ⚙️ Miscellaneous Tasks
 
 - **just:** Fast-fail ssh, setup-remotes, force variants - ([5f95c8a](https://github.com/sorinirimies/droidkraft/commit/5f95c8a84917e7f61955a418fdd15988839f57da))
+
+- Bump version to 2.1.9 - ([7fc2cb0](https://github.com/sorinirimies/droidkraft/commit/7fc2cb06b79c688102f2001062d7de3ced087cb9))
 
 
 ### ⚡ Performance
