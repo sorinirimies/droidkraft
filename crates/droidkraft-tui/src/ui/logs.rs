@@ -118,6 +118,7 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
     let inner = block.inner(area);
     f.render_widget(block, area);
     if inner.height < 4 {
+        m.logs.explorer = None;
         return;
     }
     let rows = Layout::vertical([

@@ -37,10 +37,9 @@ pub fn card_columns(width: u16) -> u16 {
     (width / 34).clamp(1, 4)
 }
 
-/// Display width of `s` in terminal cells (chars; the UI uses no wide glyphs
-/// in hint/label text).
+/// Display width of `s` in terminal cells (wide glyphs such as CJK/emoji = 2).
 pub fn cells(s: &str) -> usize {
-    s.chars().count()
+    unicode_width::UnicodeWidthStr::width(s)
 }
 
 /// Truncate to at most `w` cells, ending with `…` when cut.
@@ -50,10 +49,42 @@ pub fn truncate_to(s: &str, w: usize) -> String {
     } else if w == 0 {
         String::new()
     } else {
-        let mut t: String = s.chars().take(w - 1).collect();
+        let mut t = String::new();
+        let mut used = 0;
+        for c in s.chars() {
+            let cw = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
+            if used + cw > w - 1 {
+                break;
+            }
+            used += cw;
+            t.push(c);
+        }
         t.push('…');
         t
     }
+}
+
+/// Last `w` cells of `s`, prefixed with `…` when cut (for text inputs).
+pub fn tail_to(s: &str, w: usize) -> String {
+    if cells(s) <= w {
+        return s.to_string();
+    }
+    if w == 0 {
+        return String::new();
+    }
+    let mut out: Vec<char> = Vec::new();
+    let mut used = 0;
+    for c in s.chars().rev() {
+        let cw = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
+        if used + cw > w - 1 {
+            break;
+        }
+        used += cw;
+        out.push(c);
+    }
+    out.push('…');
+    out.reverse();
+    out.into_iter().collect()
 }
 
 /// Split a hints string (`"a b  c d · e"`) into individual hint items.

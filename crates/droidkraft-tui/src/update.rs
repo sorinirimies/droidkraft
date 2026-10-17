@@ -126,7 +126,29 @@ fn set_rate(m: &mut Model, faster: bool) -> Vec<Cmd> {
     vec![Cmd::Worker(Req::SetRate(r))]
 }
 
+#[cfg(test)]
+pub fn on_mouse_for_test(m: &mut Model, e: MouseEvent) -> Vec<Cmd> {
+    on_mouse(m, e)
+}
+
 fn on_mouse(m: &mut Model, e: MouseEvent) -> Vec<Cmd> {
+    // Help overlay owns the mouse: scroll it, never click through to panels.
+    if m.help {
+        match e.kind {
+            MouseEventKind::ScrollDown => m.help_scroll = m.help_scroll.saturating_add(3),
+            MouseEventKind::ScrollUp => m.help_scroll = m.help_scroll.saturating_sub(3),
+            _ => {}
+        }
+        return vec![];
+    }
+    // A pending modal blocks nav/tab clicks (they would leave it orphaned).
+    if m.modal_open() {
+        return if m.active.is_some() {
+            ui::route_mouse(m, e)
+        } else {
+            vec![]
+        };
+    }
     if let MouseEventKind::Down(MouseButton::Left) = e.kind {
         let nav = m
             .nav_rects

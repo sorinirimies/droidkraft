@@ -20,7 +20,7 @@ use crate::model::{state_hint, Model};
 pub const HINTS: &str = "j/k PgUp/PgDn scroll ·";
 
 const CARD_H: u16 = 11;
-const SYS_H: u16 = 17;
+const SYS_H: u16 = 18;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Card {

@@ -1924,6 +1924,7 @@ dependencies = [
  "tui-piechart",
  "tui-slider",
  "tui-spinner",
+ "unicode-width",
 ]
 
 [[package]]

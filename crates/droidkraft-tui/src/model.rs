@@ -253,6 +253,27 @@ impl Default for Model {
 }
 
 impl Model {
+    /// Drop every click-target rect. Called at the start of each frame so an
+    /// early-returning (too small) panel never leaves stale hit areas behind.
+    pub fn clear_hits(&mut self) {
+        self.nav_rects.clear();
+        self.tab_rects.clear();
+        self.card_rects.clear();
+        self.logs.level_rects.clear();
+        self.cmds.hits.clear();
+        self.flash.clear_hits();
+        self.screen.rec_rects.clear();
+    }
+
+    /// A key-capturing modal (confirm / file explorer) is pending.
+    pub fn modal_open(&self) -> bool {
+        self.flash.confirm.is_some()
+            || self.flash.explorer.is_some()
+            || self.cmds.confirm.is_some()
+            || self.cmds.explorer.is_some()
+            || self.logs.explorer.is_some()
+    }
+
     /// Stable device order: by serial.
     pub fn ordered_serials(&self) -> Vec<String> {
         let mut v: Vec<String> = self.workspaces.keys().cloned().collect();

@@ -126,6 +126,10 @@ pub struct FlashUi {
 }
 
 impl FlashUi {
+    pub fn clear_hits(&mut self) {
+        self.hits.clear();
+    }
+
     fn push_log(&mut self, s: impl Into<String>) {
         for l in s.into().lines() {
             self.log.push(l.to_string());
@@ -337,6 +341,9 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
     let inner = block.inner(area);
     f.render_widget(block, area);
     if inner.height < 3 {
+        // Too small to show (and thus safely answer) a modal: cancel it.
+        m.flash.confirm = None;
+        m.flash.explorer = None;
         return;
     }
     m.flash.hits.clear();
@@ -400,11 +407,10 @@ fn draw_fastboot(f: &mut Frame, area: Rect, m: &mut Model) {
         ])
         .split(area)
     };
-    for (i, (_, label)) in ACTIONS.iter().enumerate() {
-        if i as u16 >= cols[0].height {
-            break;
-        }
-        let r = Rect::new(cols[0].x, cols[0].y + i as u16, cols[0].width, 1);
+    let vis = cols[0].height as usize;
+    let off = (m.flash.sel + 1).saturating_sub(vis);
+    for (row, (i, (_, label))) in ACTIONS.iter().enumerate().skip(off).take(vis).enumerate() {
+        let r = Rect::new(cols[0].x, cols[0].y + row as u16, cols[0].width, 1);
         let st = if i == m.flash.sel {
             m.themes.selected()
         } else {
@@ -540,14 +546,15 @@ fn draw_rom(f: &mut Frame, area: Rect, m: &mut Model) {
         ]),
         rows[0],
     );
-    let off = (rom.selected + 1).saturating_sub(list_h as usize);
+    let vis = rows[1].height as usize;
+    let off = (rom.selected + 1).saturating_sub(vis);
     let mut hits = vec![];
     for (row, (i, b)) in rom
         .builds
         .iter()
         .enumerate()
         .skip(off)
-        .take(list_h as usize)
+        .take(vis)
         .enumerate()
     {
         let r = Rect::new(rows[1].x, rows[1].y + row as u16, rows[1].width, 1);

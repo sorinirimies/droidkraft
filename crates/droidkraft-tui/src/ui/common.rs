@@ -32,11 +32,7 @@ pub fn centered(area: Rect, w: u16, h: u16) -> Rect {
 
 /// Approximate number of rows `text` occupies when wrapped to `width`.
 pub fn wrapped_lines(text: &str, width: u16) -> usize {
-    let w = width.max(1) as usize;
-    text.lines()
-        .map(|l| l.chars().count().max(1).div_ceil(w))
-        .sum::<usize>()
-        .max(1)
+    super::layout::wrapped_height(text, width.max(1) as usize).max(1)
 }
 
 /// Adjust a scroll offset by `delta`, clamped to `0..=max`.
@@ -55,6 +51,13 @@ pub fn draw_modal(
     w: u16,
     h: u16,
 ) {
+    // Grow to fit the wrapped body (so the key hint never falls off the
+    // bottom), bounded by the available area.
+    let w = w.min(area.width);
+    let text: Vec<String> = body.iter().map(|l| l.to_string()).collect();
+    let need =
+        super::layout::wrapped_height(&text.join("\n"), w.saturating_sub(2) as usize) as u16 + 2;
+    let h = h.max(need).min(area.height);
     let r = centered(area, w, h);
     f.render_widget(Clear, r);
     let block = Block::default()

@@ -38,6 +38,7 @@ pub fn panel_block<'a>(m: &Model, title: &str) -> Block<'a> {
 pub fn draw(f: &mut Frame, m: &mut Model) {
     let area = f.area();
     m.screen.gfx.begin_frame();
+    m.clear_hits();
     f.render_widget(Block::default().style(m.themes.base()), area);
     if area.height < 5 || area.width < 12 {
         let msg = "Too small (min 12x5)";
@@ -244,6 +245,86 @@ mod render_tests {
         for (w, h) in [(40, 12), (80, 24), (200, 60)] {
             render(&mut m, w, h);
         }
+    }
+
+    const MATRIX: [(u16, u16); 9] = [
+        (12, 5),
+        (20, 8),
+        (40, 12),
+        (60, 20),
+        (80, 24),
+        (120, 30),
+        (200, 60),
+        (200, 10),
+        (30, 60),
+    ];
+
+    fn all_rects(m: &crate::model::Model) -> Vec<ratatui::layout::Rect> {
+        let mut v: Vec<_> = m.nav_rects.iter().map(|(_, r)| *r).collect();
+        v.extend(m.tab_rects.iter().map(|(_, r)| *r));
+        v.extend(m.card_rects.iter().map(|(_, _, r)| *r));
+        v.extend(m.logs.level_rects.iter().map(|(_, r)| *r));
+        v.extend(m.cmds.hits.iter().map(|(_, r)| *r));
+        v.extend(m.screen.rec_rects.iter().map(|(_, r)| *r));
+        v
+    }
+
+    #[test]
+    fn matrix_no_panic_and_hit_rects_inside_screen() {
+        for panel in Panel::ALL {
+            for (w, h) in MATRIX {
+                let mut m = with_device(panel);
+                let out = render(&mut m, w, h);
+                assert_eq!(out.lines().count(), h as usize, "{panel:?} {w}x{h}");
+                let screen = ratatui::layout::Rect::new(0, 0, w, h);
+                for r in all_rects(&m) {
+                    assert!(
+                        r.width == 0 || r.height == 0 || screen.contains(r.into()),
+                        "{panel:?} {w}x{h}: rect {r:?} outside"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn shrinking_clears_stale_hits_and_cancels_blind_modal() {
+        let mut m = with_device(Panel::Flash);
+        render(&mut m, 120, 30);
+        assert!(!m.nav_rects.is_empty());
+        m.flash.confirm = Some(crate::ui::flash::Confirm {
+            pending: crate::ui::flash::Pending::RomStep,
+            text: "wipe".into(),
+            typed: String::new(),
+        });
+        render(&mut m, 14, 6);
+        assert!(
+            m.flash.confirm.is_none(),
+            "invisible confirm must be cancelled"
+        );
+        render(&mut m, 8, 3);
+        assert!(
+            all_rects(&m).is_empty(),
+            "stale hit rects after too-small frame"
+        );
+    }
+
+    #[test]
+    fn help_swallows_mouse() {
+        use crossterm::event::{KeyModifiers, MouseEvent, MouseEventKind};
+        let mut m = with_device(Panel::Flash);
+        render(&mut m, 80, 24);
+        m.help = true;
+        let cmds = crate::update::on_mouse_for_test(
+            &mut m,
+            MouseEvent {
+                kind: MouseEventKind::Down(crossterm::event::MouseButton::Left),
+                column: 3,
+                row: 3,
+                modifiers: KeyModifiers::NONE,
+            },
+        );
+        assert!(cmds.is_empty());
     }
 
     #[test]

@@ -37,15 +37,7 @@ pub fn fmt_timer(d: Duration) -> String {
 
 /// Truncate to `max` chars with an ellipsis.
 pub fn truncate(s: &str, max: usize) -> String {
-    if s.chars().count() <= max {
-        s.to_string()
-    } else if max == 0 {
-        String::new()
-    } else {
-        let mut t: String = s.chars().take(max - 1).collect();
-        t.push('…');
-        t
-    }
+    crate::ui::layout::truncate_to(s, max)
 }
 
 /// Optional value → text or `-`.

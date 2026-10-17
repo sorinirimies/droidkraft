@@ -26,6 +26,7 @@ droidkraft-mirror = { workspace = true }
 droidkraft-fastboot = { workspace = true }
 
 crossterm         = { workspace = true }
+unicode-width     = "0.2"
 ratatui           = { workspace = true }
 ratatui-image     = { workspace = true }
 tokio             = { workspace = true }

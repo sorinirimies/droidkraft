@@ -263,14 +263,17 @@ pub fn draw(f: &mut Frame, area: Rect, m: &mut Model) {
         } else {
             "pkg> "
         };
+        let avail = (rin.width as usize).saturating_sub(p.len() + 1);
         let line = Line::from(vec![
             Span::styled(p, m.themes.title()),
-            Span::raw(format!("{text}▏")),
+            Span::raw(format!("{}▏", super::layout::tail_to(text, avail))),
         ]);
-        f.render_widget(
-            Paragraph::new(line),
-            Rect::new(rin.x, rin.bottom().saturating_sub(1), rin.width, 1),
-        );
+        if rin.height > 0 {
+            f.render_widget(
+                Paragraph::new(line),
+                Rect::new(rin.x, rin.bottom().saturating_sub(1), rin.width, 1),
+            );
+        }
     }
 
     if let Some(i) = m.cmds.confirm {
