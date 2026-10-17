@@ -97,7 +97,9 @@ impl Layout {
     pub fn card_detail(&self) -> u8 {
         let cols = self.card_columns() as f32;
         let w = (self.content_width() - 32.0 - 12.0 * (cols - 1.0)) / cols;
-        if self.height < 480.0 || w < 260.0 {
+        // Short windows still get the quick actions (the grid scrolls); only
+        // the sparkline is dropped.
+        if w < 260.0 {
             0
         } else if self.height < 640.0 || w < 330.0 {
             1
@@ -119,7 +121,7 @@ impl Layout {
     }
 
     pub fn show_charts(&self) -> bool {
-        self.height >= 520.0 && self.content_width() >= 300.0
+        self.content_width() >= 300.0 // the Overview scrolls vertically
     }
 
     /// Show secondary header chips in the workspace.
@@ -247,9 +249,11 @@ mod tests {
         assert_eq!(Layout::new(640., 420.).overview_columns(), 1);
         assert_eq!(Layout::new(900., 700.).overview_columns(), 2);
         assert_eq!(Layout::new(1600., 900.).overview_columns(), 3);
-        assert!(!Layout::new(640., 420.).show_charts());
+        assert!(Layout::new(640., 420.).show_charts());
+        assert!(!Layout::new(300., 420.).show_charts());
         assert!(Layout::new(1400., 900.).show_charts());
-        assert_eq!(Layout::new(640., 420.).card_detail(), 0);
+        assert_eq!(Layout::new(640., 420.).card_detail(), 1);
+        assert_eq!(Layout::new(300., 420.).card_detail(), 0);
         assert_eq!(Layout::new(1400., 900.).card_detail(), 2);
     }
 

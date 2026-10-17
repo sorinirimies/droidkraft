@@ -127,8 +127,12 @@ impl DroidGui {
                 div()
                     .id(("tab", tab as usize))
                     .flex_none()
-                    .min_w(gpui::px(36.))
-                    .px(gpui::px(if bar.tabs == TabStyle::Full { 12. } else { 8. }))
+                    .min_w(gpui::rems(2.25))
+                    .px(gpui::rems(if bar.tabs == TabStyle::Full {
+                        0.75
+                    } else {
+                        0.5
+                    }))
                     .py_2()
                     .text_sm()
                     .cursor_pointer()

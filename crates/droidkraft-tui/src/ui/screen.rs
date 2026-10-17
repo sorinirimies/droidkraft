@@ -450,7 +450,6 @@ fn draw_rec(f: &mut Frame, area: Rect, m: &mut Model) {
     }
     // Short panel: drop section headers, then fall back to a key-hint row so
     // the hidden options stay discoverable.
-    let mut rows = rows;
     if rows.len() > inner.height as usize {
         let mut i = 0;
         rows.retain(|(l, a)| {

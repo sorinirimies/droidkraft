@@ -62,6 +62,28 @@ pub fn init(cx: &mut App) {
     ]);
 }
 
+/// Wire Cmd/Ctrl +/-/0 to a root view's `zoom` field (detached/standalone windows).
+fn with_zoom<T: 'static>(
+    el: gpui::Div,
+    cx: &mut Context<T>,
+    field: fn(&mut T) -> &mut f32,
+) -> gpui::Div {
+    el.on_action(cx.listener(move |t, _: &ZoomIn, _w, cx| {
+        let z = field(t);
+        *z = step_zoom(*z, 1);
+        cx.notify();
+    }))
+    .on_action(cx.listener(move |t, _: &ZoomOut, _w, cx| {
+        let z = field(t);
+        *z = step_zoom(*z, -1);
+        cx.notify();
+    }))
+    .on_action(cx.listener(move |t, _: &ZoomReset, _w, cx| {
+        *field(t) = 1.0;
+        cx.notify();
+    }))
+}
+
 /// UI zoom steps (rem-size multiplier), clamped to a sane range.
 pub fn step_zoom(cur: f32, dir: i32) -> f32 {
     if dir == 0 {
@@ -872,6 +894,7 @@ pub struct DetachedRoot {
     mirror: gpui::Entity<MirrorView>,
     app: gpui::WeakEntity<crate::app::DroidGui>,
     serial: String,
+    zoom: f32,
 }
 
 impl DetachedRoot {
@@ -887,12 +910,13 @@ impl DetachedRoot {
             mirror,
             app,
             serial,
+            zoom: 1.0,
         }
     }
 }
 
 impl gpui::Render for DetachedRoot {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         use droidkraft_mirror::RecordStatus;
         let (status, elapsed, note) = self
             .app
@@ -953,7 +977,12 @@ impl gpui::Render for DetachedRoot {
         } else {
             note.unwrap_or_default()
         };
-        div()
+        window.set_rem_size(px(16.0
+            * self
+                .zoom
+                .min(f32::from(window.viewport_size().width) / 360.0)
+                .max(0.7)));
+        with_zoom(div(), cx, |t: &mut Self| &mut t.zoom)
             .size_full()
             .flex()
             .flex_col()
@@ -999,6 +1028,7 @@ pub struct StandaloneRoot {
     recorder: droidkraft_mirror::ScreenRecorder,
     note: Option<String>,
     shot: Arc<Mutex<Option<String>>>,
+    zoom: f32,
 }
 
 impl StandaloneRoot {
@@ -1009,6 +1039,7 @@ impl StandaloneRoot {
             recorder: droidkraft_mirror::ScreenRecorder::new(),
             note: None,
             shot: Arc::new(Mutex::new(None)),
+            zoom: 1.0,
         }
     }
 
@@ -1045,7 +1076,7 @@ impl StandaloneRoot {
 }
 
 impl gpui::Render for StandaloneRoot {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         use droidkraft_mirror::RecordStatus;
         if let Some(m) = self.shot.lock().unwrap().take() {
             self.note = Some(m);
@@ -1100,7 +1131,12 @@ impl gpui::Render for StandaloneRoot {
         } else {
             self.note.clone().unwrap_or_default()
         };
-        div()
+        window.set_rem_size(px(16.0
+            * self
+                .zoom
+                .min(f32::from(window.viewport_size().width) / 360.0)
+                .max(0.7)));
+        with_zoom(div(), cx, |t: &mut Self| &mut t.zoom)
             .size_full()
             .flex()
             .flex_col()
