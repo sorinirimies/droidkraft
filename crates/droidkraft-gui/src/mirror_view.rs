@@ -461,18 +461,7 @@ impl MirrorView {
         on_click: impl Fn(&mut Self, &mut Context<Self>) + 'static,
     ) -> AnyElement {
         let compact = self.chrome != Chrome::Full;
-        let mut d = div()
-            .id(id)
-            .flex()
-            .items_center()
-            .justify_center()
-            .rounded_md()
-            .bg(rgb(bg))
-            .text_color(rgb(fg))
-            .cursor_pointer()
-            .border_1()
-            .border_color(rgb(theme::BORDER))
-            .child(label.into());
+        let mut d = crate::ui::widgets::style_btn(div().id(id), bg, fg).child(label.into());
         d = if compact {
             d.px_2().py_1().text_xs()
         } else {
@@ -938,15 +927,10 @@ impl gpui::Render for DetachedRoot {
             |id: &'static str, label: String, bg: u32, cb: fn(&mut crate::app::DroidGui, &str)| {
                 let app = self.app.clone();
                 let ser = self.serial.clone();
-                div()
-                    .id(id)
-                    .px_2()
+                crate::ui::widgets::style_btn(div().id(id), bg, 0xffffff)
+                    .px_3()
                     .py_1()
-                    .rounded_md()
-                    .bg(rgb(bg))
                     .text_xs()
-                    .text_color(rgb(0xffffff))
-                    .cursor_pointer()
                     .child(label)
                     .on_click(move |_, _, cx| {
                         let _ = app.update(cx, |t, cx| {

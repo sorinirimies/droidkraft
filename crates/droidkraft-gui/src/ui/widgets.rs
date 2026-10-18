@@ -7,6 +7,31 @@ use gpui::{
 use crate::fmt::{spark_heights, tail};
 use crate::theme;
 
+/// Lighten (`amount > 0`) or darken (`< 0`) a 0xRRGGBB colour.
+pub fn shade(c: u32, amount: f32) -> Hsla {
+    let mut h = Hsla::from(rgb(c));
+    h.l = (h.l + amount).clamp(0.0, 1.0);
+    h
+}
+
+/// Shared button look: soft pill, tinted border, hover lift and pressed dip. All buttons in the app go through this.
+pub fn style_btn(el: gpui::Stateful<Div>, bg: u32, fg: u32) -> gpui::Stateful<Div> {
+    el.flex()
+        .items_center()
+        .justify_center()
+        .gap_1()
+        .rounded_lg()
+        .bg(rgb(bg))
+        .text_color(rgb(fg))
+        .font_weight(gpui::FontWeight::MEDIUM)
+        .cursor_pointer()
+        .border_1()
+        .border_color(shade(bg, 0.10))
+        .shadow_sm()
+        .hover(move |s| s.bg(shade(bg, 0.06)).border_color(rgb(theme::ACCENT_DIM)))
+        .active(move |s| s.bg(shade(bg, -0.05)).border_color(rgb(theme::ACCENT)))
+}
+
 /// Clickable button.
 pub fn button<V: 'static>(
     id: impl Into<ElementId>,
@@ -16,23 +41,12 @@ pub fn button<V: 'static>(
     cx: &mut Context<V>,
     on_click: impl Fn(&mut V, &mut Context<V>) + 'static,
 ) -> AnyElement {
-    div()
-        .id(id)
-        .flex()
-        .items_center()
-        .justify_center()
+    style_btn(div().id(id), bg, fg)
         .max_w_full()
-        .min_h(gpui::rems(1.75))
-        .px_3()
+        .min_h(gpui::rems(2.))
+        .px_4()
         .py_2()
-        .rounded_md()
-        .bg(rgb(bg))
         .text_sm()
-        .text_color(rgb(fg))
-        .cursor_pointer()
-        .border_1()
-        .border_color(rgb(theme::BORDER))
-        .hover(|s| s.border_color(rgb(theme::ACCENT_DIM)))
         .child(label.into())
         .on_click(cx.listener(move |this, _ev: &ClickEvent, _window, cx| {
             on_click(this, cx);
@@ -54,22 +68,12 @@ pub fn small_button<V: 'static>(
     } else {
         (theme::BG_PANEL, theme::TEXT_DIM)
     };
-    div()
-        .id(id)
-        .flex()
-        .items_center()
+    style_btn(div().id(id), bg, fg)
         .flex_none()
         .min_h(gpui::rems(1.75))
-        .px_2()
+        .px_3()
         .py_1()
-        .rounded_md()
-        .bg(rgb(bg))
         .text_xs()
-        .text_color(rgb(fg))
-        .cursor_pointer()
-        .border_1()
-        .border_color(rgb(theme::BORDER))
-        .hover(|s| s.bg(rgb(theme::BG_HOVER)))
         .child(label.into())
         .on_click(cx.listener(move |this, ev: &ClickEvent, _window, cx| {
             let _ = ev;
