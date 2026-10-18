@@ -4,6 +4,8 @@
 # Example: nu scripts/bump_version.nu 0.2.0
 #          nu scripts/bump_version.nu --yes 0.2.0   # skip confirmation
 
+use ./semver.nu version-cmp
+
 def main [
     new_version: string,  # New version in X.Y.Z or X.Y.Z-suffix format
     --yes (-y),           # Skip confirmation prompt (non-interactive)
@@ -53,6 +55,12 @@ Version must be in format: X.Y.Z or X.Y.Z-suffix \(e.g., 0.2.0 or 0.2.0-beta.1\)
 ($yellow)  Or bump to the next version instead.($reset)" }
     }
 
+    # ── Guard: must be strictly newer than the current version ───────────────
+    if (version-cmp $new_version $current_version) < 0 {
+        error make { msg: $"($red)Error: ($new_version) is older than the current version ($current_version).($reset)
+($yellow)  Downgrades are not allowed; pick a version greater than ($current_version).($reset)" }
+    }
+
     # ── Guard: tag already exists locally ────────────────────────────────────
     let tag_name = $"v($new_version)"
     let existing_tags = (git tag | lines)
@@ -60,6 +68,12 @@ Version must be in format: X.Y.Z or X.Y.Z-suffix \(e.g., 0.2.0 or 0.2.0-beta.1\)
         error make { msg: $"($red)Error: Tag ($tag_name) already exists locally.($reset)
 ($yellow)  Delete it first if you really want to recreate it:($reset)
       git tag -d ($tag_name)" }
+    }
+
+    # ── Guard: tag already exists on origin ──────────────────────────────────
+    let remote = (do { git ls-remote --tags origin $"refs/tags/($tag_name)" } | complete)
+    if $remote.exit_code == 0 and ($remote.stdout | str trim | is-not-empty) {
+        error make { msg: $"($red)Error: Tag ($tag_name) already exists on origin.($reset)" }
     }
 
     # ── Confirmation ─────────────────────────────────────────────────────────

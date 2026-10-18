@@ -5,6 +5,7 @@
 
 use std/assert
 use ./runner.nu *
+use ../semver.nu version-cmp
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -225,6 +226,27 @@ def "test tag name is prefixed with v" [] {
     let tag     = $"v($version)"
     assert str contains $tag "v"
     assert equal $tag "v3.0.0"
+}
+
+def "test version-cmp orders core versions" [] {
+    assert equal (version-cmp "1.2.3" "1.2.3") 0
+    assert equal (version-cmp "1.2.4" "1.2.3") 1
+    assert equal (version-cmp "1.2.3" "1.2.4") (-1)
+    assert equal (version-cmp "2.0.0" "1.99.99") 1
+    assert equal (version-cmp "1.10.0" "1.9.0") 1
+}
+
+def "test version-cmp rejects downgrades and equal" [] {
+    assert ((version-cmp "2.1.9" "2.2.0") < 0) "downgrade must compare lower"
+    assert ((version-cmp "2.2.0" "2.2.0") == 0) "same version must compare equal"
+}
+
+def "test version-cmp handles prereleases" [] {
+    assert equal (version-cmp "1.0.0" "1.0.0-beta.1") 1
+    assert equal (version-cmp "1.0.0-beta.1" "1.0.0") (-1)
+    assert equal (version-cmp "1.0.0-beta.2" "1.0.0-beta.10") (-1)
+    assert equal (version-cmp "1.0.0-alpha" "1.0.0-beta") (-1)
+    assert equal (version-cmp "1.0.1-rc.1" "1.0.0") 1
 }
 
 # ── Runner ────────────────────────────────────────────────────────────────────
