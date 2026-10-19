@@ -235,6 +235,9 @@ REMOTES := "origin gitea-starscream"
 # Fail fast (5 s) instead of hanging when a remote host is unreachable.
 export GIT_SSH_COMMAND := "ssh -o ConnectTimeout=5 -o BatchMode=yes"
 
+# Unreachable remotes warn and are skipped; real rejections still fail the recipe.
+PUSHFN := 'gpush() { out=$(git push "$@" 2>&1); rc=$?; if [ $rc -ne 0 ] && printf "%s" "$out" | grep -Eqi "timed out|could not resolve|connection refused|no route to host|network is unreachable"; then echo "⚠️  $r unreachable - NOT pushed (skipped)"; return 0; fi; [ -n "$out" ] && printf "%s\n" "$out"; return $rc; }'
+
 remotes:
     @echo "Configured git remotes:"
     @git remote -v
@@ -524,10 +527,11 @@ release-retrigger version:
 # Push latest commit + tags to every remote (after the quality gate)
 push-release-all: check-all
     #!/usr/bin/env sh
+    {{PUSHFN}}
     failed=""; skipped=""
     for r in {{REMOTES}}; do
         git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r"; skipped="$skipped $r"; continue; }
-        git push --follow-tags "$r" "$(git branch --show-current)" || failed="$failed $r"
+        gpush --follow-tags "$r" "$(git branch --show-current)" || failed="$failed $r"
     done
     [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
     [ -n "$failed" ] && { echo "⚠️  Failed to push to:$failed"; exit 1; }
@@ -536,10 +540,11 @@ push-release-all: check-all
 # Force-push the current branch to every remote
 push-all-force:
     #!/usr/bin/env sh
+    {{PUSHFN}}
     failed=""; skipped=""
     for r in {{REMOTES}}; do
         git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r"; skipped="$skipped $r"; continue; }
-        git push --force "$r" "$(git branch --show-current)" || failed="$failed $r"
+        gpush --force "$r" "$(git branch --show-current)" || failed="$failed $r"
     done
     [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
     [ -n "$failed" ] && { echo "⚠️  Failed to force-push to:$failed"; exit 1; }
@@ -589,10 +594,11 @@ push-tags-force:
 # Force-push all tags to every remote (continues on failure)
 push-tags-all-force:
     #!/usr/bin/env sh
+    {{PUSHFN}}
     failed=""
     for r in {{REMOTES}}; do
         git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r (not configured)"; continue; }
-        git push --force "$r" --tags || failed="$failed $r"
+        gpush --force "$r" --tags || failed="$failed $r"
     done
     if [ -n "$failed" ]; then echo "⚠️  Failed to force-push tags to:$failed"; exit 1; fi
     echo "✅ Tags force-pushed to every configured remote"
