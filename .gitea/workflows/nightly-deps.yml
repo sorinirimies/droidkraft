@@ -40,6 +40,11 @@ jobs:
       - name: Pre-warm cargo registry
         run: cargo update && cargo fetch
 
+      # Snapshot dependency requirements as data: a patch release is cut ONLY when
+      # `cargo upgrade` really changed one (it also reformats manifests, which must not count).
+      - name: Snapshot dependency requirements (before)
+        run: cargo metadata --no-deps --format-version 1 | jq -S -c '[.packages[].dependencies[] | {name,req,kind,features,optional,target,uses_default_features}] | sort_by(.name,.kind,.target)' > "$RUNNER_TEMP/reqs-before.json"
+
       - name: Upgrade workspace dependency pins
         run: cargo upgrade --incompatible allow
 
@@ -49,7 +54,7 @@ jobs:
       - name: Check for changes
         id: check
         run: |
-          if git diff --quiet Cargo.toml Cargo.lock; then
+          if git diff --quiet Cargo.lock; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
@@ -57,6 +62,17 @@ jobs:
 
       # default-members excludes the GUI crate (needs the full Xcode Metal
       # toolchain) -- same scope the regular CI/release workflows use.
+      - name: Check for dependency requirement changes
+        id: reqs
+        run: |
+          cargo metadata --no-deps --format-version 1 | jq -S -c '[.packages[].dependencies[] | {name,req,kind,features,optional,target,uses_default_features}] | sort_by(.name,.kind,.target)' > "$RUNNER_TEMP/reqs-after.json"
+          if cmp -s "$RUNNER_TEMP/reqs-before.json" "$RUNNER_TEMP/reqs-after.json"; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "Cargo.toml dependency requirements changed -> patch release."
+          fi
+
       - name: Check formatting
         if: steps.check.outputs.has_changes == 'true'
         run: cargo fmt --all -- --check
@@ -77,19 +93,58 @@ jobs:
           git config user.name  "gitea-actions[bot]"
           git config user.email "gitea-actions[bot]@noreply.gitea"
 
-          git add Cargo.toml Cargo.lock
+          if [ "${{ steps.reqs.outputs.release }}" = "true" ]; then
+            git add Cargo.toml Cargo.lock
+          else
+            # Lock-only: no version bump; drop cosmetic manifest reformatting.
+            git ls-files -m -- '*Cargo.toml' | xargs -r git checkout --
+            git add Cargo.lock
+          fi
           git commit -m "chore(deps): nightly dependency upgrade $DATE"
           git push origin main
 
           echo "✅ Dependency updates pushed to main."
 
-      - name: Push dependency update to GitHub mirror (no version bump or tag)
+      # ── Bump patch version, tag, and push to Gitea + GitHub ─────────────────
+      # A fresh tag push triggers release.yml (on: push: tags: v*) on both.
+      - name: Install Nushell (bump_version.nu needs it)
+        if: steps.check.outputs.has_changes == 'true' && steps.reqs.outputs.release == 'true'
+        run: cargo install nu --locked
+
+      - name: Install git-cliff (bump_version.nu uses it for CHANGELOG.md)
+        if: steps.check.outputs.has_changes == 'true' && steps.reqs.outputs.release == 'true'
+        run: cargo install git-cliff --locked
+
+      - name: Compute next patch version
+        if: steps.check.outputs.has_changes == 'true' && steps.reqs.outputs.release == 'true'
+        id: version
+        run: |
+          current=$(grep -m1 '^version' Cargo.toml | sed -E 's/version[[:space:]]*=[[:space:]]*"(.*)"/\1/')
+          IFS='.' read -r major minor patch <<< "$current"
+          next="$major.$minor.$((patch + 1))"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Bump version, changelog, commit and tag
+        if: steps.check.outputs.has_changes == 'true' && steps.reqs.outputs.release == 'true'
+        run: nu scripts/bump_version.nu --yes ${{ steps.version.outputs.next }}
+
+      - name: Push release commit and tag to Gitea
+        if: steps.check.outputs.has_changes == 'true' && steps.reqs.outputs.release == 'true'
+        run: |
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "v${{ steps.version.outputs.next }}"
+
+      - name: Push to GitHub mirror
         if: steps.check.outputs.has_changes == 'true' && env.GITHUB_REMOTE_URL != ''
         env:
           GITHUB_REMOTE_URL: ${{ secrets.GITHUB_REMOTE_URL }}
         run: |
           git remote add github-ci "$GITHUB_REMOTE_URL"
           git push github-ci HEAD:${{ github.ref_name }}
+          if [ "${{ steps.reqs.outputs.release }}" = "true" ]; then
+            git push github-ci "v${{ steps.version.outputs.next }}"
+          fi
 
       - name: Nothing to update
         if: steps.check.outputs.has_changes == 'false'
