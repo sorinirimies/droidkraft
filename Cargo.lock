@@ -7199,6 +7199,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2f4911f08f15e809075042a8dc08f92a5f7bcd798179921303d28658796c9fa"
 dependencies = [
  "ratatui",
+ "tui-nuances",
  "unicode-width",
 ]
 
@@ -7209,25 +7210,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "814f8ff6c52d794ae22e41b134fee301cdda85e84c0f0c235fcec2efa49ba17a"
 dependencies = [
  "ratatui",
+ "tui-nuances",
 ]
 
 [[package]]
 name = "tui-file-explorer"
-version = "3.0.2"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0f4682faf9b7dd7d1c1743112d47d9e64b6ca2e4f604616657aeb056d29f37b"
+checksum = "099690519b4d52f2d0ff98fc028e4cb371c629a8bea38360cf7526607c291607"
 dependencies = [
  "crossterm",
  "libc",
  "ratatui",
+ "tui-nuances",
  "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "tui-nuances"
-version = "0.1.7"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbbbf74f364cb97993bdbe7eb2550bd4705cd09a3d04df75185ab8e93d22beed"
+checksum = "1d7e70d3c50ce49a2389f0c5a4265b8fc4350e815df0895fced2035f76829ad4"
 dependencies = [
  "ratatui",
 ]
@@ -7239,6 +7242,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5cb782dbfc50939173957a794a70ad58e445d6494c96d9231fc3e3c0812f290c"
 dependencies = [
  "ratatui",
+ "tui-nuances",
 ]
 
 [[package]]
@@ -7248,6 +7252,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96da171b3bfbea0097f61644ef83738ad88c26d4ff8754dd78bd40769bba1f55"
 dependencies = [
  "ratatui",
+ "tui-nuances",
  "unicode-width",
 ]
 
@@ -7258,6 +7263,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63f13ba57ce9f65f5b17b186a1ebb6d67bbebb8dbb5db2318aa7cad6f166eee8"
 dependencies = [
  "ratatui",
+ "tui-nuances",
 ]
 
 [[package]]

@@ -48,13 +48,13 @@ color-eyre = "0.6.3"
 # TUI (Ratatui 0.30 ecosystem)
 crossterm         = { version = "0.29", features = ["event-stream"] }
 ratatui           = "0.30"
-tui-file-explorer = { version = "3", default-features = false }
-tui-nuances       = "0.1.7"
-tui-chart         = "0.1.1"
-tui-piechart      = "1.1"
-tui-spinner       = "0.5"
-tui-slider        = "0.4"
-tui-checkbox      = "0.5"
+tui-file-explorer = { version = "3", default-features = false, features = ["theme"] }
+tui-nuances       = "0.1.9"
+tui-chart         = { version = "0.1.1", features = ["theme"] }
+tui-piechart      = { version = "1.1", features = ["theme"] }
+tui-spinner       = { version = "0.5", features = ["theme"] }
+tui-slider        = { version = "0.4", features = ["theme"] }
+tui-checkbox      = { version = "0.5", features = ["theme"] }
 ratatui-image     = { version = "12.0.0-rc.2", default-features = false, features = ["crossterm"] }
 
 # Internal crates
