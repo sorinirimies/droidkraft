@@ -113,3 +113,37 @@ jobs:
         run: |
           echo "CRATES_IO_TOKEN not set — skipping crates.io publication."
           echo "Add CRATES_IO_TOKEN to your GitHub repository secrets to enable auto-publish."
+
+  macos:
+    name: macOS universal (GUI + TUI)
+    runs-on: macos-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build (arm64 + x86_64)
+        run: |
+          for t in aarch64-apple-darwin x86_64-apple-darwin; do
+            cargo build --release --target $t -p droidkraft -p droidkraft-tui
+          done
+
+      - name: Package DMG
+        run: bash packaging/macos/create_dmg.sh ${{ github.ref_name }}
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.dmg
+            dist/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
