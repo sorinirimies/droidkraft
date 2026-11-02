@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.2] - 2026-11-02
+
+### ⚙️ Miscellaneous Tasks
+
+- **gitea:** Create release with softprops action (upload_url was empty) - ([a72ae7a](https://github.com/sorinirimies/droidkraft/commit/a72ae7a8d9683a2c40717ad4d4e46b9f8cbe05b8))
+
+
+### 📦 Packaging
+
+- **release:** Build universal macOS GUI+TUI, publish .app DMG and tarball - ([4781f9e](https://github.com/sorinirimies/droidkraft/commit/4781f9e608cc9d7bb395a0aa3dc84f4a7c7f21bf))
+
+- **release:** Ship macOS universal DMG + Windows TUI zipdroidkraft - ([93bda89](https://github.com/sorinirimies/droidkraft/commit/93bda89852c9f02c4995f9f7f47d0ad8615e9468))
+
+- **release:** Windows NSIS setup.exe installer - ([eaf23d0](https://github.com/sorinirimies/droidkraft/commit/eaf23d03cdda066b05b550807e7d9870ef9180ba))
+
+
+### 🚜 Refactor
+
+- **ci:** Package macOS DMG and Windows installer with tested Nushell scripts - ([0d48830](https://github.com/sorinirimies/droidkraft/commit/0d48830d9fad66ec2d79b885429b2f293d458318))
+
+
 ## [2.2.1] - 2026-11-02
 
 ### Justfile
@@ -28,6 +49,8 @@ All notable changes to this project will be documented in this file.
 - **deny:** Ignore unmaintained zvariant/zbus_names advisories (transitive) - ([533666f](https://github.com/sorinirimies/droidkraft/commit/533666f1caf48983601aec482faa4b4d15072049))
 
 - **deps:** Cargo update; prune stale deny.toml advisory ignores - ([2f7eef9](https://github.com/sorinirimies/droidkraft/commit/2f7eef96f49318a14577d2929eda22eca24e6a36))
+
+- Bump version to 2.2.1 - ([86f9066](https://github.com/sorinirimies/droidkraft/commit/86f9066c8be4400a3d961ab0edefd591eeea5600))
 
 
 ### 🐛 Bug Fixes
