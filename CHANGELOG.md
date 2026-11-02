@@ -2,11 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.1] - 2026-11-02
+
+### Justfile
+
+- Skip unreachable remotes gracefully (5s SSH timeout, warn instead of fail) - ([6dd4b5f](https://github.com/sorinirimies/droidkraft/commit/6dd4b5fd093c714705584343a681d56f2cb11e75))
+
+
+### ⚙️ Miscellaneous Tasks
+
+- Nightly dependency update pushes lockfile only, no version bump or release - ([37b9cd7](https://github.com/sorinirimies/droidkraft/commit/37b9cd7440a1d9697851ad0e9ef9a527d7e510ea))
+
+- Nightly merges lockfile-only updates; bump + release only when a Cargo.toml requirement changes - ([5d4cf83](https://github.com/sorinirimies/droidkraft/commit/5d4cf83555a97e1c29c0cef32556095c7631a3c6))
+
+- Nightly merges lockfile-only updates; bump + release only when a Cargo.toml requirement changes - ([b729988](https://github.com/sorinirimies/droidkraft/commit/b7299888fad982cc176dae5416c89971ce045b1f))
+
+- Bump tui-nuances to 0.1.7 - ([cc95a96](https://github.com/sorinirimies/droidkraft/commit/cc95a96612c75987e9a2de484a6a860000044685))
+
+- **deps:** Bump tui-nuances to 0.1.10 - ([9825a62](https://github.com/sorinirimies/droidkraft/commit/9825a628f50e2aa78917a4c393f39d26c436e14d))
+
+- **deps:** Tui-file-explorer 4.0 (tui-nuances-only themes) - ([eda121e](https://github.com/sorinirimies/droidkraft/commit/eda121e7c73f360d0dabd6d76b34f4843f2b1b40))
+
+- **deps:** Bump rustls-webpki 0.103.16, webpki-roots 1.0.11 (RUSTSEC-2026-0381/0382) - ([0aed807](https://github.com/sorinirimies/droidkraft/commit/0aed807719dc6cb878244f91e77c286226e1af77))
+
+- **deny:** Ignore unmaintained zvariant/zbus_names advisories (transitive) - ([533666f](https://github.com/sorinirimies/droidkraft/commit/533666f1caf48983601aec482faa4b4d15072049))
+
+- **deps:** Cargo update; prune stale deny.toml advisory ignores - ([2f7eef9](https://github.com/sorinirimies/droidkraft/commit/2f7eef96f49318a14577d2929eda22eca24e6a36))
+
+
+### 🐛 Bug Fixes
+
+- **scripts:** Bump_version.nu rejects downgrades (semver compare) and tags already on origin - ([f449792](https://github.com/sorinirimies/droidkraft/commit/f449792f9ec7d6323b2ed1f058745a509b9fee70))
+
+
+### 📦 Packaging
+
+- **packages:** Retry release creation (tag-push race with Release workflow) - ([e12bba0](https://github.com/sorinirimies/droidkraft/commit/e12bba041b670daa93c1bee95fc302ba729a72da))
+
+- **packages:** Drop windows-gui job (gpui shaders need fxc.exe on a Windows host; cannot cross-build) - ([d7a30ab](https://github.com/sorinirimies/droidkraft/commit/d7a30ab165d68733fa291baab178c70fe0eecbb5))
+
+
+### 🚀 Features
+
+- **gui:** Redesigned buttons — shared style_btn (pill, tinted border, shadow, hover lift, pressed state) - ([bc36ccb](https://github.com/sorinirimies/droidkraft/commit/bc36ccbb33d069043c1d0d722982549bb77f4321))
+
+- **tui:** Enable tui-nuances theme feature on widgets, nuances 0.1.9 - ([d99b7eb](https://github.com/sorinirimies/droidkraft/commit/d99b7ebcbdc00e2c79cbe1a1abfcb12ad6fc21f8))
+
+
 ## [2.2.0] - 2026-10-17
 
 ### ⚙️ Miscellaneous Tasks
 
 - **deps:** Zip 2.4 -> 9 (RUSTSEC-2026-0367/0368/0369) - ([f6a9cd7](https://github.com/sorinirimies/droidkraft/commit/f6a9cd70a5c0afd77fbccdc47ccea81638787d56))
+
+- Bump version to 2.2.0 - ([815892b](https://github.com/sorinirimies/droidkraft/commit/815892bd8fd90b246ded28a9ebed8f2f8f587f36))
 
 
 ## [2.1.9] - 2026-10-17
