@@ -149,7 +149,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   windows:
-    name: Windows TUI
+    name: Windows (installer + zip)
     runs-on: windows-latest
     needs: build
     steps:
@@ -169,9 +169,17 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path target/release/droidkraft-tui.exe -DestinationPath droidkraft-tui-${{ github.ref_name }}-windows-x86_64.zip
 
+      - name: Build installer (NSIS)
+        shell: bash
+        run: |
+          choco install nsis -y --no-progress
+          bash packaging/windows/build_installer.sh ${{ github.ref_name }} target/release
+
       - name: Upload to release
         uses: softprops/action-gh-release@v1
         with:
-          files: droidkraft-tui-${{ github.ref_name }}-windows-x86_64.zip
+          files: |
+            droidkraft-tui-${{ github.ref_name }}-windows-x86_64.zip
+            dist/*-setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

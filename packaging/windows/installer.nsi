@@ -1,42 +1,46 @@
-; DroidKraft TUI installer. Built by scripts/ci/package_windows.nu with -DVERSION -DSRC -DOUT
+; Generic NSIS installer. Build with (see packaging/windows/build_installer.sh):
+;   makensis -DAPP_NAME=.. -DSLUG=.. -DVERSION=1.2.3 -DROOT=C:\repo \
+;            -DBINDIR=target\release -DCLI_EXE=x.exe [-DGUI_EXE=y.exe]
+Unicode true
 !include "MUI2.nsh"
-!include "StrFunc.nsh"
-${StrStr}
-${UnStrRep}
 
-Name "DroidKraft (terminal)"
-OutFile "${OUT}"
-InstallDir "$PROGRAMFILES64\DroidKraft"
+Name "${APP_NAME} ${VERSION}"
+OutFile "${ROOT}\dist\${SLUG}-v${VERSION}-windows-x86_64-setup.exe"
+InstallDir "$PROGRAMFILES64\${APP_NAME}"
+InstallDirRegKey HKLM "Software\${APP_NAME}" "InstallDir"
 RequestExecutionLevel admin
+
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
 
-!define ENVKEY "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
-!define UNKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\DroidKraft"
-
 Section "Install"
+  SetRegView 64
   SetOutPath "$INSTDIR"
-  File "${SRC}\droidkraft-tui.exe"
-  File "${SRC}\LICENSE"
+  File "${ROOT}\${BINDIR}\${CLI_EXE}"
+  !ifdef GUI_EXE
+    File "${ROOT}\${BINDIR}\${GUI_EXE}"
+    CreateShortcut "$SMPROGRAMS\${APP_NAME}.lnk" "$INSTDIR\${GUI_EXE}"
+  !endif
   WriteUninstaller "$INSTDIR\uninstall.exe"
-  ; add to the machine PATH (once)
-  ReadRegStr $0 HKLM "${ENVKEY}" "Path"
-  ${StrStr} $1 "$0" "$INSTDIR"
-  StrCmp $1 "" 0 +3
-    WriteRegExpandStr HKLM "${ENVKEY}" "Path" "$0;$INSTDIR"
-    SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
-  WriteRegStr HKLM "${UNKEY}" "DisplayName" "DroidKraft (terminal)"
-  WriteRegStr HKLM "${UNKEY}" "DisplayVersion" "${VERSION}"
-  WriteRegStr HKLM "${UNKEY}" "Publisher" "sorinirimies"
-  WriteRegStr HKLM "${UNKEY}" "UninstallString" "$INSTDIR\uninstall.exe"
+  WriteRegStr HKLM "Software\${APP_NAME}" "InstallDir" "$INSTDIR"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayName" "${APP_NAME}"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayVersion" "${VERSION}"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "UninstallString" '"$INSTDIR\uninstall.exe"'
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "NoModify" 1
 SectionEnd
 
 Section "Uninstall"
-  ReadRegStr $0 HKLM "${ENVKEY}" "Path"
-  ${UnStrRep} $0 "$0" ";$INSTDIR" ""
-  WriteRegExpandStr HKLM "${ENVKEY}" "Path" "$0"
-  SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
-  RMDir /r "$INSTDIR"
-  DeleteRegKey HKLM "${UNKEY}"
+  SetRegView 64
+  Delete "$INSTDIR\${CLI_EXE}"
+  !ifdef GUI_EXE
+    Delete "$INSTDIR\${GUI_EXE}"
+    Delete "$SMPROGRAMS\${APP_NAME}.lnk"
+  !endif
+  Delete "$INSTDIR\uninstall.exe"
+  RMDir "$INSTDIR"
+  DeleteRegKey HKLM "Software\${APP_NAME}"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
 SectionEnd
