@@ -147,3 +147,31 @@ jobs:
             dist/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  windows:
+    name: Windows TUI
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build TUI
+        run: cargo build --release -p droidkraft-tui
+
+      - name: Package zip
+        shell: pwsh
+        run: Compress-Archive -Path target/release/droidkraft-tui.exe -DestinationPath droidkraft-tui-${{ github.ref_name }}-windows-x86_64.zip
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: droidkraft-tui-${{ github.ref_name }}-windows-x86_64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
