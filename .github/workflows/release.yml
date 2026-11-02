@@ -130,14 +130,13 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Build (arm64 + x86_64)
-        run: |
-          for t in aarch64-apple-darwin x86_64-apple-darwin; do
-            cargo build --release --target $t -p droidkraft -p droidkraft-tui
-          done
+      - name: Install Nushell
+        uses: hustcer/setup-nu@v3
+        with:
+          version: "*"
 
       - name: Package DMG
-        run: bash packaging/macos/create_dmg.sh ${{ github.ref_name }}
+        run: nu scripts/ci/package_macos.nu ${{ github.ref_name }} --build
 
       - name: Upload to release
         uses: softprops/action-gh-release@v1
@@ -145,41 +144,5 @@ jobs:
           files: |
             dist/*.dmg
             dist/*.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  windows:
-    name: Windows (installer + zip)
-    runs-on: windows-latest
-    needs: build
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build TUI
-        run: cargo build --release -p droidkraft-tui
-
-      - name: Package zip
-        shell: pwsh
-        run: Compress-Archive -Path target/release/droidkraft-tui.exe -DestinationPath droidkraft-tui-${{ github.ref_name }}-windows-x86_64.zip
-
-      - name: Build installer (NSIS)
-        shell: bash
-        run: |
-          choco install nsis -y --no-progress
-          bash packaging/windows/build_installer.sh ${{ github.ref_name }} target/release
-
-      - name: Upload to release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            droidkraft-tui-${{ github.ref_name }}-windows-x86_64.zip
-            dist/*-setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
