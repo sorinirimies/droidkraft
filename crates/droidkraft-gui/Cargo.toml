@@ -27,6 +27,14 @@ droidkraft-mirror = { workspace = true }
 gpui = "0.2.2"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 
+# Pin only: xattr 0.2.3 (gpui → zed-async-tar) reads libc::ENOATTR, which libc 0.2.190
+# dropped on Linux. Remove once gpui no longer pulls xattr 0.2.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "=0.2.189"
+
+[package.metadata.cargo-machete]
+ignored = ["libc"]
+
 # ── Packaging metadata ────────────────────────────────────────────────────────
 # `cargo binstall droidkraft` downloads the prebuilt Linux or macOS archive.
 [package.metadata.binstall]
