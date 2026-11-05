@@ -6,7 +6,7 @@
 # links against. Does nothing off Linux or when APT is empty. Every CI job that
 # compiles runs it first (test_workflows.nu checks that).
 #
-# Usage: nu scripts/ci/apt.nu
+# Usage: nu scripts/ci/apt.nu [extra packages...]
 # ──────────────────────────────────────────────────────────────────────────────
 
 use ../project.nu [APT]
@@ -21,12 +21,13 @@ export def commands [packages: list<string>, root: bool]: nothing -> list<list<s
     ]
 }
 
-def main [] {
-    if $nu.os-info.name != "linux" or ($APT | is-empty) {
+def main [...extra: string] {
+    let packages = $APT ++ $extra
+    if $nu.os-info.name != "linux" or ($packages | is-empty) {
         print "apt=skipped"
         return
     }
     let root = (^id -u | str trim) == "0"
-    for c in (commands $APT $root) { run-external $c.0 ...($c | skip 1) }
-    print $"apt=($APT | str join ',')"
+    for c in (commands $packages $root) { run-external $c.0 ...($c | skip 1) }
+    print $"apt=($packages | str join ',')"
 }

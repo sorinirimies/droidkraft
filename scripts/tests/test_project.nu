@@ -47,4 +47,16 @@ def "test project: the readme of every published crate exists" [] {
     }
 }
 
+def "test project: each gui window app_id is its desktop entry id" [] {
+    let root = $env.CURRENT_FILE | path dirname | path join ".." ".."
+    use ../project.nu [APP]
+    use ../ci/package_desktop.nu [entry-id]
+    for g in ($BINS | where {|b| ($b.kind? | default "") == "gui" }) {
+        let id = entry-id $APP $g
+        let src = glob ($root | path join "crates" "**" "src" "**" "*.rs") | each {|f| open --raw $f } | str join "\n"
+        let ids = $src | parse --regex `pub const APP_ID: &str = "(?<id>[^"]+)"` | get id
+        assert ($ids | any {|i| $i == $id }) $"($g.bin): set APP_ID = \"($id)\" as the Wayland app_id \(found ($ids)\)"
+    }
+}
+
 def main [] { run-tests }

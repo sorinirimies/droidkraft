@@ -68,6 +68,11 @@ def "test package_desktop: a tui entry opens a terminal, a gui entry its window"
     assert ($gui | str contains "StartupWMClass=demo-gui")
 }
 
+def "test package_desktop: StartupWMClass is the reverse-DNS desktop id, the Wayland app_id" [] {
+    let gui = desktop-entry (app | insert desktop_ids {demo-gui: "io.github.me.Demo"}) (bin demo-gui)
+    assert ($gui | str contains "StartupWMClass=io.github.me.Demo\n")
+}
+
 def "test package_desktop: metainfo is valid xml naming the launcher" [] {
     let x = metainfo (app) (bin demo-gui) | from xml
     let tag = {|n| $x.content | where tag == $n | get 0.content.0.content }

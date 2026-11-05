@@ -81,7 +81,7 @@ export def desktop-entry [app: record, bin: record]: nothing -> string {
     let tui = $bin.kind == "tui"
     let name = if $tui { $"($app.title) \(terminal\)" } else { $app.title }
     let categories = ($app.categories ++ (if $tui { [ConsoleOnly] } else { [] }) | str join ";") + ";"
-    let wm = if $tui { "" } else { $"StartupWMClass=($bin.bin)\nStartupNotify=true\n" }
+    let wm = if $tui { "" } else { $"StartupWMClass=(entry-id $app $bin)\nStartupNotify=true\n" }
     $"[Desktop Entry]
 Type=Application
 Version=1.0

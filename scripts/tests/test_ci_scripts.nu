@@ -8,6 +8,7 @@ use ../ci/deps_update.nu [present commit_message lock_versions downgrades pins p
 use ../ci/publish_crate.nu [already_published package_args]
 use ../ci/apt.nu [commands]
 use ../ci/check_static.nu [is_static]
+use ../ci/wayland_smoke.nu [gui_bins app_command verdict SOCKET]
 use ../ci/prune_releases.nu [from_gh from_gitea doomed]
 use ../ci/gitea_release.nu [release_payload]
 use ../ci/actions_update.nu [uses major_of bump PINNED]
@@ -165,6 +166,28 @@ def "test deps_update: downgrades lists lowered packages only" [] {
 def "test deps_update: a crate kept at two versions is no downgrade" [] {
     let lock = lock_versions $LOCK
     assert equal (downgrades $lock $lock) []
+}
+
+def "test wayland_smoke: only gui binaries are started" [] {
+    let bins = [[crate bin kind]; [a-tui a-tui tui] [a a gui] [a-web a-web web]]
+    assert equal (gui_bins $bins | get bin) [a]
+    assert equal (gui_bins [[crate bin]; [x x]] | length) 0
+}
+
+def "test wayland_smoke: the app runs on Wayland only, for a bounded time" [] {
+    let c = app_command target/debug/a /run/x 8
+    assert equal ($c | first 2) [timeout 8s]
+    assert equal ($c | skip 2 | first 3) [env -u DISPLAY]
+    assert ($c | any {|a| $a == $"WAYLAND_DISPLAY=($SOCKET)" })
+    assert ($c | any {|a| $a == "XDG_RUNTIME_DIR=/run/x" })
+    assert equal ($c | last) target/debug/a
+}
+
+def "test wayland_smoke: only an app stopped by timeout passed" [] {
+    assert equal (verdict 124) ran
+    assert equal (verdict 0) quit
+    assert equal (verdict 101) crashed
+    assert equal (verdict 139) crashed
 }
 
 def main [] { run-tests }
