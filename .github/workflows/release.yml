@@ -327,7 +327,7 @@ jobs:
           merge-multiple: true
       - name: Store manifests
         run: nu scripts/ci/render_packaging.nu ${{ needs.validate.outputs.version }}
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
       - name: Arch packages
         run: nu scripts/ci/distro_packages.nu arch
       - name: Alpine packages
