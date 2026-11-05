@@ -8,7 +8,7 @@ use ../ci/deps_update.nu [present commit_message series lock_versions downgrades
 use ../ci/publish_crate.nu [already_published package_args]
 use ../ci/apt.nu [commands]
 use ../ci/check_static.nu [is_static]
-use ../ci/wayland_smoke.nu [gui_bins app_command verdict SOCKET]
+use ../ci/wayland_smoke.nu [gui_bins app_command as_user compositor_command verdict SOCKET]
 use ../ci/prune_releases.nu [from_gh from_gitea doomed]
 use ../ci/gitea_release.nu [release_payload]
 use ../ci/actions_update.nu [uses major_of bump PINNED]
@@ -207,6 +207,21 @@ def "test wayland_smoke: the app runs on Wayland only, for a bounded time" [] {
     assert ($c | any {|a| $a == $"WAYLAND_DISPLAY=($SOCKET)" })
     assert ($c | any {|a| $a == "XDG_RUNTIME_DIR=/run/x" })
     assert equal ($c | last) target/debug/a
+}
+
+def "test wayland_smoke: a headless GNOME compositor on the smoke socket" [] {
+    let c = compositor_command 90
+    assert equal ($c | first 3) [timeout 90s mutter]
+    assert ($c | any {|a| $a == "--headless" })
+    assert ($c | any {|a| $a == "--no-x11" })
+    assert equal ($c | last 2) [--wayland-display $SOCKET]
+}
+
+def "test wayland_smoke: as root the smoke runs as nobody" [] {
+    assert equal (as_user [timeout 8s app] 1000 /run/x) [timeout 8s app]
+    let c = as_user [timeout 8s app] 0 /run/x
+    assert equal ($c | first 4) [setpriv --reuid=65534 --regid=65534 --clear-groups]
+    assert equal ($c | skip 4) [env HOME=/run/x timeout 8s app]
 }
 
 def "test wayland_smoke: only an app stopped by timeout passed" [] {

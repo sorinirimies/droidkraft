@@ -81,9 +81,9 @@ jobs:
         run: nu scripts/ci/check_static.nu x86_64-unknown-linux-musl --build
 
   # The desktop app must start with Wayland alone (no X11): GNOME and KDE default
-  # to it. Weston runs headless; lavapipe gives the GPU-less runner a Vulkan driver.
+  # to it. GNOME (mutter) runs headless; lavapipe gives the GPU-less runner a Vulkan driver.
   wayland:
-    name: wayland (headless weston)
+    name: wayland (headless GNOME)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -92,8 +92,8 @@ jobs:
       - uses: hustcer/setup-nu@v3
         with:
           version: "0.116.1"
-      - name: Install system packages, weston and a software Vulkan driver
-        run: nu scripts/ci/apt.nu weston mesa-vulkan-drivers
+      - name: Install system packages, the GNOME compositor and a software Vulkan driver
+        run: nu scripts/ci/apt.nu mutter dbus-daemon mesa-vulkan-drivers
       - name: Start the desktop app on Wayland
         run: nu scripts/ci/wayland_smoke.nu --build
 
