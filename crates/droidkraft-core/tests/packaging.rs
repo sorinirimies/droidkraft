@@ -58,7 +58,7 @@ fn icns_length_header_matches_file() {
 fn desktop_entries_point_at_real_binaries_and_the_app_icon() {
     let gui = text(&format!("packaging/linux/{APP_ID}.desktop"));
     assert!(gui.contains("Exec=droidkraft\n"));
-    assert!(gui.contains("StartupWMClass=droidkraft"));
+    assert!(gui.contains(&format!("StartupWMClass={APP_ID}\n")));
     let tui = text(&format!("packaging/linux/{TUI_ID}.desktop"));
     assert!(tui.contains("Exec=droidkraft-tui\n") && tui.contains("Terminal=true"));
     // package_desktop.nu installs the icon under the APP.icon name in scripts/project.nu.

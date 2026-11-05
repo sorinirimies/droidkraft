@@ -9,5 +9,5 @@ Icon=io.github.sorinirimies.DroidKraft
 Terminal=false
 Categories=Development;Utility;
 Keywords=android;adb;fastboot;mirror;logcat;flash;
-StartupWMClass=droidkraft
+StartupWMClass=io.github.sorinirimies.DroidKraft
 StartupNotify=true

@@ -15,8 +15,8 @@ use std::time::{Duration, Instant};
 use gpui::{
     AnyElement, App, Bounds, ClickEvent, Context, EventEmitter, FocusHandle, KeyBinding,
     KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ObjectFit, Pixels,
-    Point, RenderImage, ScrollDelta, ScrollWheelEvent, Window, actions, canvas, div, img,
-    prelude::*, px, rgb,
+    Point, RenderImage, ScrollDelta, ScrollWheelEvent, SharedString, Window, actions, canvas, div,
+    img, prelude::*, px, rgb,
 };
 
 use crate::screen::{ScreenStream, Zoom, layout, map_to_device, oriented_device};
@@ -884,6 +884,7 @@ pub struct DetachedRoot {
     mirror: gpui::Entity<MirrorView>,
     app: gpui::WeakEntity<crate::app::DroidGui>,
     serial: String,
+    title: SharedString,
     zoom: f32,
 }
 
@@ -892,6 +893,7 @@ impl DetachedRoot {
         mirror: gpui::Entity<MirrorView>,
         app: gpui::WeakEntity<crate::app::DroidGui>,
         serial: String,
+        title: SharedString,
         cx: &mut Context<Self>,
     ) -> Self {
         // Repaint (elapsed timer) whenever the mirror repaints.
@@ -900,6 +902,7 @@ impl DetachedRoot {
             mirror,
             app,
             serial,
+            title,
             zoom: 1.0,
         }
     }
@@ -907,6 +910,14 @@ impl DetachedRoot {
 
 impl gpui::Render for DetachedRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let body = self.body(window, cx);
+        crate::frame::frame(window, self.title.clone(), body)
+    }
+}
+
+impl DetachedRoot {
+    /// The window content, framed by [`crate::frame::frame`].
+    fn body(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         use droidkraft_mirror::RecordStatus;
         let (status, elapsed, note) = self
             .app
@@ -1014,17 +1025,23 @@ pub struct StandaloneRoot {
     recorder: droidkraft_mirror::ScreenRecorder,
     note: Option<String>,
     shot: Arc<Mutex<Option<String>>>,
+    title: SharedString,
     zoom: f32,
 }
 
 impl StandaloneRoot {
-    pub fn new(mirror: gpui::Entity<MirrorView>, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        mirror: gpui::Entity<MirrorView>,
+        title: SharedString,
+        cx: &mut Context<Self>,
+    ) -> Self {
         cx.observe(&mirror, |_, _, cx| cx.notify()).detach();
         Self {
             mirror,
             recorder: droidkraft_mirror::ScreenRecorder::new(),
             note: None,
             shot: Arc::new(Mutex::new(None)),
+            title,
             zoom: 1.0,
         }
     }
@@ -1063,6 +1080,14 @@ impl StandaloneRoot {
 
 impl gpui::Render for StandaloneRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let body = self.body(window, cx);
+        crate::frame::frame(window, self.title.clone(), body)
+    }
+}
+
+impl StandaloneRoot {
+    /// The window content, framed by [`crate::frame::frame`].
+    fn body(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         use droidkraft_mirror::RecordStatus;
         if let Some(m) = self
             .shot

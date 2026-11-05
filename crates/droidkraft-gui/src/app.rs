@@ -5,10 +5,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use gpui::{
-    Bounds, Context, Entity, TitlebarOptions, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
-};
+use gpui::{Bounds, Context, Entity, Window, div, prelude::*, px, rgb, size};
 
 use droidkraft_core::features::fastboot::FastbootCommand;
 use droidkraft_core::features::flash::RebootTarget;
@@ -513,16 +510,8 @@ impl DroidGui {
         let ser_root = serial.to_string();
         let bounds = Bounds::centered(None, size(px(w), px(h)), cx);
         let opened = cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                titlebar: Some(TitlebarOptions {
-                    title: Some(title.into()),
-                    ..Default::default()
-                }),
-                window_min_size: Some(size(px(240.), px(320.))),
-                ..Default::default()
-            },
-            |_, cx| cx.new(|cx| DetachedRoot::new(m2, app, ser_root, cx)),
+            crate::frame::options(bounds, &title, size(px(240.), px(320.))),
+            |_, cx| cx.new(|cx| DetachedRoot::new(m2, app, ser_root, title.into(), cx)),
         );
         let Ok(handle) = opened else { return };
         mirror.update(cx, |m, cx| m.set_chrome(Chrome::Compact, true, cx));
@@ -598,6 +587,14 @@ fn build_flash_session(d: &mut DeviceState, rom_zip: std::path::PathBuf) {
 
 impl Render for DroidGui {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let body = self.body(window, cx);
+        crate::frame::frame(window, "DroidKraft".into(), body)
+    }
+}
+
+impl DroidGui {
+    /// The window content, framed by [`crate::frame::frame`].
+    fn body(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let route = self.fleet.resolve(&self.route);
         let vp = window.viewport_size();
         // Never zoom so far that the effective window drops below 480x360.

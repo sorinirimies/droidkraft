@@ -5,6 +5,7 @@ pub mod app;
 pub mod cli;
 pub mod commands;
 pub mod fmt;
+pub mod frame;
 pub mod layout;
 pub mod mirror_view;
 pub mod screen;

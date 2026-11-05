@@ -3,12 +3,12 @@
 use std::sync::Arc;
 
 use gpui::prelude::*;
-use gpui::{Application, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
+use gpui::{Application, Bounds, px, size};
 
-use droidkraft_gui::DroidGui;
 use droidkraft_gui::cli::{self, Cli};
 use droidkraft_gui::mirror_view::{self, Chrome, MirrorView, StandaloneRoot};
 use droidkraft_gui::screen::ScreenStream;
+use droidkraft_gui::{DroidGui, frame};
 
 fn main() {
     let parsed = match cli::parse(std::env::args().skip(1)) {
@@ -27,17 +27,9 @@ fn main() {
         if let Cli::Mirror(m) = parsed {
             let (w, h) = m.size.unwrap_or((400, 860));
             let bounds = Bounds::centered(None, size(px(w as f32), px(h as f32)), cx);
+            let title = m.title.unwrap_or_else(|| "DroidKraft Mirror".into());
             cx.open_window(
-                WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    titlebar: Some(TitlebarOptions {
-                        title: Some(m.title.unwrap_or_else(|| "DroidKraft Mirror".into()).into()),
-                        ..Default::default()
-                    }),
-                    window_min_size: Some(size(px(240.), px(320.))),
-                    app_id: Some("droidkraft".into()),
-                    ..Default::default()
-                },
+                frame::options(bounds, &title, size(px(240.), px(320.))),
                 move |_, cx| {
                     let serial = m.serial.clone();
                     let mirror = cx.new(|cx| {
@@ -47,7 +39,7 @@ fn main() {
                         v.set_serial(serial);
                         v
                     });
-                    cx.new(|cx| StandaloneRoot::new(mirror, cx))
+                    cx.new(|cx| StandaloneRoot::new(mirror, title.into(), cx))
                 },
             )
             .expect("failed to open window");
@@ -56,13 +48,7 @@ fn main() {
         }
         let bounds = Bounds::centered(None, size(px(1100.), px(760.)), cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                window_min_size: Some(size(px(640.), px(420.))),
-                // Wayland app_id / X11 WM_CLASS: must match the .desktop file.
-                app_id: Some("droidkraft".into()),
-                ..Default::default()
-            },
+            frame::options(bounds, "DroidKraft", size(px(640.), px(420.))),
             |_, cx| cx.new(DroidGui::new),
         )
         .expect("failed to open window");
