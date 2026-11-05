@@ -166,4 +166,12 @@ def "test workflows: rust toolchain refs are channels Dependabot leaves alone" [
     assert equal ($refs | where $it not-in [stable beta nightly master]) []
 }
 
+# A download piped into tar cannot be retried once it started (a dropped HTTP/2
+# stream failed a musl job); curl saves the archive first and retries it whole.
+def "test workflows: no download is piped into tar" [] {
+    let piped = [".github" ".gitea"] | each {|h| workflows $h | each {|f| $"($h)/workflows/($f)" } } | flatten
+        | where {|f| (open --raw (root | path join $f)) =~ '\|\s*tar\s' }
+    assert equal $piped []
+}
+
 def main [] { run-tests }
