@@ -21,19 +21,28 @@ use ../project.nu [AUTO_RELEASE]
 
 export const LOCKFILES = ["Cargo.lock" "fuzz/Cargo.lock"]
 
-# Each package's highest locked version (a lockfile can hold several), without
-# build metadata (`+wasi-…`), which does not order versions.
+# A version's semver-compatible series: 1.4.2 → 1, 0.53.5 → 0.53, 0.0.3 → 0.0.3.
+export def series [version: string]: nothing -> string {
+    let p = $version | split row "+" | first | split row "-" | first | split row "."
+    if $p.0 != "0" { $p.0 } else if ($p | get -o 1) != "0" { $"0.($p.1)" } else { $p | str join "." }
+}
+
+# Each package series' highest locked version, keyed `name@series` (a lockfile
+# can hold several series of a crate), without build metadata (`+wasi-…`), which
+# does not order versions. A series that drops out (its last dependent moved on)
+# is then no downgrade.
 export def lock_versions [lock: string]: nothing -> record {
-    $lock | from toml | get package | group-by name | transpose name pkgs
+    $lock | from toml | get package
+    | each {|p| let v = $p.version | split row "+" | first; {key: $"($p.name)@(series $v)", v: $v} }
+    | group-by key | transpose key rows
     | reduce -f {} {|p, acc|
-        let top = $p.pkgs.version | each {|v| $v | split row "+" | first }
-            | reduce {|v, m| if (compare_versions $v $m) > 0 { $v } else { $m } }
-        $acc | insert $p.name $top
+        let top = $p.rows.v | reduce {|v, m| if (compare_versions $v $m) > 0 { $v } else { $m } }
+        $acc | insert $p.key $top
     }
 }
 
-# Packages whose highest locked version went down: a stale registry cache or a
-# yanked release can do that, and the build still passes.
+# Package series whose highest locked version went down: a stale registry cache
+# or a yanked release can do that, and the build still passes.
 export def downgrades [before: record, after: record]: nothing -> list<string> {
     $after | transpose name version
     | where {|p| ($before | get -o $p.name) != null and (compare_versions $p.version ($before | get $p.name)) < 0 }

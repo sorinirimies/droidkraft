@@ -4,7 +4,7 @@
 
 use std/assert
 use runner.nu *
-use ../ci/deps_update.nu [present commit_message lock_versions downgrades pins pins_changed next_patch upgrade_message]
+use ../ci/deps_update.nu [present commit_message series lock_versions downgrades pins pins_changed next_patch upgrade_message]
 use ../ci/publish_crate.nu [already_published package_args]
 use ../ci/apt.nu [commands]
 use ../ci/check_static.nu [is_static]
@@ -154,7 +154,33 @@ version = "0.11.0+wasi-snapshot-preview1"
 '
 
 def "test deps_update: lock_versions keeps the highest version and drops build metadata" [] {
-    assert equal (lock_versions $LOCK) {syn: "2.0.100", wasi: "0.11.0"}
+    assert equal (lock_versions $LOCK) {"syn@1": "1.0.109", "syn@2": "2.0.100", "wasi@0.11": "0.11.0"}
+}
+
+def "test deps_update: series groups semver-compatible versions" [] {
+    assert equal (["1.4.2" "0.53.5" "0.0.3" "2.0.0-rc.1" "0.11.0+wasi"] | each {|v| series $v }) ["1" "0.53" "0.0.3" "2" "0.11"]
+}
+
+# windows-targets 0.53 left flashkraft's lock and 0.52 stayed: no downgrade.
+def "test deps_update: a series that drops out is no downgrade" [] {
+    let before = lock_versions '[[package]]
+name = "w"
+version = "0.52.6"
+
+[[package]]
+name = "w"
+version = "0.53.5"
+'
+    let after = lock_versions '[[package]]
+name = "w"
+version = "0.52.6"
+'
+    assert equal (downgrades $before $after) []
+    let yanked = lock_versions '[[package]]
+name = "w"
+version = "0.53.4"
+'
+    assert equal (downgrades $before $yanked) ["w@0.53 0.53.5 -> 0.53.4"]
 }
 
 def "test deps_update: downgrades lists lowered packages only" [] {
