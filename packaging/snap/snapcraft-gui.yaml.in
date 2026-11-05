@@ -26,7 +26,7 @@ parts:
     organize:
       droidkraft: bin/droidkraft
       droidkraft.desktop: usr/share/applications/droidkraft.desktop
-      droidkraft.png: usr/share/icons/hicolor/256x256/apps/droidkraft.png
+      droidkraft-256.png: usr/share/icons/hicolor/256x256/apps/droidkraft.png
     stage-packages:
       - libxkbcommon0
       - libxkbcommon-x11-0

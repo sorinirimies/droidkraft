@@ -1,62 +1,40 @@
-# cargo-deny configuration: `cargo deny check`
-[graph]
-all-features = true
-
 [advisories]
-version = 2
+yanked = "deny"
+# adb_client 2.1.19, our ADB client. Drop each entry once an adb_client release moves off it.
+# 3.x drops bincode but is an API change; rsa has no fixed release yet (0.10 is a release
+# candidate). adb_client signs the ADB auth token locally with rsa, so the timing
+# side channel needs a local attacker measuring that signature.
 ignore = [
-    # Pre-existing transitive advisories (gpui, adb_client, rustls/aws-lc stack);
-    # tracked for upgrade, not directly fixable here. Revisit on dependency bumps.
-    "RUSTSEC-2023-0071",
-    "RUSTSEC-2024-0384",
-    "RUSTSEC-2024-0436",
-    "RUSTSEC-2025-0052",
-    "RUSTSEC-2025-0134",
-    "RUSTSEC-2025-0141",
-    "RUSTSEC-2026-0173",
-    "RUSTSEC-2026-0192",
-    "RUSTSEC-2026-0206",
-    # zbus/zvariant merged into zbus 6; gpui 0.2.2 (latest) -> oo7/ashpd pin zbus 5.
-    "RUSTSEC-2026-0370",
-    "RUSTSEC-2026-0371",
-    "RUSTSEC-2026-0372",
-    # pin-utils via async-std (zed-async-tar in gpui 0.2.2); no safe upgrade.
-    "RUSTSEC-2026-0441",
+    "RUSTSEC-2023-0071", # rsa: Marvin attack
+    "RUSTSEC-2025-0141", # bincode unmaintained
+    # Unmaintained crates reached only through gpui 0.2.2, the latest release; droidkraft
+    # cannot replace them. Drop each entry once a gpui release moves off it.
+    # gpui_http_client (zed-async-tar, zed-reqwest, futures-lite 1).
+    "RUSTSEC-2025-0052", # async-std discontinued
+    "RUSTSEC-2025-0134", # rustls-pemfile unmaintained
+    "RUSTSEC-2024-0384", # instant unmaintained
+    "RUSTSEC-2026-0441", # pin-utils unmaintained (through async-std)
+    # Text and SVG rendering (cosmic-text, fontdb, usvg/resvg).
+    "RUSTSEC-2026-0192", # ttf-parser unmaintained
+    "RUSTSEC-2026-0206", # rustybuzz unmaintained
+    # macOS Metal and video bindings (metal, core-video).
+    "RUSTSEC-2024-0436", # paste unmaintained
+    # gpui's stacksafe macro.
+    "RUSTSEC-2026-0173", # proc-macro-error2 unmaintained
+    # Linux desktop portal (ashpd over zbus).
+    "RUSTSEC-2026-0370", # zvariant unmaintained
+    "RUSTSEC-2026-0371", # zbus_names unmaintained
+    "RUSTSEC-2026-0372", # zvariant_derive unmaintained
 ]
 
 [licenses]
-version = 2
-allow = [
-    "MIT",
-    "Apache-2.0",
-    "Apache-2.0 WITH LLVM-exception",
-    "BSD-2-Clause",
-    "BSD-3-Clause",
-    "ISC",
-    "Unicode-3.0",
-    "Unicode-DFS-2016",
-    "Zlib",
-    "MPL-2.0",
-    "BSL-1.0",
-    "Unlicense",
-    "WTFPL",
-    "CC0-1.0",
-    "OpenSSL",
-    "NCSA",
-    "CDLA-Permissive-2.0",
-]
-confidence-threshold = 0.8
-
-[licenses.private]
-ignore = true
+allow = ["MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib", "MPL-2.0", "CC0-1.0", "BSL-1.0",
+  # libfuzzer-sys bundles LLVM code (NCSA); webpki-root-certs ships the Mozilla CA data (CDLA).
+  "NCSA", "CDLA-Permissive-2.0"]
 
 [bans]
 multiple-versions = "warn"
-wildcards = "allow"
-highlight = "all"
 
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = []

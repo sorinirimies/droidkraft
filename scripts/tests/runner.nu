@@ -30,8 +30,8 @@ export def run-tests [] {
         exit 1
     }
 
-    mut passed   = 0
-    mut failed   = 0
+    mut passed  = 0
+    mut failed  = 0
     mut failures = []
 
     for test in $tests {
@@ -45,7 +45,7 @@ export def run-tests [] {
             $passed = $passed + 1
         } else {
             print $"($red)FAILED($reset)"
-            $failed   = $failed + 1
+            $failed  = $failed + 1
             $failures = ($failures | append { test: $test, output: $res.stderr })
         }
     }

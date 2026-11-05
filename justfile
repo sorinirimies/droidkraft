@@ -1,604 +1,320 @@
 # DroidKraft — task runner
-#
-# Install just:     cargo install just
-# Install nushell:  https://www.nushell.sh
-# Usage:            just <task>   |   just --list
+# Recipes run in Nushell; anything longer than a line lives in scripts/*.nu (tested).
+# Install: cargo install just nu git-cliff   — then `just install-tools`
+# Usage:   just <task>
 
-# Default task — show available commands
+set shell := ["nu", "-c"]
+
+# ── Default ───────────────────────────────────────────────────────────────────
+
 default:
     @just --list
 
-# ── Prerequisites ─────────────────────────────────────────────────────────────
+# ── Tool checks ───────────────────────────────────────────────────────────────
 
-# Install required tools (just, git-cliff). Nu must be installed manually.
+_check-git-cliff:
+    @nu scripts/tools.nu check git-cliff
+
+# Install the development tools (git-cliff, cargo-audit/deny/fuzz/llvm-cov/outdated/machete)
 install-tools:
-    @echo "Installing required tools..."
-    @command -v just >/dev/null 2>&1 || cargo install just
-    @command -v git-cliff >/dev/null 2>&1 || cargo install git-cliff
-    @command -v nu >/dev/null 2>&1 && echo "✅ nu found" || echo "⚠ nu (nushell) not found. Install: https://www.nushell.sh"
-    @echo "✅ Done!"
-
-# Check git-cliff is available
-check-git-cliff:
-    @command -v git-cliff >/dev/null 2>&1 || { echo "❌ git-cliff not found. Run: just install-tools"; exit 1; }
-
-# Check nu (nushell) is available
-check-nu:
-    @command -v nu >/dev/null 2>&1 || { echo "❌ nu (nushell) not found. Install: https://www.nushell.sh"; exit 1; }
+    nu scripts/tools.nu install
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 
-# Build (debug) — core + TUI (default members)
+# Check without building
+check:
+    cargo check --workspace
+
+# Build (dev)
 build:
-    cargo build
-
-# Build (release) — core + TUI
-build-release:
-    cargo build --release
-
-# Build the GPUI GUI (opt-in; needs the full Xcode/Metal toolchain on macOS)
-build-gui:
-    cargo build -p droidkraft
-
-# Build everything including the GUI
-build-all:
     cargo build --workspace
 
-# ── Code quality ──────────────────────────────────────────────────────────────
+# Release build of the shipped binaries (scripts/project.nu)
+build-release:
+    nu scripts/ci/build_release.nu
 
-# Check code without building
-check:
-    cargo check
+# Install the shipped binaries from this checkout into ~/.cargo/bin
+install:
+    nu scripts/ci/build_release.nu install
 
-# Format code
-fmt:
-    cargo fmt
+# ── Run ───────────────────────────────────────────────────────────────────────
 
-# Check formatting (CI-safe, no writes)
-fmt-check:
-    cargo fmt --check
+# Run the main binary (e.g. just run --help)
+run *args:
+    cargo run -q -p droidkraft-tui -- {{ args }}
 
-# Run clippy
-clippy:
-    cargo clippy -- -D warnings
+# ── Test & quality ────────────────────────────────────────────────────────────
 
-# Run all quality checks (fmt, clippy, test)
-check-all: fmt-check clippy test
-    @echo "✅ All checks passed!"
-
-# ── Tests ─────────────────────────────────────────────────────────────────────
-
-# Run tests — core + TUI
+# Rust tests
 test:
-    cargo test
+    cargo test --workspace --all-features
 
-# Run only the core library tests
-test-core:
-    cargo test -p droidkraft-core
-
-# Run tests with all features
-test-all:
-    cargo test --all-features --all-targets
-
-# Run Nu script tests
-test-nu: check-nu
+# Nushell script tests
+test-nu:
     nu scripts/tests/run_all.nu
 
-# Run both Rust and Nu tests
-test-all-nu: test-all test-nu
+fmt:
+    cargo fmt --all
+
+fmt-check:
+    cargo fmt --all -- --check
+
+# Clippy, warnings are errors
+clippy:
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+# Rust and Nu tests
+test-all-nu: test test-nu
     @echo "✅ All Rust and Nu tests passed!"
 
-# ── Documentation ─────────────────────────────────────────────────────────────
-
-# Build and open docs
-doc:
-    cargo doc --no-deps --open
-
-# Build docs (no open, for CI)
-doc-build:
-    cargo doc --no-deps --all-features
-
-# ── Changelog ─────────────────────────────────────────────────────────────────
-
-# Generate full changelog from all tags
-changelog: check-git-cliff
-    @echo "Generating full changelog..."
-    git-cliff -o CHANGELOG.md
-    @echo "✅ Changelog generated!"
-
-# Preview unreleased changes (no file write)
-changelog-preview: check-git-cliff
-    @git-cliff --unreleased
-
-# Prepend unreleased commits to existing changelog
-changelog-unreleased: check-git-cliff
-    @echo "Prepending unreleased commits..."
-    git-cliff --unreleased --prepend CHANGELOG.md
-    @echo "✅ Done!"
-
-# Generate changelog for a specific version tag
-changelog-version version: check-git-cliff
-    @echo "Generating changelog for version {{version}}..."
-    git-cliff --tag v{{version}} -o CHANGELOG.md
-    @echo "✅ Changelog generated for v{{version}}!"
-
-# Regenerate full changelog from all history
-changelog-update: check-git-cliff
-    @echo "Regenerating complete changelog..."
-    git-cliff --output CHANGELOG.md
-    @echo "✅ Changelog updated!"
-
-# ── Versioning & Release ──────────────────────────────────────────────────────
-
-# Show current version
-version: check-nu
-    @nu scripts/version.nu
-
-# Bump version interactively — prompts for confirmation, runs checks, commits and tags.
-# Use `just release <version>` for fully automated non-interactive release.
-bump version: check-all check-git-cliff check-nu
-    nu scripts/bump_version.nu {{version}}
-
-# Run pre-publish readiness checks
-release-check: check-nu
-    nu scripts/check_publish.nu
-
-# Publish to crates.io (dry run — no side-effects)
-publish-dry:
-    cargo publish --dry-run -p droidkraft-mirror
-    cargo publish --dry-run -p droidkraft-fastboot
-    @echo "ℹ️  core/tui/gui dry-runs need their dependencies on crates.io first"
-
-# Publish to crates.io
-publish: release-check publish-mirror publish-fastboot publish-core publish-tui publish-gui
-    @echo "✅ All crates published."
-
-# ── Full release workflows ────────────────────────────────────────────────────
-
-# Full automated release to GitHub — bumps version, commits, tags, and pushes.
-# This is the single command you run to cut a release:
-#   just release 0.4.0
-release version: check-all check-git-cliff check-nu
-    nu scripts/bump_version.nu --yes {{version}}
-    @echo "Pushing branch and tag to GitHub..."
-    git push origin "$(git branch --show-current)"
-    git push origin v{{version}}
-    @echo "✅ Release v{{version}} pushed — GitHub Actions will handle the rest."
-
-# Full automated release to Gitea only.
-release-gitea-starscream version: check-all check-git-cliff check-nu
-    nu scripts/bump_version.nu --yes {{version}}
-    @echo "Pushing branch and tag to Gitea..."
-    git push gitea-starscream "$(git branch --show-current)"
-    git push gitea-starscream v{{version}}
-    @echo "✅ Release v{{version}} pushed to Gitea."
-
-# Full automated release to both GitHub and Gitea.
-release-all version: check-all check-git-cliff check-nu
-    nu scripts/bump_version.nu --yes {{version}}
-    @echo "Pushing branch and tag to GitHub and Gitea..."
-    git push origin "$(git branch --show-current)"
-    git push gitea-starscream "$(git branch --show-current)"
-    git push origin v{{version}}
-    git push gitea-starscream v{{version}}
-    @echo "✅ Release v{{version}} pushed to both remotes."
-
-# ── Application ───────────────────────────────────────────────────────────────
-
-# Run the TUI (cargo run, debug)
-run:
-    cargo run -p droidkraft-tui
-
-# Run the GPUI GUI (opt-in; needs the full Xcode/Metal toolchain on macOS)
-run-gui:
-    cargo run -p droidkraft
-
-# Build release binary and launch it
-run-release: build-release
-    nu scripts/run.nu
-
-# Run interactive demo
-demo: build-release
-    nu scripts/demo.nu
-
-# Run long output test (scrolling)
-test-long-output:
-    nu scripts/test_long_output.nu
-
-# Run wide output test (wrapping)
-test-wide-output:
-    nu scripts/test_wide_output.nu
-
-# ── VHS / Demo GIFs ──────────────────────────────────────────────────────────
-
-# Re-record one preview GIF (usage: just vhs tui-overview; needs vhs + a device + release build)
-vhs name:
-    cargo build --release -p droidkraft-tui
-    vhs docs/tapes/{{name}}.tape
-    @echo "✅ Generated docs/previews/{{name}}.gif"
-
-# Re-record all TUI preview GIFs (the GUI GIFs are screen captures, see docs/tapes/README.md)
-previews:
-    cargo build --release -p droidkraft-tui
-    for t in docs/tapes/tui-*.tape; do vhs "$t"; done
-
-# Check if VHS is installed
-vhs-check:
-    @command -v vhs >/dev/null 2>&1 || { echo "❌ VHS not installed. Install with: brew install vhs"; exit 1; }
-    @echo "✅ VHS is installed"
-
-# ── Git helpers ───────────────────────────────────────────────────────────────
-
-# Show current git remotes
-REMOTES := "origin gitea-starscream"
-
-# Fail fast (5 s) instead of hanging when a remote host is unreachable.
-export GIT_SSH_COMMAND := "ssh -o ConnectTimeout=5 -o BatchMode=yes"
-
-# Unreachable remotes warn and are skipped; real rejections still fail the recipe.
-PUSHFN := 'gpush() { out=$(git push "$@" 2>&1); rc=$?; if [ $rc -ne 0 ] && printf "%s" "$out" | grep -Eqi "timed out|could not resolve|connection refused|no route to host|network is unreachable"; then echo "⚠️  $r unreachable - NOT pushed (skipped)"; return 0; fi; [ -n "$out" ] && printf "%s\n" "$out"; return $rc; }'
-
-remotes:
-    @echo "Configured git remotes:"
-    @git remote -v
-
-# Add a Gitea remote (usage: just setup-gitea https://gitea.example.com/user/repo.git)
-setup-gitea url:
-    git remote add gitea {{url}}
-    @echo "✅ Gitea remote added! Test with: git push gitea-starscream main"
-
-# Commit all staged changes
-commit message:
-    git add .
-    git commit -m "{{message}}"
-
-# Pull from GitHub
-pull:
-    git pull origin "$(git branch --show-current)"
-
-# Pull from Gitea
-pull-gitea-starscream:
-    git pull gitea-starscream "$(git branch --show-current)"
-
-# Pull from both remotes
-pull-all:
-    #!/usr/bin/env sh
-    failed=""; ok_=""; skipped=""
-    for r in {{REMOTES}}; do
-        if ! git remote get-url "$r" >/dev/null 2>&1; then
-            echo "↷ skipping $r (not configured here; add with: git remote add $r <url>)"
-            skipped="$skipped $r"; continue
-        fi
-        echo "→ pulling from $r"
-        if git pull "$r" "$(git branch --show-current)"; then ok_="$ok_ $r"; else failed="$failed $r"; fi
-    done
-    echo ""
-    [ -n "$ok_" ] && echo "✅ Pulled from:$ok_"
-    [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
-    if [ -n "$failed" ]; then echo "⚠️  Failed:$failed"; exit 1; fi
-
-# Push to GitHub
-push:
-    git push origin "$(git branch --show-current)"
-
-# Push to Gitea
-push-gitea-starscream:
-    git push gitea-starscream "$(git branch --show-current)"
-
-# Push to both GitHub and Gitea
-push-all:
-    #!/usr/bin/env sh
-    failed=""; ok_=""; skipped=""
-    for r in {{REMOTES}}; do
-        if ! git remote get-url "$r" >/dev/null 2>&1; then
-            echo "↷ skipping $r (not configured here; add with: git remote add $r <url>)"
-            skipped="$skipped $r"; continue
-        fi
-        echo "→ pushing to $r"
-        if git push "$r" "$(git branch --show-current)"; then ok_="$ok_ $r"; else failed="$failed $r"; fi
-    done
-    echo ""
-    [ -n "$ok_" ] && echo "✅ Pushed to:$ok_"
-    [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
-    if [ -n "$failed" ]; then echo "⚠️  Failed:$failed"; exit 1; fi
-
-# Push tags to GitHub
-push-tags:
-    git push origin --tags
-
-# Push tags to both remotes
-push-tags-all:
-    #!/usr/bin/env sh
-    failed=""; ok_=""; skipped=""
-    for r in {{REMOTES}}; do
-        if ! git remote get-url "$r" >/dev/null 2>&1; then
-            echo "↷ skipping $r (not configured here; add with: git remote add $r <url>)"
-            skipped="$skipped $r"; continue
-        fi
-        echo "→ pushing tags to $r"
-        if git push "$r" --tags; then ok_="$ok_ $r"; else failed="$failed $r"; fi
-    done
-    echo ""
-    [ -n "$ok_" ] && echo "✅ Tags pushed to:$ok_"
-    [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
-    if [ -n "$failed" ]; then echo "⚠️  Failed:$failed"; exit 1; fi
-
-# Force-sync Gitea from GitHub
-sync-gitea-starscream:
-    git push gitea-starscream "$(git branch --show-current)" --force
-    git push gitea-starscream --tags --force
-    @echo "✅ Gitea synced!"
-
-# ── Misc ─────────────────────────────────────────────────────────────────────
-
-# Update dependencies
-update:
-    cargo update
-
-# Show outdated dependencies
-outdated:
-    cargo outdated
-
-# Clean build artifacts
-clean:
-    cargo clean
-
-# Install the application locally
-install:
-    cargo install --path .
-
-# Watch and auto-run on file changes (requires cargo-watch)
-watch:
-    cargo watch -x run
-
-# Build all examples
-examples:
-    cargo build --examples
-
-# Run example: main menu
-example-menu:
-    cargo run --example main_menu
-
-# Show project info
-info:
-    @echo "Project:  DroidKraft"
-    @echo "Version:  $(just version)"
-    @echo "Author:   Sorin Albu-Irimies"
-    @echo "License:  MIT"
-    @echo "Crate:    https://crates.io/crates/droidkraft"
-
-# View changelog
-view-changelog:
-    @cat CHANGELOG.md
-
-# ── Security ──────────────────────────────────────────────────────────────────
-
-# ── Security ──────────────────────────────────────────────────────────────────
-
-# Run cargo-deny checks (advisories, licenses, bans, sources)
-deny:
-    cargo deny check
-
-# Run cargo-audit (RustSec advisories against Cargo.lock)
-audit:
-    cargo audit
-
-# Full security gate: audit + deny
-security: audit deny
-
-# ── Fuzzing (needs nightly + `cargo install cargo-fuzz`) ──────────────────────
-
-# List fuzz targets
-fuzz-list:
-    cargo +nightly fuzz list
-
-# Fuzz one target: just fuzz log_entry [secs]
-fuzz target="log_entry" secs="60":
-    cargo +nightly fuzz run {{target}} -- -max_total_time={{secs}}
-
-# Short fuzz run of every target (CI smoke)
-fuzz-smoke secs="10":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    for t in $(cargo +nightly fuzz list); do
-        echo "== $t"
-        cargo +nightly fuzz run "$t" -- -max_total_time={{secs}}
-    done
-
-# Check the fuzz crate compiles (stable, no fuzzing)
-fuzz-check:
-    cd fuzz && cargo check --bins
-
-# ── Memory / leak checks ──────────────────────────────────────────────────────
-
-# Sample memory of a running process: just soak droidkraft-tui 120 (start it first; open the Screen tab)
-soak name="droidkraft" secs="60":
-    nu scripts/soak.nu {{name}} {{secs}}
-
-# macOS: report leaked allocations in a running process (leaks <name>). just leaks droidkraft-tui
-leaks name="droidkraft-tui":
-    leaks {{name}} | tail -40
-
-# macOS: heap summary of a running process. just heap droidkraft
-heap name="droidkraft":
-    heap {{name}} | head -40
-
-# ── Per-crate build / run / test / doc ────────────────────────────────────────
-
-# Build core only
-build-core:
-    cargo build -p droidkraft-core
-
-# Build the TUI only
-build-tui:
-    cargo build -p droidkraft-tui
-
-# Run the TUI
-run-tui:
-    cargo run -p droidkraft-tui
-
-# Test the TUI
-test-tui:
-    cargo test -p droidkraft-tui --all-features
-
-# Test the GUI
-test-gui:
-    cargo test -p droidkraft --all-features
-
-# Open TUI docs
-doc-tui:
-    cargo doc --no-deps -p droidkraft-tui --open
-
-# Open GUI docs
-doc-gui:
-    cargo doc --no-deps -p droidkraft --open
-
-# ── Coverage / benchmarks ─────────────────────────────────────────────────────
-
-# HTML coverage report (needs `cargo install cargo-llvm-cov`)
+# Line coverage (needs cargo-llvm-cov); writes target/llvm-cov/html
 coverage:
     cargo llvm-cov --workspace --html
     @echo "→ target/llvm-cov/html/index.html"
 
-# Run benchmarks, if any (cargo bench)
-bench:
-    cargo bench --workspace
+# Docs for the workspace, warnings are errors (what docs.rs would reject)
+doc:
+    $env.RUSTDOCFLAGS = "-D warnings"; cargo doc --no-deps --workspace
 
-# ── Publishing (order: mirror/fastboot → core → tui → gui) ────────────────────
+# Secrets anywhere in the git history (brew install gitleaks); CI runs it on every push.
+# A false positive goes in .gitleaksignore, by the fingerprint gitleaks prints.
+secrets:
+    gitleaks git --redact --no-banner .
 
-# Check publish readiness
-check-publish: check-nu
-    nu scripts/check_publish.nu
+# Everything CI runs (fmt check, clippy, tests, versions, nu tests)
+check-all: fmt
+    nu scripts/ci/quality_gate.nu
 
-publish-mirror:
-    @echo "📦 Publishing droidkraft-mirror…"
-    cargo publish -p droidkraft-mirror
+# Security: known vulnerabilities (cargo install cargo-audit)
+audit:
+    cargo audit
 
-publish-fastboot:
-    @echo "📦 Publishing droidkraft-fastboot…"
-    cargo publish -p droidkraft-fastboot
-    @echo "⏳ Waiting 30 s for the index to propagate…"
-    sleep 30
+# Security: licenses, advisories, bans, sources (cargo install cargo-deny)
+deny:
+    cargo deny check
 
-publish-core:
-    @echo "📦 Publishing droidkraft-core…"
-    cargo publish -p droidkraft-core
-    @echo "⏳ Waiting 30 s for the index to propagate…"
-    sleep 30
+# Dependencies nothing uses (cargo install cargo-machete; the gate runs it too)
+unused-deps:
+    cargo machete
 
-publish-tui:
-    @echo "📦 Publishing droidkraft-tui…"
-    cargo publish -p droidkraft-tui
+# Fuzz one target (e.g. just fuzz parse 60); needs nightly + cargo-fuzz
+fuzz target secs="60":
+    cargo +nightly fuzz run {{ target }} -- -max_total_time={{ secs }}
 
-publish-gui:
-    @echo "📦 Publishing the GUI (package droidkraft)…"
-    cargo publish -p droidkraft
+# Every fuzz target for a short while
+fuzz-all secs="30":
+    nu scripts/ci/fuzz_all.nu --secs {{ secs }}
 
-# ── Release helpers ───────────────────────────────────────────────────────────
+# List the fuzz targets
+fuzz-list:
+    cargo +nightly fuzz list
 
-# Show the latest changelog section
-changelog-latest: check-git-cliff
+# Security + fuzz locally, like the nightly workflows
+nightly-local: audit deny fuzz-all
+
+# ── Dependencies ──────────────────────────────────────────────────────────────
+
+# Update Cargo.lock and fuzz/Cargo.lock (semver-compatible only)
+update:
+    nu scripts/ci/deps_update.nu update
+
+# Show outdated dependencies (needs cargo-outdated)
+outdated:
+    cargo outdated --workspace
+
+# What the nightly workflow does: update, full gate, commit and push if green
+update-deps: update check-all
+    nu scripts/ci/deps_update.nu commit (git config user.name) (git config user.email)
+
+# ── Nightly workflows on demand ───────────────────────────────────────────────
+
+# Run a GitHub workflow now (deps-update | security | fuzz | ci), needs gh
+gh-run workflow="deps-update":
+    gh workflow run {{ workflow }}.yml
+    @echo "✅ Dispatched {{ workflow }} — gh run watch"
+
+# Run a Gitea workflow now (deps-update | security | fuzz); needs GITEA_URL + GITEA_TOKEN
+gitea-run workflow="deps-update":
+    nu scripts/gitea_run.nu {{ workflow }}
+
+# The nightly dependency update, now, on both hosts
+deps-update-now: (gh-run "deps-update")
+    -just gitea-run deps-update
+
+# Security audit workflow, now, on both hosts
+security-now: (gh-run "security")
+    -just gitea-run security
+
+# Fuzz workflow, now, on both hosts
+fuzz-now: (gh-run "fuzz")
+    -just gitea-run fuzz
+
+# ── Changelog ─────────────────────────────────────────────────────────────────
+
+# Regenerate CHANGELOG.md from all tags
+changelog: _check-git-cliff
+    git-cliff --output CHANGELOG.md
+
+# Preview the next release's changelog
+changelog-preview: _check-git-cliff
+    @git-cliff --unreleased
+
+# Prepend only the unreleased commits to CHANGELOG.md
+changelog-unreleased: _check-git-cliff
+    git-cliff --unreleased --prepend CHANGELOG.md
+
+# Show the latest release's entry
+changelog-latest: _check-git-cliff
     @git-cliff --latest
 
-# Preview what the next release would contain
-release-preview: check-git-cliff
-    @echo "Current version: $(just version)"
-    @echo ""
-    @echo "Unreleased commits:"
+# ── Version & release ─────────────────────────────────────────────────────────
+
+# Current version (Cargo.toml)
+version:
+    @nu scripts/version.nu
+
+# Check Cargo.toml and EXTRA_MANIFESTS agree (and a tag, if given)
+check-versions tag="":
+    nu scripts/ci/check_versions.nu {{ tag }}
+
+# Validate that a version gives a valid vX.Y.Z tag
+validate-tag version:
+    nu scripts/ci/validate_tag.nu "v{{ version }}"
+
+# What would be released, without changing anything
+release-preview: _check-git-cliff
+    @print $"Current version: (nu scripts/version.nu)\n"
     @git-cliff --unreleased
-    @echo ""
-    @echo "Published crates: droidkraft-mirror • droidkraft-fastboot • droidkraft-core • droidkraft-tui • droidkraft (GUI)"
+    @nu scripts/project.nu
 
-# Release quality gate: fmt + clippy + test + release build
-check-release: check-all build-release
-    @echo "✅ Release quality gate passed!"
+# Everything in check-all plus a release build and the docs
+check-release: check-all build-release doc
+    @echo "✅ Release gate passed"
 
-# Release to GitHub only: bump, tag, push to origin
-release-github version: (bump version)
-    git push --follow-tags origin "$(git branch --show-current)"
-    @echo "✅ Release v{{version}} pushed to GitHub."
+# Dry-run the crates.io publish of every crate in scripts/project.nu
+publish-dry:
+    nu scripts/ci/publish_crate.nu --dry-run
 
-# Re-run the Release workflow for an existing tag
+# Bump Cargo.toml (+ EXTRA_MANIFESTS) + Cargo.lock, regenerate the changelog, commit and tag
+bump version: _check-git-cliff check-all
+    nu scripts/bump_version.nu --yes --skip-checks {{ version }}
+
+# Bump, tag and push to GitHub — starts the Release workflow
+release version: (bump version)
+    git push --follow-tags origin (git branch --show-current)
+    @print "✅ v{{ version }} pushed — the Release workflow builds the binaries."
+
+# First release of the version already in Cargo.toml (no bump), pushed to GitHub
+release-initial: _check-git-cliff check-all
+    nu scripts/release_initial.nu
+    git push --follow-tags origin (git branch --show-current)
+
+# Bump, tag and push to every remote — starts the Release workflows on both hosts
+release-all version: (bump version) push-all
+
+# Bump, tag and push to Gitea only
+release-gitea-starscream version: (bump version)
+    git push --follow-tags gitea-starscream (git branch --show-current)
+
+# First release, pushed to every remote
+release-initial-all: _check-git-cliff check-all
+    nu scripts/release_initial.nu
+    nu scripts/remotes.nu push
+
+# Re-run the GitHub Release workflow for an existing tag (e.g. just release-retrigger 0.1.0)
 release-retrigger version:
-    @command -v gh >/dev/null 2>&1 || { echo "❌ GitHub CLI (gh) not found. Install from https://cli.github.com"; exit 1; }
-    gh workflow run release.yml --field tag=v{{version}}
-    @echo "✅ Dispatched — see GitHub Actions."
+    gh workflow run release.yml --field tag=v{{ version }}
 
-# Push latest commit + tags to every remote (after the quality gate)
-push-release-all: check-all
-    #!/usr/bin/env sh
-    {{PUSHFN}}
-    failed=""; skipped=""
-    for r in {{REMOTES}}; do
-        git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r"; skipped="$skipped $r"; continue; }
-        gpush --follow-tags "$r" "$(git branch --show-current)" || failed="$failed $r"
-    done
-    [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
-    [ -n "$failed" ] && { echo "⚠️  Failed to push to:$failed"; exit 1; }
-    echo "✅ Latest commit + tags pushed to: {{REMOTES}}"
+# Package the release binaries locally (e.g. just package aarch64-apple-darwin)
+package target:
+    nu scripts/ci/build_release.nu {{ target }}
+    nu scripts/ci/package.nu {{ target }} --out dist
 
-# Force-push the current branch to every remote
+# ── Git remotes (GitHub = origin, Gitea = gitea-starscream; no mirroring) ─────
+
+# Push the current branch + tags to every configured remote (continues on failure)
+push-all:
+    nu scripts/remotes.nu push
+
+# Show all configured remotes
+remotes:
+    @git remote -v
+
+# Push the current branch to GitHub
+push:
+    git push origin (git branch --show-current)
+
+# Push the current branch to Gitea Starscream
+push-gitea-starscream:
+    git push gitea-starscream (git branch --show-current)
+
+# Push all tags to GitHub
+push-tags:
+    git push origin --tags
+
+# Push all tags to every remote (continues on failure)
+push-tags-all:
+    nu scripts/remotes.nu push-tags
+
+# Latest commit + tags to every remote, after the gate (no bump)
+push-release-all: check-all push-all
+
+# Force-push the current branch to every remote (no lease — be sure!)
 push-all-force:
-    #!/usr/bin/env sh
-    {{PUSHFN}}
-    failed=""; skipped=""
-    for r in {{REMOTES}}; do
-        git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r"; skipped="$skipped $r"; continue; }
-        gpush --force "$r" "$(git branch --show-current)" || failed="$failed $r"
-    done
-    [ -n "$skipped" ] && echo "ℹ️  Skipped (not configured):$skipped"
-    [ -n "$failed" ] && { echo "⚠️  Failed to force-push to:$failed"; exit 1; }
-    echo "✅ Force-pushed to: {{REMOTES}}"
+    nu scripts/remotes.nu push --force
 
-# ── Housekeeping ──────────────────────────────────────────────────────────────
+# Pull the current branch from GitHub
+pull:
+    git pull origin (git branch --show-current)
 
-# Update deps, run the gate, commit Cargo.lock and push
-update-deps:
-    @echo "⬆️  Updating dependencies…"
-    cargo update
-    cargo fmt --all -- --check
-    cargo clippy --workspace --all-targets -- -D warnings
-    cargo test --workspace --locked
-    git add Cargo.lock
-    git diff --cached --quiet || git commit -m "chore: update dependencies"
-    git push origin "$(git branch --show-current)"
-    @echo "✅ Dependency updates pushed."
+# Pull the current branch from Gitea Starscream
+pull-gitea-starscream:
+    git pull gitea-starscream (git branch --show-current)
 
-# Trigger the dependency-update workflow on GitHub
-deps-update-now:
-    gh workflow run deps-update.yml
+# Pull the current branch from every remote (continues on failure)
+pull-all:
+    nu scripts/remotes.nu pull
 
-# List available VHS tapes
-vhs-list:
-    @ls docs/tapes/*.tape | sed 's|.*/||; s|\.tape||' | sed 's/^/  /'
+# Force-sync Gitea Starscream with this checkout (branch + tags) — the nightlies diverge
+sync-gitea-starscream:
+    git push gitea-starscream (git branch --show-current) --force
+    git push gitea-starscream --tags --force
 
-# Add any missing remotes
+# Add the missing remotes
 setup-remotes:
-    #!/usr/bin/env sh
-    git remote get-url origin >/dev/null 2>&1 || git remote add origin git@github.com:sorinirimies/droidkraft.git
-    git remote get-url gitea-starscream >/dev/null 2>&1 || git remote add gitea-starscream gitea@192.168.1.44:sorin/droidkraft.git
-    git remote -v
+    nu scripts/remotes.nu setup
 
-# Force-push the current branch to GitHub (origin). No lease!
-push-force:
-    git push --force origin "$(git branch --show-current)"
+# Remove build artifacts
+clean:
+    cargo clean
+    rm -rf dist
 
-# Force-push the current branch to Gitea Starscream. No lease!
-push-gitea-starscream-force:
-    git push --force gitea-starscream "$(git branch --show-current)"
+# ── Project extras ─────────────────────────────────────────────────────────────
 
-# Force-push all tags to GitHub (moves existing tags)
-push-tags-force:
-    git push --force origin --tags
+# Run the GUI (needs the Xcode Metal toolchain on macOS)
+run-gui:
+    cargo run -p droidkraft
 
-# Force-push all tags to every remote (continues on failure)
-push-tags-all-force:
-    #!/usr/bin/env sh
-    {{PUSHFN}}
-    failed=""
-    for r in {{REMOTES}}; do
-        git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r (not configured)"; continue; }
-        gpush --force "$r" --tags || failed="$failed $r"
-    done
-    if [ -n "$failed" ]; then echo "⚠️  Failed to force-push tags to:$failed"; exit 1; fi
-    echo "✅ Tags force-pushed to every configured remote"
+# Build the TUI in release mode and launch it
+run-release:
+    cargo build --release -p droidkraft-tui; nu scripts/run.nu
+
+# Interactive feature demo
+demo:
+    cargo build --release -p droidkraft-tui; nu scripts/demo.nu
+
+# Memory growth of a running droidkraft or droidkraft-tui (start it first)
+soak name="droidkraft" secs="60":
+    nu scripts/soak.nu {{name}} {{secs}}
+
+# Regenerate the app icons in assets/icons, packaging/macos and packaging/windows
+icons:
+    cargo run -p droidkraft-tui --example gen_icons
+
+# Re-record one preview GIF, e.g. `just vhs tui-overview` (needs vhs and a device)
+vhs name:
+    cargo build --release -p droidkraft-tui; vhs docs/tapes/{{name}}.tape
+
+# Re-record every TUI preview GIF (the GUI GIFs are screen captures)
+previews:
+    cargo build --release -p droidkraft-tui; glob docs/tapes/tui-*.tape | each {|t| ^vhs $t } | ignore

@@ -1,12 +1,16 @@
 #!/usr/bin/env nu
-# Prints the current version from Cargo.toml.
+# Prints the current workspace version from Cargo.toml.
 # Usage: nu scripts/version.nu
 
-open Cargo.toml --raw
-| lines
-| where { |l| $l =~ '^version\s*=' }
-| first
-| parse --regex 'version\s*=\s*"(?P<v>[^"]+)"'
-| get v
-| first
-| print
+export def read_version [] {
+    cargo_version (open Cargo.toml)
+}
+
+# The version of a parsed Cargo.toml: `[workspace.package]` (a workspace) or
+# `[package]` (a single crate at the root).
+export def cargo_version [cargo: record]: nothing -> string {
+    let ws = $cargo | get -o workspace.package.version
+    if $ws != null { $ws } else { $cargo | get package.version }
+}
+
+def main [] { print (read_version) }

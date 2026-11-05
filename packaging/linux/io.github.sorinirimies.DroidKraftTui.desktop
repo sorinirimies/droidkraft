@@ -4,6 +4,6 @@ Version=1.0
 Name=DroidKraft (terminal)
 Comment=Terminal UI for Android devices
 Exec=droidkraft-tui
-Icon=droidkraft
+Icon=io.github.sorinirimies.DroidKraft
 Terminal=true
 Categories=Development;Utility;ConsoleOnly;

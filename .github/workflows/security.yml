@@ -4,10 +4,10 @@ on:
   schedule:
     - cron: "0 3 * * *"
   push:
-    branches: [main, master]
-    paths: ["Cargo.lock", "Cargo.toml", "**/Cargo.toml", "deny.toml", ".cargo/audit.toml", "fuzz/**"]
+    branches: [main]
+    paths: ["Cargo.lock", "Cargo.toml", "**/Cargo.toml", ".cargo/audit.toml", "deny.toml", "fuzz/**"]
   pull_request:
-    paths: ["Cargo.lock", "Cargo.toml", "**/Cargo.toml", "deny.toml", ".cargo/audit.toml", "fuzz/**"]
+    paths: ["Cargo.lock", "Cargo.toml", "**/Cargo.toml", ".cargo/audit.toml", "deny.toml", "fuzz/**"]
   workflow_dispatch:
 
 env:
@@ -18,7 +18,7 @@ jobs:
     name: cargo audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Rust stable
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
@@ -32,7 +32,7 @@ jobs:
     name: cargo deny
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Rust stable
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable

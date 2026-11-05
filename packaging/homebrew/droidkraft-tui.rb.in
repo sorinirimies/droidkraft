@@ -8,22 +8,22 @@ class DroidkraftTui < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-@VERSION@-aarch64-apple-darwin.tar.gz"
+      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-aarch64-apple-darwin.tar.gz"
       sha256 "@SHA_MACOS_ARM@"
     end
     on_intel do
-      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-@VERSION@-x86_64-apple-darwin.tar.gz"
+      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-x86_64-apple-darwin.tar.gz"
       sha256 "@SHA_MACOS_X86@"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-@VERSION@-aarch64-unknown-linux-gnu.tar.gz"
+      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-aarch64-unknown-linux-gnu.tar.gz"
       sha256 "@SHA_AARCH64@"
     end
     on_intel do
-      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-@VERSION@-x86_64-unknown-linux-gnu.tar.gz"
+      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-x86_64-unknown-linux-gnu.tar.gz"
       sha256 "@SHA_X86_64@"
     end
   end

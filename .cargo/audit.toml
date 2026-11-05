@@ -2,7 +2,8 @@
 # are reported as warnings.
 [advisories]
 ignore = [
-    # rsa Marvin attack: no fixed release. Pulled in by adb_client for ADB
-    # key signing; local-only use, no remote decryption oracle is exposed.
+    # rsa Marvin attack, through adb_client 2.1.19: no fixed rsa release yet (0.10 is a
+    # release candidate). adb_client signs the ADB auth token locally, so the timing
+    # side channel needs a local attacker measuring that signature.
     "RUSTSEC-2023-0071",
 ]

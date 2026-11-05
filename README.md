@@ -69,35 +69,39 @@ cargo run --release -p droidkraft         # GUI
 
 | | Linux x86_64 | Linux aarch64 | macOS | Windows x86_64 |
 |---|:-:|:-:|:-:|:-:|
-| **TUI** prebuilt | ✅ | ✅ | ✅ arm64 · x86_64 | ✅ `.zip` · installer |
+| **TUI** prebuilt | ✅ | ✅ | ✅ universal | ✅ `.zip` · installer |
 | **TUI** `cargo install` | ✅ | ✅ | ✅ | ✅ |
-| **GUI** prebuilt | ✅ | — | — | — |
+| **GUI** prebuilt | ✅ | ✅ | ✅ universal `.dmg` | — |
 | **GUI** `cargo install` | ✅ | ✅ | ✅ | ⚠️ builds on Windows only |
 
 - **Linux:** AppImage, Flatpak, Snap, `.deb`, `.rpm`, `.tar.gz`, AUR, Nix, Homebrew.
-- **macOS:** prebuilt TUI tarballs (arm64 + x86_64, cross-compiled from Linux with zig, best-effort) and a Homebrew formula. The GUI needs `cargo install` and Xcode's Metal toolchain.
-- **Windows:** prebuilt TUI zip and installer (adds `droidkraft-tui` to PATH), cross-compiled with `cargo-xwin`; Scoop, winget and Chocolatey manifests are attached. The GUI can only be built natively on Windows (gpui compiles its shaders with `fxc.exe`).
+- **macOS:** a universal DMG with the app and the TUI, `.tar.gz` per architecture, and a Homebrew formula for the TUI.
+- **Windows:** TUI zip and installer (adds `droidkraft-tui` to PATH); Scoop, winget and Chocolatey manifests are attached. The GUI is not shipped for Windows (gpui compiles its shaders with `fxc.exe`, so it builds on Windows only).
 - **Fastboot:** Linux needs a udev rule; Windows needs the Google USB driver.
 
 ## Downloads 📥
 
-Every release attaches these, all built on Linux CI:
+Every GitHub release attaches these. Only the newest release keeps its files; older
+releases keep their notes and tags.
 
 | Platform | Format | GUI | TUI |
 |---|---|:-:|:-:|
-| Linux | AppImage | ✅ | ✅ |
-| Linux | Flatpak (one per app) | ✅ | ✅ |
-| Linux | Snap (one per app) | ✅ | ✅ |
-| Debian · Ubuntu · Mint | `.deb` | ✅ x86_64 | ✅ x86_64 · arm64 |
-| Fedora · openSUSE · RHEL | `.rpm` | ✅ x86_64 | ✅ x86_64 · aarch64 |
+| Linux | AppImage | ✅ x86_64 · aarch64 | ✅ x86_64 · aarch64 |
+| Linux | Flatpak (one per app) | ✅ x86_64 | ✅ x86_64 |
+| Linux | Snap (one per app) | ✅ x86_64 | ✅ x86_64 |
+| Debian · Ubuntu · Mint | `.deb` | ✅ x86_64 · arm64 | ✅ x86_64 · arm64 |
+| Fedora · openSUSE · RHEL | `.rpm` | ✅ x86_64 · aarch64 | ✅ x86_64 · aarch64 |
 | Arch | `.pkg.tar.zst` + `PKGBUILD` (`droidkraft-bin`, `droidkraft-tui-bin`) | ✅ x86_64 | ✅ x86_64 · aarch64 |
 | Alpine | `.apk` (static musl) | — | ✅ x86_64 · aarch64 |
 | Linux | static musl `.tar.gz` (any distro) | — | ✅ x86_64 · aarch64 |
-| Linux | `.tar.gz` (TUI) | ✅ x86_64 | ✅ x86_64 · aarch64 |
+| Linux | `.tar.gz` (glibc) | ✅ x86_64 · aarch64 | ✅ x86_64 · aarch64 |
 | Windows | `.zip`, NSIS installer `-setup.exe` | — | ✅ x86_64 |
 | Windows | Scoop · winget · Chocolatey manifests | — | ✅ x86_64 |
-| macOS | `.tar.gz` (arm64, x86_64), Homebrew formula | — | ✅ |
-| macOS | `cargo install` | ✅ | ✅ |
+| macOS | universal `.dmg`, `.tar.gz` (arm64, x86_64) | ✅ | ✅ |
+| macOS | Homebrew formula | — | ✅ |
+
+The Gitea mirror's releases carry the Linux x86_64 `.tar.gz`, `.deb`, `.rpm` and
+AppImages.
 
 ```sh
 cargo binstall droidkraft-tui                  # prebuilt TUI, no compile
@@ -164,9 +168,11 @@ for dev in &status.devices {
 ## Development 🛠️
 
 ```bash
-cargo test --workspace            # tests (GUI excluded from default members: add -p droidkraft)
-cargo clippy --workspace --all-targets
+just check-all                    # the quality gate CI runs (fmt, clippy, tests, docs, Nu tests)
+cargo test --workspace            # --workspace includes the GUI, which plain `cargo test` skips
 just --list                       # helper recipes
+just release 2.3.0                # bump, tag and push: the Release workflow builds and publishes
+just release-all 2.3.0            # the same on GitHub and Gitea
 just previews                     # re-record the preview GIFs (needs vhs + a device)
 ```
 

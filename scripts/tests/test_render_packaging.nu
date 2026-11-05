@@ -1,25 +1,27 @@
 #!/usr/bin/env nu
-# Tests for scripts/ci/render_packaging.nu and package_tarball.nu
+# Tests for scripts/ci/render_packaging.nu
 #
 # Run with: nu scripts/tests/test_render_packaging.nu
 
 use std/assert
 use ./runner.nu *
-use ../ci/render_packaging.nu [render, sha, outputs]
+use ../ci/render_packaging.nu [render, sha, outputs, MUSL]
+use ../ci/package.nu [asset_name]
+use ../project.nu [LINUX release_matrix bins_for]
 
 def "test render replaces every placeholder" [] {
     let out = (render "v@VERSION@ @SHA@ @VERSION@" { VERSION: "1.2.3", SHA: "abc" })
     assert equal $out "v1.2.3 abc 1.2.3"
 }
 
-def "test sha is SKIP for missing tarball" [] {
-    assert equal (sha "/nonexistent" "1.0.0" "x86_64-unknown-linux-gnu") "SKIP"
+def "test sha is SKIP for a missing archive" [] {
+    assert equal (sha "/nonexistent" "x86_64-unknown-linux-gnu") "SKIP"
 }
 
-def "test sha hashes an existing tarball" [] {
+def "test sha hashes the archive package nu writes" [] {
     let d = (mktemp -d)
-    "hello" | save -f $"($d)/droidkraft-tui-1.0.0-t.tar.gz"
-    let h = (sha $d "1.0.0" "t")
+    "hello" | save -f ($d | path join (asset_name "x86_64-unknown-linux-gnu" "droidkraft-tui"))
+    let h = (sha $d "x86_64-unknown-linux-gnu")
     rm -rf $d
     assert equal $h ("hello" | hash sha256)
 }
@@ -32,21 +34,19 @@ def "test templates only use known placeholders" [] {
     }
 }
 
-def "test tarball has the binary at the archive root" [] {
-    let d = (mktemp -d)
-    let here = $env.PWD
-    mkdir $"($d)/target/release"
-    "bin" | save -f $"($d)/target/release/droidkraft-tui"
-    cp LICENSE README.md $d
-    cd $d
-    nu ($here | path join scripts/ci/package_tarball.nu) 9.9.9 x86_64-unknown-linux-gnu
-    let listing = (^tar -tzf dist/droidkraft-tui-9.9.9-x86_64-unknown-linux-gnu.tar.gz | lines | str trim --left --char '.' | str trim --left --char '/')
-    cd $here
-    rm -rf $d
-    assert ($listing | any {|l| $l == "droidkraft-tui" })
+# Every download URL in a rendered manifest names an archive the release uploads
+# (scripts/ci/package.nu for the release matrix and MUSL).
+def "test every manifest url names a released archive" [] {
+    let targets = (release_matrix $LINUX | get target) ++ $MUSL
+    let built = $targets | each {|t| bins_for $t | each {|b| asset_name $t $b.bin } } | flatten
+    for o in (outputs) {
+        let text = render (open --raw $o.tpl) { VERSION: "1.2.3" }
+        let name = $text | parse --regex '(?m)^_name=(?P<n>\S+)' | get -o n.0 | default ""
+        let urls = $text | str replace --all '$_name' $name
+            | parse --regex 'releases/download/v[^/\s]+/(?P<f>[^\s"'')]+)' | get f
+        let files = $urls | each {|u| if ($u | str contains '$CARCH') { [x86_64 aarch64] | each {|a| $u | str replace '$CARCH' $a } } else { [$u] } } | flatten
+        for f in $files { assert ($f in $built) $"($o.tpl): ($f) is not a release archive" }
+    }
 }
 
-def main [] {
-    print $"(ansi cyan)═══ test_render_packaging.nu ═══(ansi reset)"
-    run-tests
-}
+def main [] { run-tests }

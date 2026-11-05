@@ -1,5 +1,5 @@
-Output docs/previews/tui-overview.gif
-Set Shell "bash"
+Output "docs/previews/tui-overview.gif"
+Set Shell "nu"
 Set FontSize 14
 Set Width 1400
 Set Height 800
@@ -8,9 +8,9 @@ Set Theme "Catppuccin Mocha"
 Set TypingSpeed 60ms
 Set WindowBar Colorful
 Hide
-Type "export PATH=$PWD/target/release:$PATH && clear"
+Type "clear"
 Enter
-Type "droidkraft-tui --graphics halfblocks"
+Type "./target/release/droidkraft-tui --graphics halfblocks"
 Enter
 Show
 Sleep 9s

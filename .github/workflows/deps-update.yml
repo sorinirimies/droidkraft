@@ -1,39 +1,66 @@
-name: Dependency update
+name: Nightly dependency update
+
+# `cargo update` within the semver ranges (and in fuzz/), then the full gate; if
+# it is green, commit the lockfiles straight to main as `chore(deps)`. Nothing
+# changed ⇒ nothing happens. Releases stay manual (`just release X.Y.Z`).
 
 on:
   schedule:
-    - cron: "0 5 * * 1"
+    - cron: "0 2 * * *" # 02:00 UTC (Gitea runs at 02:30)
   workflow_dispatch:
 
 permissions:
   contents: write
-  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+# Never cancel mid-run: a half-finished push would leave main inconsistent.
+concurrency:
+  group: deps-update
+  cancel-in-progress: false
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt,clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Update Cargo.lock
-        run: cargo update
-      - name: Verify (default members)
-        run: |
-          cargo check --locked --all-targets
-          cargo test --locked
-      - name: Open PR
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.116.1"
+      - name: Install system packages
+        run: nu scripts/ci/apt.nu
+      # AUTO_RELEASE in scripts/project.nu: upgrade the requirements and release.
+      - name: Mode
+        id: mode
+        run: nu scripts/project.nu auto-release >> "$GITHUB_OUTPUT"
+      - name: cargo update
+        if: steps.mode.outputs.auto_release != 'true'
+        run: nu scripts/ci/deps_update.nu update
+      - name: Install cargo-edit, git-cliff
+        if: steps.mode.outputs.auto_release == 'true'
+        run: cargo install cargo-edit git-cliff --locked
+      - name: cargo upgrade + update
+        if: steps.mode.outputs.auto_release == 'true'
+        run: nu scripts/ci/deps_update.nu upgrade
+      - name: Anything to do?
+        id: diff
+        run: nu scripts/ci/deps_update.nu changed >> "$GITHUB_OUTPUT"
+      - name: Quality gate
+        if: steps.diff.outputs.changed == 'true'
+        run: nu scripts/ci/quality_gate.nu
+      - name: Commit
+        if: steps.diff.outputs.changed == 'true' && steps.diff.outputs.release != 'true'
+        run: nu scripts/ci/deps_update.nu commit "github-actions[bot]" "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Patch release
+        if: steps.diff.outputs.release == 'true'
+        run: nu scripts/ci/deps_update.nu release "github-actions[bot]" "41898282+github-actions[bot]@users.noreply.github.com"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git diff --quiet Cargo.lock && { echo "No updates"; exit 0; }
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          b="chore/deps-$(date +%Y%m%d)"
-          git checkout -b "$b"
-          git commit -am "chore: update dependencies"
-          git push origin "$b"
-          PR_URL=$(gh pr create --title "chore: update dependencies" --body "Automated \`cargo update\`. Lockfile only: merged without a version bump." --base "${GITHUB_REF_NAME}")
-          # Checks already passed above (check + tests on the updated lockfile): merge it.
-          gh pr merge "$PR_URL" --merge --delete-branch 2>/dev/null \
-            || gh pr merge "$PR_URL" --auto --merge --delete-branch
+          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+          HAS_PAT: ${{ secrets.GH_PAT != '' }}

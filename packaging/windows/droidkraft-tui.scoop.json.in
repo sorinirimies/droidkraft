@@ -5,7 +5,7 @@
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-@VERSION@-x86_64-pc-windows-msvc.zip",
+            "url": "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-tui-x86_64-pc-windows-msvc.zip",
             "hash": "@SHA_WIN_ZIP@"
         }
     },
@@ -14,7 +14,7 @@
     "autoupdate": {
         "architecture": {
             "64bit": {
-                "url": "https://github.com/sorinirimies/droidkraft/releases/download/v$version/droidkraft-tui-$version-x86_64-pc-windows-msvc.zip"
+                "url": "https://github.com/sorinirimies/droidkraft/releases/download/v$version/droidkraft-tui-x86_64-pc-windows-msvc.zip"
             }
         }
     }

@@ -1,9 +1,10 @@
-//! Sanity checks for release packaging assets (icons, desktop entries,
-//! Flatpak manifest) so a broken file fails `cargo test`, not the release.
+//! Sanity checks for the packaging files (icons, desktop entries, Flatpak, Snap and
+//! store manifests) so a broken file fails `cargo test`, not the release.
 
 use std::path::PathBuf;
 
 const APP_ID: &str = "io.github.sorinirimies.DroidKraft";
+const TUI_ID: &str = "io.github.sorinirimies.DroidKraftTui";
 
 fn root(p: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -21,7 +22,7 @@ fn text(p: &str) -> String {
 
 #[test]
 fn png_icon_is_256_square() {
-    let b = read("assets/icons/droidkraft.png");
+    let b = read("assets/icons/droidkraft-256.png");
     assert_eq!(&b[..8], b"\x89PNG\r\n\x1a\n");
     let w = u32::from_be_bytes(b[16..20].try_into().unwrap());
     let h = u32::from_be_bytes(b[20..24].try_into().unwrap());
@@ -30,7 +31,7 @@ fn png_icon_is_256_square() {
 
 #[test]
 fn ico_has_directory_and_valid_offsets() {
-    let b = read("assets/icons/droidkraft.ico");
+    let b = read("packaging/windows/droidkraft.ico");
     assert_eq!(&b[..4], [0, 0, 1, 0]);
     let n = u16::from_le_bytes([b[4], b[5]]) as usize;
     assert!(n >= 4);
@@ -45,7 +46,7 @@ fn ico_has_directory_and_valid_offsets() {
 
 #[test]
 fn icns_length_header_matches_file() {
-    let b = read("assets/icons/droidkraft.icns");
+    let b = read("packaging/macos/droidkraft.icns");
     assert_eq!(&b[..4], b"icns");
     assert_eq!(
         u32::from_be_bytes(b[4..8].try_into().unwrap()) as usize,
@@ -54,76 +55,49 @@ fn icns_length_header_matches_file() {
 }
 
 #[test]
-fn desktop_entries_point_at_real_binaries() {
-    let gui = text("packaging/linux/droidkraft.desktop");
+fn desktop_entries_point_at_real_binaries_and_the_app_icon() {
+    let gui = text(&format!("packaging/linux/{APP_ID}.desktop"));
     assert!(gui.contains("Exec=droidkraft\n"));
     assert!(gui.contains("StartupWMClass=droidkraft"));
-    let tui = text("packaging/linux/droidkraft-tui.desktop");
+    let tui = text(&format!("packaging/linux/{TUI_ID}.desktop"));
     assert!(tui.contains("Exec=droidkraft-tui\n") && tui.contains("Terminal=true"));
-}
-
-#[test]
-fn flatpak_manifest_matches_metainfo() {
-    let m = text(&format!("packaging/flatpak/{APP_ID}.yml"));
-    assert!(m.contains(&format!("app-id: {APP_ID}")));
-    assert!(m.contains("command: droidkraft"));
-    assert!(m.contains("appstream-compose: false"));
-    let info = text(&format!("packaging/linux/{APP_ID}.metainfo.xml"));
-    assert!(info.contains(&format!("<id>{APP_ID}</id>")));
-    assert!(
-        info.contains("VERSION"),
-        "placeholder replaced by package_flatpak.nu"
-    );
-}
-
-#[test]
-fn release_workflow_builds_every_package_type() {
-    let w = text(".github/workflows/packages.yml");
-    for needle in [
-        "AppImage",
-        "flatpak",
-        "x86_64-pc-windows-msvc",
-        "cargo-xwin",
-        "prune_releases.nu",
-    ] {
-        assert!(w.contains(needle), "packages.yml missing {needle}");
+    // package_desktop.nu installs the icon under the APP.icon name in scripts/project.nu.
+    for entry in [gui, tui] {
+        assert!(entry.contains(&format!("Icon={APP_ID}\n")));
     }
 }
 
 #[test]
-fn tui_cargo_toml_has_binstall_deb_and_rpm_metadata() {
-    let t = text("crates/droidkraft-tui/Cargo.toml");
-    for needle in [
-        "[package.metadata.binstall]",
-        "[package.metadata.deb]",
-        "[package.metadata.generate-rpm]",
-    ] {
-        assert!(t.contains(needle), "missing {needle}");
+fn flatpak_manifests_match_their_metainfo() {
+    for (id, command) in [(APP_ID, "droidkraft"), (TUI_ID, "droidkraft-tui")] {
+        let m = text(&format!("packaging/flatpak/{id}.yml"));
+        assert!(m.contains(&format!("app-id: {id}")));
+        assert!(m.contains(&format!("command: {command}\n")));
+        assert!(m.contains("install -Dm644 droidkraft-256.png"));
+        let info = text(&format!("packaging/linux/{id}.metainfo.xml"));
+        assert!(info.contains(&format!("<id>{id}</id>")));
+        // The .deb and .rpm install it as it is; package_flatpak.nu adds the release.
+        assert!(
+            !info.contains("<release"),
+            "{id}: no <release> in the committed metainfo"
+        );
     }
-    // binstall URL must match package_tarball.nu's file naming.
-    assert!(t.contains("{ name }-{ version }-{ target }{ archive-suffix }"));
-    let g = text("crates/droidkraft-gui/Cargo.toml");
-    assert!(g.contains("[package.metadata.deb]") && g.contains("[package.metadata.generate-rpm]"));
 }
 
 #[test]
-fn tui_and_gui_each_have_flatpak_snap_and_brew_packaging() {
-    for p in [
-        "packaging/flatpak/io.github.sorinirimies.DroidKraft.yml",
-        "packaging/flatpak/io.github.sorinirimies.DroidKraftTui.yml",
-        "packaging/snap/snapcraft-gui.yaml.in",
-        "packaging/snap/snapcraft-tui.yaml.in",
-        "packaging/aur/PKGBUILD.in",
-        "packaging/aur/PKGBUILD-gui.in",
-        "packaging/homebrew/droidkraft.rb.in",
-        "packaging/homebrew/droidkraft-tui.rb.in",
+fn binstall_urls_use_the_release_archive_names() {
+    // scripts/ci/package.nu writes <bin>-<target>.tar.gz (zip on Windows).
+    for c in [
+        "crates/droidkraft-tui/Cargo.toml",
+        "crates/droidkraft-gui/Cargo.toml",
     ] {
-        assert!(root(p).exists(), "{p} missing");
+        let t = text(c);
+        assert!(t.contains("[package.metadata.binstall]"), "{c}");
+        assert!(
+            t.contains("/releases/download/v{ version }/{ name }-{ target }{ archive-suffix }"),
+            "{c}"
+        );
     }
-    let tui = text("packaging/flatpak/io.github.sorinirimies.DroidKraftTui.yml");
-    assert!(tui.contains("command: droidkraft-tui"));
-    let info = text("packaging/linux/io.github.sorinirimies.DroidKraftTui.metainfo.xml");
-    assert!(info.contains("<id>io.github.sorinirimies.DroidKraftTui</id>"));
 }
 
 #[test]
@@ -147,36 +121,16 @@ fn snap_templates_are_consistent() {
 }
 
 #[test]
-fn extra_package_manifests_exist() {
+fn package_manifests_exist() {
     for p in [
+        "packaging/aur/PKGBUILD.in",
+        "packaging/aur/PKGBUILD-gui.in",
         "packaging/alpine/APKBUILD.in",
-        "packaging/windows/installer.nsi",
+        "packaging/homebrew/droidkraft.rb.in",
+        "packaging/homebrew/droidkraft-tui.rb.in",
         "packaging/windows/droidkraft-tui.scoop.json.in",
         "packaging/windows/winget.installer.yaml.in",
         "packaging/windows/droidkraft-tui.nuspec.in",
-        "scripts/ci/package_windows.nu",
-    ] {
-        assert!(root(p).exists(), "{p} missing");
-    }
-    let wf = text(".github/workflows/packages.yml");
-    for needle in [
-        "macos:",
-        "aarch64-apple-darwin",
-        "x86_64-unknown-linux-musl",
-        "package_windows.nu",
-        "makepkg",
-        "abuild",
-    ] {
-        assert!(wf.contains(needle), "packages.yml missing {needle}");
-    }
-}
-
-#[test]
-fn deb_rpm_assets_exist() {
-    for p in [
-        "packaging/linux/droidkraft.desktop",
-        "packaging/linux/droidkraft-tui.desktop",
-        "assets/icons/droidkraft.png",
     ] {
         assert!(root(p).exists(), "{p} missing");
     }

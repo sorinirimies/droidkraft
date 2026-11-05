@@ -1,107 +1,74 @@
 name: Release
 
+# Gitea runners are Linux only: this builds the Linux binaries (gitea_targets in
+# scripts/project.nu) and publishes a Gitea release with them. The full set (macOS, Windows) comes from
+# the GitHub release.
+
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.2.0)"
+        required: true
 
-permissions:
-  contents: write
-  packages: write
+env:
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: "10"
+  CARGO_NET_RETRY: "10"
 
 jobs:
-  test:
-    name: Test
+  release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4
         with:
-          components: rustfmt, clippy
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run clippy
-        run: cargo clippy -- -D warnings -A deprecated
-
-      - name: Run tests
-        run: cargo test --all-features
-
-  build:
-    name: Build and release
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
           fetch-depth: 0
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install git-cliff
-        run: cargo install git-cliff
-
-      - name: Install Nushell
+      - name: Install Rust stable + targets
+        run: |
+          for i in 1 2 3 4 5; do
+            curl --proto '=https' --tlsv1.2 -sSf --retry 5 --retry-all-errors --retry-delay 5 https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && break
+            [ $i = 5 ] && exit 1
+            echo "rustup install failed, retrying..."; sleep 15
+          done
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          . "$HOME/.cargo/env"
+          rustup component add rustfmt clippy
+          rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Nushell, zig, cargo-zigbuild, git-cliff
         run: |
           V=0.116.1
-          curl -fsSL https://github.com/nushell/nushell/releases/download/$V/nu-$V-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C /tmp
-          sudo install -m 0755 /tmp/nu-$V-x86_64-unknown-linux-gnu/nu /usr/local/bin/nu || install -m 0755 /tmp/nu-$V-x86_64-unknown-linux-gnu/nu "$HOME/.cargo/bin/nu"
-          nu --version
-
-      - name: Prepare release
-        run: nu scripts/release_prepare.nu ${{ github.ref_name }}
-
-      - name: Build release
-        run: cargo build --release
-
-      - name: Package binary
-        run: |
-          tar -C target/release -czvf droidkraft-${{ github.ref_name }}-linux-x86_64.tar.gz droidkraft-tui
-
-      - name: Create Gitea Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          body_path: RELEASE_CHANGELOG.md
-          files: droidkraft-${{ github.ref_name }}-linux-x86_64.tar.gz
+          curl -fsSL --retry 5 https://github.com/nushell/nushell/releases/download/$V/nu-$V-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C /tmp
+          sudo install -m 0755 /tmp/nu-$V-x86_64-unknown-linux-gnu/nu /usr/local/bin/nu || install -m 0755 /tmp/nu-$V-x86_64-unknown-linux-gnu/nu $HOME/.cargo/bin/nu
+          python3 -m pip install --user --break-system-packages ziglang || python3 -m pip install --user ziglang
+          cargo install cargo-zigbuild git-cliff --locked
+      - name: Install system packages
+        run: nu scripts/ci/apt.nu
+      - name: Validate tag
+        id: v
+        run: nu scripts/ci/validate_tag.nu "${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+      - name: Versions match the tag
+        run: nu scripts/ci/check_versions.nu "${{ steps.v.outputs.tag }}"
+      - name: Quality gate
+        run: nu scripts/ci/quality_gate.nu
+      - name: Build and package
+        run: nu scripts/ci/build_release.nu gitea --out dist
+      - name: Install packaging tools
+        run: nu scripts/ci/package_desktop.nu tools linux
+      - name: Build glibc binaries
+        run: nu scripts/ci/build_release.nu x86_64-unknown-linux-gnu
+      - name: .deb, .rpm and AppImage
+        run: nu scripts/ci/package_desktop.nu linux ${{ steps.v.outputs.version }} x86_64-unknown-linux-gnu --appimage
+      - name: Release notes
+        run: nu scripts/ci/release_notes.nu ${{ steps.v.outputs.tag }}
+      - name: Create Gitea release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish to crates.io
-        if: env.CRATES_IO_TOKEN != ''
+          GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: nu scripts/ci/gitea_release.nu ${{ steps.v.outputs.tag }} --api "${{ github.server_url }}/api/v1/repos/${{ github.repository }}" --dir dist
+      - name: Keep binaries only on the newest release
         env:
-          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-        run: |
-          echo "Publishing droidkraft-core to crates.io..."
-          cargo publish -p droidkraft-core --token $CRATES_IO_TOKEN --allow-dirty
-          echo "Waiting for the index to update..."
-          sleep 30
-          echo "Publishing droidkraft-tui (TUI) to crates.io..."
-          cargo publish -p droidkraft-tui --token $CRATES_IO_TOKEN --allow-dirty
-          echo "Waiting for the index to update..."
-          sleep 30
-          echo "Publishing droidkraft (GUI) to crates.io..."
-          # --no-verify: the GUI needs the GPU toolchain to build (verified on
-          # macOS); skip the Linux verify build here. crates.io still stores it.
-          cargo publish -p droidkraft --no-verify --token $CRATES_IO_TOKEN --allow-dirty
-
-      - name: Skip crates.io publish
-        if: env.CRATES_IO_TOKEN == ''
-        env:
-          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-        run: |
-          echo "CRATES_IO_TOKEN not set — skipping crates.io publication."
-          echo "Add CRATES_IO_TOKEN to your Gitea repository secrets to enable auto-publish."
+          GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: nu scripts/ci/prune_releases.nu ${{ steps.v.outputs.tag }} --gitea-api "${{ github.server_url }}/api/v1/repos/${{ github.repository }}"

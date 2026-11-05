@@ -1,4 +1,5 @@
-//! Generates `assets/icons/droidkraft.{png,ico,icns}`.
+//! Generates `assets/icons/droidkraft-256.png`, `packaging/windows/droidkraft.ico` and
+//! `packaging/macos/droidkraft.icns`, where the release packaging looks for them.
 //! Run from the repo root: `cargo run -p droidkraft-tui --example gen_icons`
 
 use image::{ImageEncoder, Rgba, RgbaImage, imageops::FilterType};
@@ -53,7 +54,7 @@ fn main() -> std::io::Result<()> {
     let big = draw(2048); // supersample, then downscale for smooth edges
     let at = |s: u32| image::imageops::resize(&big, s, s, FilterType::Lanczos3);
     std::fs::create_dir_all("assets/icons")?;
-    std::fs::write("assets/icons/droidkraft.png", png(&at(256)))?;
+    std::fs::write("assets/icons/droidkraft-256.png", png(&at(256)))?;
 
     // .ico: PNG-compressed entries
     let sizes = [16u32, 32, 48, 64, 128, 256];
@@ -69,7 +70,8 @@ fn main() -> std::io::Result<()> {
         off += d.len() as u32;
     }
     imgs.iter().for_each(|d| ico.extend(d));
-    std::fs::write("assets/icons/droidkraft.ico", ico)?;
+    std::fs::create_dir_all("packaging/windows")?;
+    std::fs::write("packaging/windows/droidkraft.ico", ico)?;
 
     // .icns: PNG-compressed entries, big-endian lengths
     let mut body = Vec::new();
@@ -90,7 +92,10 @@ fn main() -> std::io::Result<()> {
     let mut icns = b"icns".to_vec();
     icns.extend((body.len() as u32 + 8).to_be_bytes());
     icns.extend(body);
-    std::fs::write("assets/icons/droidkraft.icns", icns)?;
-    println!("wrote assets/icons/droidkraft.{{png,ico,icns}}");
+    std::fs::create_dir_all("packaging/macos")?;
+    std::fs::write("packaging/macos/droidkraft.icns", icns)?;
+    println!(
+        "wrote assets/icons/droidkraft-256.png, packaging/windows/droidkraft.ico, packaging/macos/droidkraft.icns"
+    );
     Ok(())
 }

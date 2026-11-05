@@ -11,5 +11,4 @@
   <launchable type="desktop-id">io.github.sorinirimies.DroidKraft.desktop</launchable>
   <url type="homepage">https://github.com/sorinirimies/droidkraft</url>
   <content_rating type="oars-1.1"/>
-  <releases><release version="VERSION" date="DATE"/></releases>
 </component>

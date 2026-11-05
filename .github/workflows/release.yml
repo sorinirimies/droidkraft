@@ -1,148 +1,384 @@
 name: Release
 
+# Push a vX.Y.Z tag (`just release X.Y.Z`): validate tag == Cargo.toml → gate →
+# build the binaries in scripts/project.nu for macOS (arm64, x86-64), Linux
+# (static musl arm64, x86-64) and Windows → GitHub release with the archives +
+# sha256 and git-cliff notes → crates.io, every crate in scripts/project.nu (only
+# if the CRATES_IO_TOKEN secret is set; idempotent).
+
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.2.0)"
+        required: true
 
 permissions:
   contents: write
-  packages: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Test
+  validate:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      version: ${{ steps.v.outputs.version }}
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.116.1"
+      - name: Validate tag
+        id: v
+        run: nu scripts/ci/validate_tag.nu "${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+      - name: Versions match the tag
+        run: nu scripts/ci/check_versions.nu "${{ steps.v.outputs.tag }}"
+      - name: Build matrix
+        id: m
+        run: nu scripts/project.nu matrix >> "$GITHUB_OUTPUT"
+
+  gate:
+    name: Quality gate
+    needs: validate
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7
         with:
-          components: rustfmt, clippy
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run clippy
-        run: cargo clippy -- -D warnings -A deprecated
-
-      - name: Run tests
-        run: cargo test --all-features
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt,clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.116.1"
+      - name: Install system packages
+        run: nu scripts/ci/apt.nu
+      - run: nu scripts/ci/quality_gate.nu
 
   build:
-    name: Build and release
-    runs-on: ubuntu-latest
-    needs: test
+    name: Build ${{ matrix.target }}
+    needs: [validate, gate]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      # release_matrix in scripts/project.nu: the targets for its LINUX flavour.
+      matrix: ${{ fromJSON(needs.validate.outputs.matrix) }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install git-cliff
-        run: cargo install git-cliff
-
-      - name: Install Nushell
-        run: |
-          V=0.116.1
-          curl -fsSL https://github.com/nushell/nushell/releases/download/$V/nu-$V-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C /tmp
-          sudo install -m 0755 /tmp/nu-$V-x86_64-unknown-linux-gnu/nu /usr/local/bin/nu || install -m 0755 /tmp/nu-$V-x86_64-unknown-linux-gnu/nu "$HOME/.cargo/bin/nu"
-          nu --version
-
-      - name: Prepare release
-        run: nu scripts/release_prepare.nu ${{ github.ref_name }}
-
-      - name: Build release
-        run: cargo build --release
-
-      - name: Package binary
-        run: |
-          tar -C target/release -czvf droidkraft-${{ github.ref_name }}-linux-x86_64.tar.gz droidkraft-tui
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          body_path: RELEASE_CHANGELOG.md
-          files: |
-            droidkraft-${{ github.ref_name }}-linux-x86_64.tar.gz
-            LICENSE
-            README.md
-            CHANGELOG.md
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.116.1"
+      - name: Install system packages
+        run: nu scripts/ci/apt.nu
+      # Static Linux binaries for both architectures from one runner: zig is the
+      # C cross-compiler for any bundled C code (sqlite, zstd, …).
+      - name: Install zig
+        if: matrix.zig
+        uses: mlugg/setup-zig@v2
+      - name: Install cargo-zigbuild
+        if: matrix.zig
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+      - name: Build (zig)
+        if: matrix.zig
+        run: nu scripts/ci/build_release.nu ${{ matrix.target }} --zig
+      - name: Build
+        if: ${{ !matrix.zig }}
+        run: nu scripts/ci/build_release.nu ${{ matrix.target }}
+      - name: Package
+        run: nu scripts/ci/package.nu ${{ matrix.target }} --out dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
 
-      - name: Publish to crates.io
-        if: env.CRATES_IO_TOKEN != ''
-        env:
-          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-        run: |
-          for c in droidkraft-mirror droidkraft-fastboot; do
-            echo "Publishing $c to crates.io..."
-            cargo publish -p $c --token $CRATES_IO_TOKEN --allow-dirty
-          done
-          echo "Waiting for the index to update..."
-          sleep 30
-          echo "Publishing droidkraft-core to crates.io..."
-          cargo publish -p droidkraft-core --token $CRATES_IO_TOKEN --allow-dirty
-          echo "Waiting for the index to update..."
-          sleep 30
-          echo "Publishing droidkraft-tui (TUI) to crates.io..."
-          cargo publish -p droidkraft-tui --token $CRATES_IO_TOKEN --allow-dirty
-          echo "Waiting for the index to update..."
-          sleep 30
-          echo "Publishing droidkraft (GUI) to crates.io..."
-          # --no-verify: the GUI needs the GPU toolchain to build (verified on
-          # macOS); skip the Linux verify build here. crates.io still stores it.
-          cargo publish -p droidkraft --no-verify --token $CRATES_IO_TOKEN --allow-dirty
+  # .deb, .rpm and AppImages, built on the OLDEST hosted runners: a binary needs
+  # at least the glibc it was linked against (22.04 = 2.35).
+  linux-packages:
+    name: Linux packages ${{ matrix.target }}
+    needs: [validate, gate]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-22.04, target: x86_64-unknown-linux-gnu }
+          - { runner: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: desktop-${{ matrix.target }}
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.116.1"
+      - name: Install system packages
+        run: nu scripts/ci/apt.nu
+      - name: Install packaging tools
+        run: nu scripts/ci/package_desktop.nu tools linux
+      - name: Build
+        run: nu scripts/ci/build_release.nu ${{ matrix.target }}
+      - name: .deb, .rpm and AppImage
+        run: nu scripts/ci/package_desktop.nu linux ${{ needs.validate.outputs.version }} ${{ matrix.target }} --appimage
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-${{ matrix.target }}
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
+          if-no-files-found: error
 
-      - name: Skip crates.io publish
-        if: env.CRATES_IO_TOKEN == ''
-        env:
-          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-        run: |
-          echo "CRATES_IO_TOKEN not set — skipping crates.io publication."
-          echo "Add CRATES_IO_TOKEN to your GitHub repository secrets to enable auto-publish."
-
-  macos:
-    name: macOS universal (GUI + TUI)
+  macos-dmg:
+    name: macOS universal DMG
+    needs: [validate, gate]
     runs-on: macos-latest
-    needs: build
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install Nushell
-        uses: hustcer/setup-nu@v3
+      - uses: Swatinem/rust-cache@v2
+      - uses: hustcer/setup-nu@v3
         with:
-          version: "*"
-
-      - name: Package DMG
-        run: nu scripts/ci/package_macos.nu ${{ github.ref_name }} --build
-
-      - name: Upload to release
-        uses: softprops/action-gh-release@v1
+          version: "0.116.1"
+      - name: Build arm64
+        run: nu scripts/ci/build_release.nu aarch64-apple-darwin
+      - name: Build x86_64
+        run: nu scripts/ci/build_release.nu x86_64-apple-darwin
+      - name: DMG
+        run: nu scripts/ci/package_desktop.nu macos ${{ needs.validate.outputs.version }}
+      - uses: actions/upload-artifact@v7
         with:
-          files: |
-            dist/*.dmg
-            dist/*.tar.gz
+          name: desktop-macos
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  windows-installer:
+    name: Windows installer
+    needs: [validate, gate]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.116.1"
+      - name: Install NSIS
+        run: nu scripts/ci/package_desktop.nu tools windows
+      - name: Build
+        run: nu scripts/ci/build_release.nu x86_64-pc-windows-msvc
+      - name: Installer
+        run: nu scripts/ci/package_desktop.nu windows ${{ needs.validate.outputs.version }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-windows
+          path: dist/*-setup.exe
+          if-no-files-found: error
+
+  # droidkraft extras: Flatpak and Snap bundles, and the static musl TUI the APKBUILD downloads.
+  bundles:
+    name: Flatpak, Snap and musl
+    needs: [validate, gate]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: bundles
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.116.1"
+      - name: Install system packages
+        run: nu scripts/ci/apt.nu
+      - name: Install Flatpak
+        run: |
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+      - name: Install zig
+        uses: mlugg/setup-zig@v2
+      - name: Install cargo-zigbuild
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+      - name: Build
+        run: nu scripts/ci/build_release.nu x86_64-unknown-linux-gnu
+      - name: Flatpak GUI
+        run: nu scripts/ci/package_flatpak.nu ${{ needs.validate.outputs.version }}
+      - name: Flatpak TUI
+        run: nu scripts/ci/package_flatpak.nu ${{ needs.validate.outputs.version }} --tui
+      - name: Snap GUI project
+        run: nu scripts/ci/package_snap.nu ${{ needs.validate.outputs.version }}
+      - name: Snap TUI project
+        run: nu scripts/ci/package_snap.nu ${{ needs.validate.outputs.version }} --tui
+      - name: Build the GUI snap
+        id: snap-gui
+        uses: snapcore/action-build@v1
+        with:
+          path: snapbuild-gui
+      - name: Build the TUI snap
+        id: snap-tui
+        uses: snapcore/action-build@v1
+        with:
+          path: snapbuild-tui
+      - name: Collect the GUI snap
+        run: nu -c "cp '${{ steps.snap-gui.outputs.snap }}' dist/droidkraft_${{ needs.validate.outputs.version }}_amd64.snap"
+      - name: Collect the TUI snap
+        run: nu -c "cp '${{ steps.snap-tui.outputs.snap }}' dist/droidkraft-tui_${{ needs.validate.outputs.version }}_amd64.snap"
+      # libudev-sys looks for a host libudev through pkg-config; there is none for musl.
+      - name: Static musl TUI
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LIBUDEV_NO_PKG_CONFIG: "1"
+        run: nu scripts/ci/render_packaging.nu musl
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bundles
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: GitHub release
+    needs: [validate, build, linux-packages, macos-dmg, windows-installer, bundles]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+          fetch-depth: 0
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.116.1"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+      - name: Release notes
+        run: nu scripts/ci/release_notes.nu ${{ needs.validate.outputs.tag }}
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Store manifests (AUR, Alpine, Homebrew, Scoop, winget, Chocolatey)
+        run: nu scripts/ci/render_packaging.nu ${{ needs.validate.outputs.version }}
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.validate.outputs.tag }}
+          name: DroidKraft ${{ needs.validate.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          files: dist/*
+      - name: Keep binaries only on the newest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: nu scripts/ci/prune_releases.nu ${{ needs.validate.outputs.tag }}
+
+  # Arch and Alpine packages from the rendered manifests; their sources are the
+  # release assets, so this runs after the release. Best effort, as before.
+  distro-packages:
+    name: Arch and Alpine packages
+    needs: [validate, publish]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.116.1"
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Store manifests
+        run: nu scripts/ci/render_packaging.nu ${{ needs.validate.outputs.version }}
+      - uses: docker/setup-qemu-action@v3
+      - name: Arch packages
+        run: nu scripts/ci/distro_packages.nu arch
+      - name: Alpine packages
+        run: nu scripts/ci/distro_packages.nu alpine
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ needs.validate.outputs.tag }} pkgs/* --clobber
+
+  crates-io:
+    name: crates.io
+    needs: [validate, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.116.1"
+      - name: Install system packages
+        run: nu scripts/ci/apt.nu
+      # Every crate in scripts/project.nu, dependencies first.
+      - name: Publish crates (idempotent)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: nu scripts/ci/publish_crate.nu
+
+  # Needs the AUR_USERNAME, AUR_EMAIL and AUR_SSH_PRIVATE_KEY secrets; without
+  # them the deploy fails without failing the release.
+  aur:
+    name: AUR
+    needs: [validate, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: hustcer/setup-nu@v3
+        with:
+          version: "0.116.1"
+      - name: PKGBUILD for this version
+        run: nu scripts/ci/package_desktop.nu aur ${{ needs.validate.outputs.version }}
+      - name: Deploy to the AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v3
+        continue-on-error: true
+        with:
+          pkgname: droidkraft
+          pkgbuild: dist/aur/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update to v${{ needs.validate.outputs.version }}

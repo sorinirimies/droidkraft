@@ -7,7 +7,7 @@ class Droidkraft < Formula
 
   on_linux do
     on_intel do
-      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-@VERSION@-x86_64-unknown-linux-gnu.tar.gz"
+      url "https://github.com/sorinirimies/droidkraft/releases/download/v@VERSION@/droidkraft-x86_64-unknown-linux-gnu.tar.gz"
       sha256 "@SHA_GUI_X86_64@"
     end
   end
