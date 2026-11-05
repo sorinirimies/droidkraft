@@ -20,6 +20,8 @@ ignore = [
     "RUSTSEC-2026-0370",
     "RUSTSEC-2026-0371",
     "RUSTSEC-2026-0372",
+    # pin-utils via async-std (zed-async-tar in gpui 0.2.2); no safe upgrade.
+    "RUSTSEC-2026-0441",
 ]
 
 [licenses]
