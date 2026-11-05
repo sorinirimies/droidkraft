@@ -6,16 +6,16 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use gpui::{
-    div, prelude::*, px, rgb, size, Bounds, Context, Entity, TitlebarOptions, Window, WindowBounds,
-    WindowOptions,
+    Bounds, Context, Entity, TitlebarOptions, Window, WindowBounds, WindowOptions, div, prelude::*,
+    px, rgb, size,
 };
 
 use droidkraft_core::features::fastboot::FastbootCommand;
 use droidkraft_core::features::flash::RebootTarget;
 use droidkraft_core::features::rom::{
-    build_plan, DownloadProgress, FlashOptions, FlashSession, InstallMethod, RomBuild, StepStatus,
+    DownloadProgress, FlashOptions, FlashSession, InstallMethod, RomBuild, StepStatus, build_plan,
 };
-use droidkraft_mirror::{timestamped_name, RecordStatus};
+use droidkraft_mirror::{RecordStatus, timestamped_name};
 
 use crate::commands::{CommandAction, GuiCommand};
 use crate::mirror_view::{Chrome, DetachedRoot, MirrorEvent, MirrorView, ToggleDetach};
@@ -24,6 +24,7 @@ use crate::theme;
 use crate::worker::{Worker, WorkerRequest, WorkerResponse};
 
 /// Root application state + view.
+#[derive(Debug)]
 pub struct DroidGui {
     pub(crate) worker: Worker,
     pub(crate) fleet: Fleet,
@@ -41,17 +42,19 @@ pub struct DroidGui {
 impl DroidGui {
     pub fn new(cx: &mut Context<Self>) -> Self {
         // Periodic refresh loop (drains worker + logcat, then repaints).
-        cx.spawn(async move |this, cx| loop {
-            let alive = this.update(cx, |this, cx| {
-                this.tick(cx);
-                cx.notify();
-            });
-            if alive.is_err() {
-                break;
+        cx.spawn(async move |this, cx| {
+            loop {
+                let alive = this.update(cx, |this, cx| {
+                    this.tick(cx);
+                    cx.notify();
+                });
+                if alive.is_err() {
+                    break;
+                }
+                cx.background_executor()
+                    .timer(Duration::from_millis(250))
+                    .await;
             }
-            cx.background_executor()
-                .timer(Duration::from_millis(250))
-                .await;
         })
         .detach();
 
@@ -260,13 +263,13 @@ impl DroidGui {
             } => {
                 if let Some(d) = self.dev(&serial) {
                     d.flash_busy = false;
-                    if let Some(s) = &mut d.flash_session {
-                        if let Some(slot) = s.statuses.get_mut(idx) {
-                            *slot = match result {
-                                Ok(_) => StepStatus::Done,
-                                Err(e) => StepStatus::Failed(e),
-                            };
-                        }
+                    if let Some(s) = &mut d.flash_session
+                        && let Some(slot) = s.statuses.get_mut(idx)
+                    {
+                        *slot = match result {
+                            Ok(_) => StepStatus::Done,
+                            Err(e) => StepStatus::Failed(e),
+                        };
                     }
                 }
             }
@@ -391,14 +394,14 @@ impl DroidGui {
             if d.flash_busy {
                 return;
             }
-            if let Some(session) = &d.flash_session {
-                if let Some((idx, step)) = session.next_step() {
-                    req = Some(WorkerRequest::RunFlashStep {
-                        serial: serial.to_string(),
-                        idx,
-                        step: step.clone(),
-                    });
-                }
+            if let Some(session) = &d.flash_session
+                && let Some((idx, step)) = session.next_step()
+            {
+                req = Some(WorkerRequest::RunFlashStep {
+                    serial: serial.to_string(),
+                    idx,
+                    step: step.clone(),
+                });
             }
             if req.is_some() {
                 d.flash_busy = true;

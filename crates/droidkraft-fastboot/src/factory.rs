@@ -493,9 +493,10 @@ mod tests {
         assert!(pos("reboot-bootloader") < pos("flash:radio_a"));
         assert!(pos("flash:vbmeta_b") < pos("reboot-fastboot"));
         assert!(pos("reboot-fastboot") < pos("create-logical-partition:system_a:0"));
-        assert!(log
-            .iter()
-            .any(|c| c.starts_with("resize-logical-partition:vendor_b:")));
+        assert!(
+            log.iter()
+                .any(|c| c.starts_with("resize-logical-partition:vendor_b:"))
+        );
         assert!(!log.iter().any(|c| c.starts_with("erase:")));
         assert_eq!(log.last().unwrap(), "reboot");
         let last = prog.last().unwrap();

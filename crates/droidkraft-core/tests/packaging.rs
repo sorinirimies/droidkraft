@@ -16,7 +16,7 @@ fn read(p: &str) -> Vec<u8> {
 }
 
 fn text(p: &str) -> String {
-    String::from_utf8(read(p)).unwrap()
+    String::from_utf8(read(p)).unwrap_or_else(|e| panic!("{p}: {e}"))
 }
 
 #[test]

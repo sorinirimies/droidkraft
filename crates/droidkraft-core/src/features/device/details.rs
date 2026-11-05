@@ -408,18 +408,18 @@ pub(crate) fn parse_meminfo_full(text: &str) -> MemoryInfo {
 pub(crate) fn parse_df(text: &str) -> StorageInfo {
     for line in text.lines().rev() {
         let f: Vec<&str> = line.split_whitespace().collect();
-        if f.len() >= 4 {
-            if let (Ok(t), Ok(u), Ok(a)) = (
+        if f.len() >= 4
+            && let (Ok(t), Ok(u), Ok(a)) = (
                 f[1].parse::<u64>(),
                 f[2].parse::<u64>(),
                 f[3].parse::<u64>(),
-            ) {
-                return StorageInfo {
-                    total_mib: t / 1024,
-                    used_mib: u / 1024,
-                    avail_mib: a / 1024,
-                };
-            }
+            )
+        {
+            return StorageInfo {
+                total_mib: t / 1024,
+                used_mib: u / 1024,
+                avail_mib: a / 1024,
+            };
         }
     }
     StorageInfo::default()
@@ -796,10 +796,10 @@ pub fn collect_device_details_with(
         return fail(format!("shell: {e}"));
     }
     let (mut d, sample) = assemble(serial, &String::from_utf8_lossy(&buf), prev_cpu);
-    if let Some(b) = base {
-        if d.errors.is_empty() {
-            merge_static(&mut d, b);
-        }
+    if let Some(b) = base
+        && d.errors.is_empty()
+    {
+        merge_static(&mut d, b);
     }
     (d, sample)
 }
@@ -909,11 +909,15 @@ mod tests {
 
     #[test]
     fn mem_df() {
-        let m = parse_meminfo_full("MemTotal: 8192000 kB\nMemAvailable: 4096000 kB\nSwapTotal: 2048000 kB\nSwapFree: 1024000 kB\nCached: 1024000 kB\n");
+        let m = parse_meminfo_full(
+            "MemTotal: 8192000 kB\nMemAvailable: 4096000 kB\nSwapTotal: 2048000 kB\nSwapFree: 1024000 kB\nCached: 1024000 kB\n",
+        );
         assert_eq!(m.total_mib, 8000);
         assert_eq!(m.used_mib(), 4000);
         assert!((m.used_pct() - 50.0).abs() < 0.1);
-        let s = parse_df("Filesystem 1K-blocks Used Available Use% Mounted on\n/dev/block/dm-9 102400 51200 51200 50% /data\n");
+        let s = parse_df(
+            "Filesystem 1K-blocks Used Available Use% Mounted on\n/dev/block/dm-9 102400 51200 51200 50% /data\n",
+        );
         assert_eq!((s.total_mib, s.used_mib, s.avail_mib), (100, 50, 50));
         assert!((s.used_pct() - 50.0).abs() < 0.1);
     }

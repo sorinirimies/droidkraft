@@ -5,14 +5,14 @@
 //! the "clear stale image" bookkeeping.
 
 use std::io::Write;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{Receiver, SyncSender, channel, sync_channel};
 
 use image::imageops::FilterType;
 use image::{DynamicImage, RgbaImage};
-use ratatui::layout::Rect;
 use ratatui::Frame;
+use ratatui::layout::Rect;
 use ratatui_image::picker::{Picker, ProtocolType};
 use ratatui_image::thread::{ResizeResponse, ThreadProtocol};
 use ratatui_image::{Resize, StatefulImage};
@@ -101,6 +101,19 @@ pub struct Gfx {
     kitty: Option<KittyState>,
 }
 
+// By hand: the picker and the worker channels are not Debug.
+impl std::fmt::Debug for Gfx {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Gfx")
+            .field("proto", &self.proto)
+            .field("font", &self.font)
+            .field("shown_seq", &self.shown_seq)
+            .field("drawn", &self.drawn)
+            .field("clear_pending", &self.clear_pending)
+            .finish_non_exhaustive()
+    }
+}
+
 impl Default for Gfx {
     fn default() -> Self {
         Self::halfblocks()
@@ -158,14 +171,19 @@ impl Gfx {
         }
         // Prefer the real pixel size of a cell (window pixels / cells): a wrong cell size makes
         // the terminal upscale a too-small image, which looks pixelated on HiDPI screens.
-        if let Ok(ws) = crossterm::terminal::window_size() {
-            if ws.width > 0 && ws.height > 0 && ws.columns > 0 && ws.rows > 0 {
-                let fw = (ws.width / ws.columns).max(1);
-                let fh = (ws.height / ws.rows).max(1);
-                #[allow(deprecated)]
-                {
-                    picker = Picker::from_fontsize((fw, fh).into());
-                }
+        if let Ok(ws) = crossterm::terminal::window_size()
+            && ws.width > 0
+            && ws.height > 0
+            && ws.columns > 0
+            && ws.rows > 0
+        {
+            let fw = (ws.width / ws.columns).max(1);
+            let fh = (ws.height / ws.rows).max(1);
+            // The only constructor that takes a measured font size; the suggested
+            // `from_query_stdio` is what failed to get here, and `halfblocks` drops the image protocols.
+            #[allow(deprecated)]
+            {
+                picker = Picker::from_fontsize((fw, fh).into());
             }
         }
         picker.set_protocol_type(proto);
@@ -188,10 +206,10 @@ impl Gfx {
         let (res_tx, res_rx) = channel();
         std::thread::spawn(move || {
             while let Ok(req) = req_rx.recv() {
-                if let Ok(done) = req.resize_encode() {
-                    if res_tx.send(done).is_err() {
-                        break;
-                    }
+                if let Ok(done) = req.resize_encode()
+                    && res_tx.send(done).is_err()
+                {
+                    break;
                 }
             }
         });
@@ -437,8 +455,8 @@ pub fn kitty_place(rect: Rect, png: &[u8]) -> Vec<u8> {
 
 /// Scale `img` to `w`×`h` and PNG-encode it (fast compression).
 pub fn encode_png(img: &RgbaImage, w: u32, h: u32) -> Option<Vec<u8>> {
-    use image::codecs::png::{CompressionType, FilterType as PF, PngEncoder};
     use image::ImageEncoder;
+    use image::codecs::png::{CompressionType, FilterType as PF, PngEncoder};
     let rgb = DynamicImage::ImageRgba8(img.clone()).to_rgb8();
     let scaled = image::imageops::resize(&rgb, w.max(1), h.max(1), FilterType::Triangle);
     let mut out = Vec::new();
@@ -482,16 +500,15 @@ impl KittyState {
         let b = busy.clone();
         std::thread::spawn(move || {
             while let Ok(job) = job_rx.recv() {
-                if let Some(png) = encode_png(&job.img, job.px.0, job.px.1) {
-                    if res_tx
+                if let Some(png) = encode_png(&job.img, job.px.0, job.px.1)
+                    && res_tx
                         .send(KittyDone {
                             rect: job.rect,
                             png,
                         })
                         .is_err()
-                    {
-                        break;
-                    }
+                {
+                    break;
                 }
                 b.store(false, Ordering::SeqCst);
             }

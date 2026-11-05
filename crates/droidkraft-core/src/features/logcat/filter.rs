@@ -125,10 +125,10 @@ impl LogcatFilter {
 
         if !self.search_query.is_empty() {
             if self.use_regex {
-                if let Some(ref re) = self.compiled_regex {
-                    if !re.is_match(&entry.raw) {
-                        return false;
-                    }
+                if let Some(ref re) = self.compiled_regex
+                    && !re.is_match(&entry.raw)
+                {
+                    return false;
                 }
             } else if self.fuzzy {
                 if !fuzzy_match(&self.search_query, &entry.raw) {
@@ -145,10 +145,10 @@ impl LogcatFilter {
 
         if !self.exclude_query.is_empty() {
             if self.use_regex {
-                if let Some(ref re) = self.compiled_exclude {
-                    if re.is_match(&entry.raw) {
-                        return false;
-                    }
+                if let Some(ref re) = self.compiled_exclude
+                    && re.is_match(&entry.raw)
+                {
+                    return false;
                 }
             } else if entry
                 .raw
@@ -335,6 +335,7 @@ impl LogcatFilter {
 }
 
 #[cfg(test)]
+// Tests set one filter field after `default()`, to show which field each case is about.
 #[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;

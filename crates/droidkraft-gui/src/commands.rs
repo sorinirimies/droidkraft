@@ -1,9 +1,9 @@
 //! Framework-free catalogue of one-click device commands surfaced as buttons in
 //! the GUI.  Kept independent of gpui so it can be unit-tested.
 
+use droidkraft_core::AdbCommand;
 use droidkraft_core::features::flash::RebootTarget;
 use droidkraft_core::features::packages::PackageFilter;
-use droidkraft_core::AdbCommand;
 
 /// A logical grouping of commands, used to lay buttons out in sections.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,8 +214,10 @@ mod tests {
     #[test]
     fn reboot_actions_map_to_targets() {
         let power = by_category(CommandCategory::Power);
-        assert!(power
-            .iter()
-            .any(|c| matches!(c.action, CommandAction::Reboot(RebootTarget::Bootloader))));
+        assert!(
+            power
+                .iter()
+                .any(|c| matches!(c.action, CommandAction::Reboot(RebootTarget::Bootloader)))
+        );
     }
 }

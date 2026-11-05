@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event};
 use crossterm::execute;
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
 
 use crate::message::{Cmd, Message};
 use crate::model::Model;
@@ -15,6 +15,7 @@ pub const TICK: Duration = Duration::from_millis(100);
 /// Redraw cadence (~30 fps) while the Screen panel is open.
 pub const FRAME: Duration = Duration::from_millis(33);
 
+#[derive(Debug)]
 pub struct App {
     pub model: Model,
     pub worker: Worker,

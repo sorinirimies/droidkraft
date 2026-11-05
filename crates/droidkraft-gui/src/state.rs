@@ -17,7 +17,7 @@ use droidkraft_core::features::rom::{
 use droidkraft_core::{
     AdbDeviceEntry, DeviceDetails, DeviceHistory, LogEntry, LogcatFilter, LogcatStream,
 };
-use droidkraft_mirror::{default_output_dir, RecordOptions, ScreenRecorder, ScreenStream};
+use droidkraft_mirror::{RecordOptions, ScreenRecorder, ScreenStream, default_output_dir};
 
 use crate::mirror_view::{DetachedRoot, MirrorView};
 
@@ -149,6 +149,7 @@ pub fn next_dir(cur: &std::path::Path, choices: &[PathBuf]) -> PathBuf {
 }
 
 /// Everything that belongs to ONE device.
+#[derive(Debug)]
 pub struct DeviceState {
     pub serial: String,
     /// adb state ("device", "unauthorized", "offline", …) or "disconnected".
@@ -323,7 +324,7 @@ fn rank(d: &DeviceState) -> u8 {
 }
 
 /// All known devices in stable first-seen order.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Fleet {
     seen: Vec<String>,
     devices: HashMap<String, DeviceState>,

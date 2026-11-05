@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use super::catalog::supported_roms;
 use super::lineage;
-use super::{graphene, ArtifactKind, BuildSource, RomBuild, RomOs};
+use super::{ArtifactKind, BuildSource, RomBuild, RomOs, graphene};
 
 /// Resolve downloadable builds for a single ROM + device codename.
 pub fn resolve_builds(os: RomOs, codename: &str) -> Result<Vec<RomBuild>, String> {
@@ -35,10 +35,10 @@ pub fn resolve_all(codename: &str) -> Vec<RomBuild> {
         }
     }
     for os in [RomOs::LineageOs, RomOs::GrapheneOs] {
-        if !seen_os.contains(&os) {
-            if let Ok(mut builds) = resolve_builds(os, codename) {
-                out.append(&mut builds);
-            }
+        if !seen_os.contains(&os)
+            && let Ok(mut builds) = resolve_builds(os, codename)
+        {
+            out.append(&mut builds);
         }
     }
     out
@@ -206,8 +206,10 @@ mod tests {
 
     #[test]
     fn resolve_builds_website_only_is_empty() {
-        assert!(resolve_builds(RomOs::PixelExperience, "sunfish")
-            .unwrap()
-            .is_empty());
+        assert!(
+            resolve_builds(RomOs::PixelExperience, "sunfish")
+                .unwrap()
+                .is_empty()
+        );
     }
 }

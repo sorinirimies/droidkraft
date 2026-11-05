@@ -150,10 +150,10 @@ fn run_query_mode(args: &[String]) -> color_eyre::Result<()> {
                         _ => continue,
                     }
                 }
-                if let Some(ref pat) = grep_lower {
-                    if !entry.message.to_lowercase().contains(pat) {
-                        continue;
-                    }
+                if let Some(ref pat) = grep_lower
+                    && !entry.message.to_lowercase().contains(pat)
+                {
+                    continue;
                 }
 
                 // Serialize and write
@@ -164,10 +164,10 @@ fn run_query_mode(args: &[String]) -> color_eyre::Result<()> {
 
                 count += 1;
 
-                if let Some(n) = last_n {
-                    if count >= n {
-                        break;
-                    }
+                if let Some(n) = last_n
+                    && count >= n
+                {
+                    break;
                 }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => continue,

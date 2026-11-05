@@ -214,9 +214,11 @@ mod tests {
     #[test]
     fn hints() {
         assert!(state_hint("device").is_none());
-        assert!(state_hint("unauthorized")
-            .unwrap()
-            .contains("USB debugging"));
+        assert!(
+            state_hint("unauthorized")
+                .unwrap()
+                .contains("USB debugging")
+        );
         assert!(state_hint("weird").is_some());
     }
 

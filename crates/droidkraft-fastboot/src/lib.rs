@@ -61,8 +61,8 @@ mod transport;
 mod types;
 mod usb;
 
-pub use factory::{flash_all, flash_factory_zip, FactoryOptions, FlashProgress};
-pub use types::{parse_variables, FastbootCommand, FastbootError, FastbootResult};
+pub use factory::{FactoryOptions, FlashProgress, flash_all, flash_factory_zip};
+pub use types::{FastbootCommand, FastbootError, FastbootResult, parse_variables};
 
 /// Which implementation executes commands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

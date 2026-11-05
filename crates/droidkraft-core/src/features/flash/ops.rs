@@ -23,14 +23,14 @@ impl AdbManager {
     /// (`magisk -V`), and a generic `su` binary (`which su`).
     pub fn detect_root(&mut self) -> AdbResult<RootStatus> {
         // 1. Is adbd already root?
-        if let Ok(id) = self.shell_command("id") {
-            if id.contains("uid=0(root)") {
-                return Ok(RootStatus {
-                    is_rooted: true,
-                    method: RootMethod::AdbdRoot,
-                    magisk_version: None,
-                });
-            }
+        if let Ok(id) = self.shell_command("id")
+            && id.contains("uid=0(root)")
+        {
+            return Ok(RootStatus {
+                is_rooted: true,
+                method: RootMethod::AdbdRoot,
+                magisk_version: None,
+            });
         }
 
         // 2. Magisk?
@@ -52,14 +52,14 @@ impl AdbManager {
         }
 
         // 3. Generic su binary?
-        if let Ok(which) = self.shell_command("which su") {
-            if which.trim().contains("/su") {
-                return Ok(RootStatus {
-                    is_rooted: true,
-                    method: RootMethod::SuBinary,
-                    magisk_version: None,
-                });
-            }
+        if let Ok(which) = self.shell_command("which su")
+            && which.trim().contains("/su")
+        {
+            return Ok(RootStatus {
+                is_rooted: true,
+                method: RootMethod::SuBinary,
+                magisk_version: None,
+            });
         }
 
         Ok(RootStatus::not_rooted())

@@ -1,9 +1,9 @@
 //! Left navigation rail: Devices home, one entry per device, Theme/Help (mouse clickable).
 
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use ratatui::Frame;
 use tui_nuances::Status;
 
 use crate::format::truncate;

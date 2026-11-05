@@ -3,12 +3,12 @@
 use std::sync::Arc;
 
 use gpui::prelude::*;
-use gpui::{px, size, Application, Bounds, TitlebarOptions, WindowBounds, WindowOptions};
+use gpui::{Application, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
 
+use droidkraft_gui::DroidGui;
 use droidkraft_gui::cli::{self, Cli};
 use droidkraft_gui::mirror_view::{self, Chrome, MirrorView, StandaloneRoot};
 use droidkraft_gui::screen::ScreenStream;
-use droidkraft_gui::DroidGui;
 
 fn main() {
     let parsed = match cli::parse(std::env::args().skip(1)) {

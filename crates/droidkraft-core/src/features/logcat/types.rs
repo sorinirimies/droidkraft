@@ -312,9 +312,9 @@ impl LogStats {
         if self.samples.len() > 30 {
             self.samples.pop_front();
         }
-        if self.samples.len() >= 2 {
-            let newest = *self.samples.back().unwrap();
-            let oldest = *self.samples.front().unwrap();
+        if self.samples.len() >= 2
+            && let (Some(&newest), Some(&oldest)) = (self.samples.back(), self.samples.front())
+        {
             let window = self.samples.len() as f64;
             self.lines_per_sec = (newest - oldest) as f64 / (window / 30.0);
         }
@@ -339,24 +339,22 @@ impl Default for LogStats {
 /// Pretty-print embedded JSON in a log message, if present.
 pub fn try_format_json(message: &str) -> Option<String> {
     let trimmed = message.trim();
-    if (trimmed.starts_with('{') && trimmed.ends_with('}'))
-        || (trimmed.starts_with('[') && trimmed.ends_with(']'))
+    if ((trimmed.starts_with('{') && trimmed.ends_with('}'))
+        || (trimmed.starts_with('[') && trimmed.ends_with(']')))
+        && let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed)
     {
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
-            return serde_json::to_string_pretty(&value).ok();
-        }
+        return serde_json::to_string_pretty(&value).ok();
     }
     for sep in [':', '='] {
         if let Some(pos) = trimmed.find(sep) {
             let after = trimmed[pos + 1..].trim();
-            if (after.starts_with('{') && after.ends_with('}'))
-                || (after.starts_with('[') && after.ends_with(']'))
+            if ((after.starts_with('{') && after.ends_with('}'))
+                || (after.starts_with('[') && after.ends_with(']')))
+                && let Ok(value) = serde_json::from_str::<serde_json::Value>(after)
             {
-                if let Ok(value) = serde_json::from_str::<serde_json::Value>(after) {
-                    let prefix = &trimmed[..pos + 1];
-                    if let Ok(formatted) = serde_json::to_string_pretty(&value) {
-                        return Some(format!("{} {}", prefix.trim(), formatted));
-                    }
+                let prefix = &trimmed[..pos + 1];
+                if let Ok(formatted) = serde_json::to_string_pretty(&value) {
+                    return Some(format!("{} {}", prefix.trim(), formatted));
                 }
             }
         }

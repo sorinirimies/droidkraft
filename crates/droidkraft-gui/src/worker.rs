@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender, TryRecvError};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, TryRecvError, channel};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -35,6 +35,7 @@ impl<T, E: std::fmt::Display> StringErr<T> for Result<T, E> {
 const LIST_INTERVAL: Duration = Duration::from_secs(2);
 /// A request from the UI to the worker. Every device-scoped request carries
 /// the serial it targets.
+#[derive(Debug)]
 pub enum WorkerRequest {
     /// Run a catalogue command, tagged with its button label.
     Run {
@@ -92,6 +93,7 @@ pub enum WorkerRequest {
 
 /// A response from the worker to the UI. Device-scoped responses carry the
 /// serial so the UI can route them to the right device state.
+#[derive(Debug)]
 pub enum WorkerResponse {
     /// Fresh `adb devices` snapshot.
     Devices(Vec<AdbDeviceEntry>),
@@ -138,6 +140,7 @@ pub enum WorkerResponse {
 }
 
 /// Handle to the background worker.
+#[derive(Debug)]
 pub struct Worker {
     req_tx: Sender<WorkerRequest>,
     res_rx: Receiver<WorkerResponse>,

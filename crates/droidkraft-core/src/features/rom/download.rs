@@ -139,11 +139,13 @@ mod tests {
             sha256_file(&path).unwrap(),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
-        assert!(verify_sha256(
-            &path,
-            "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"
-        )
-        .unwrap());
+        assert!(
+            verify_sha256(
+                &path,
+                "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"
+            )
+            .unwrap()
+        );
         assert!(!verify_sha256(&path, "deadbeef").unwrap());
         let _ = std::fs::remove_file(&path);
     }

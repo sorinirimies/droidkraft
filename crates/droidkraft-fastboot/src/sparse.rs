@@ -18,7 +18,7 @@ const CRC: u16 = 0xCAC4;
 
 /// A byte run inside a piece.
 #[derive(Debug, Clone)]
-pub enum Seg {
+pub(crate) enum Seg {
     Bytes(Vec<u8>),
     File { off: u64, len: u64 },
     Zeros(u64),
@@ -26,12 +26,12 @@ pub enum Seg {
 
 /// One download unit.
 #[derive(Debug, Clone)]
-pub struct Piece {
+pub(crate) struct Piece {
     pub segs: Vec<Seg>,
 }
 
 impl Piece {
-    pub fn len(&self) -> u64 {
+    pub(crate) fn len(&self) -> u64 {
         self.segs
             .iter()
             .map(|s| match s {
@@ -120,7 +120,7 @@ fn parse_sparse<R: Read + Seek>(r: &mut R) -> io::Result<(u64, u64, Vec<Chunk>)>
 }
 
 /// Size of the image once expanded onto the partition.
-pub fn expanded_size<R: Read + Seek>(r: &mut R) -> io::Result<u64> {
+pub(crate) fn expanded_size<R: Read + Seek>(r: &mut R) -> io::Result<u64> {
     if is_sparse(r)? {
         let (blk, total, _) = parse_sparse(r)?;
         Ok(blk * total)
@@ -130,7 +130,7 @@ pub fn expanded_size<R: Read + Seek>(r: &mut R) -> io::Result<u64> {
 }
 
 /// Plan the downloads for an image. Images that already fit are sent as-is.
-pub fn plan<R: Read + Seek>(r: &mut R, max: Option<u64>) -> io::Result<Vec<Piece>> {
+pub(crate) fn plan<R: Read + Seek>(r: &mut R, max: Option<u64>) -> io::Result<Vec<Piece>> {
     let len = r.seek(SeekFrom::End(0))?;
     if max.is_none_or(|m| len <= m) {
         return Ok(vec![Piece {
@@ -280,7 +280,7 @@ fn pack(items: &[Chunk], blk: u64, total: u64, limit: u64) -> io::Result<Vec<Pie
 }
 
 /// Stream a piece to `sink` in buffers of exactly `chunk` bytes (last one shorter).
-pub fn stream<R: Read + Seek>(
+pub(crate) fn stream<R: Read + Seek>(
     piece: &Piece,
     r: &mut R,
     chunk: usize,

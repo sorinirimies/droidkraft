@@ -1,9 +1,9 @@
 //! Framework-free catalogue of one-click device commands (mirrors the GUI's
 //! `commands.rs`), plus the sectioned layout used by the Commands panel.
 
+use droidkraft_core::AdbCommand;
 use droidkraft_core::features::flash::RebootTarget;
 use droidkraft_core::features::packages::PackageFilter;
-use droidkraft_core::AdbCommand;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Category {
@@ -119,9 +119,11 @@ mod tests {
 
     #[test]
     fn power_is_destructive() {
-        assert!(catalog()
-            .iter()
-            .filter(|c| c.category == Category::Power)
-            .all(|c| c.destructive));
+        assert!(
+            catalog()
+                .iter()
+                .filter(|c| c.category == Category::Power)
+                .all(|c| c.destructive)
+        );
     }
 }

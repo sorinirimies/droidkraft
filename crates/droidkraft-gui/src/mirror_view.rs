@@ -9,17 +9,17 @@
 use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use gpui::{
-    actions, canvas, div, img, prelude::*, px, rgb, AnyElement, App, Bounds, ClickEvent, Context,
-    EventEmitter, FocusHandle, KeyBinding, KeyDownEvent, MouseButton, MouseDownEvent,
-    MouseMoveEvent, MouseUpEvent, ObjectFit, Pixels, Point, RenderImage, ScrollDelta,
-    ScrollWheelEvent, Window,
+    AnyElement, App, Bounds, ClickEvent, Context, EventEmitter, FocusHandle, KeyBinding,
+    KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ObjectFit, Pixels,
+    Point, RenderImage, ScrollDelta, ScrollWheelEvent, Window, actions, canvas, div, img,
+    prelude::*, px, rgb,
 };
 
-use crate::screen::{layout, map_to_device, oriented_device, ScreenStream, Zoom};
+use crate::screen::{ScreenStream, Zoom, layout, map_to_device, oriented_device};
 use crate::theme;
 
 actions!(
@@ -114,6 +114,7 @@ impl EventEmitter<MirrorEvent> for MirrorView {}
 
 type ViewRect = ((f32, f32), (f32, f32, f32, f32));
 
+#[derive(Debug)]
 pub struct MirrorView {
     stream: Arc<ScreenStream>,
     serial: Option<String>,
@@ -282,10 +283,9 @@ impl MirrorView {
             && !self.user_stopped
             && !self.stream.is_running()
             && self.stream.state().error.is_none()
+            && let Some(serial) = self.serial.clone()
         {
-            if let Some(serial) = self.serial.clone() {
-                self.stream.start(serial);
-            }
+            self.stream.start(serial);
         }
     }
 
@@ -879,6 +879,7 @@ fn to_render_image(rgba: &image::RgbaImage) -> Arc<RenderImage> {
 
 /// Root view of the detached mirror window: hosts the shared [`MirrorView`]
 /// plus a capture bar (record / stop / screenshot).
+#[derive(Debug)]
 pub struct DetachedRoot {
     mirror: gpui::Entity<MirrorView>,
     app: gpui::WeakEntity<crate::app::DroidGui>,
@@ -1007,6 +1008,7 @@ impl gpui::Render for DetachedRoot {
 
 /// Root view of the standalone `--mirror` window: mirror + capture bar
 /// (record / stop / screenshot) with its own recorder.
+#[derive(Debug)]
 pub struct StandaloneRoot {
     mirror: gpui::Entity<MirrorView>,
     recorder: droidkraft_mirror::ScreenRecorder,
@@ -1054,7 +1056,7 @@ impl StandaloneRoot {
                 Ok(p) => format!("Saved {}", p.display()),
                 Err(e) => format!("Screenshot failed: {e}"),
             };
-            *slot.lock().unwrap() = Some(msg);
+            *slot.lock().unwrap_or_else(PoisonError::into_inner) = Some(msg);
         });
     }
 }
@@ -1062,7 +1064,12 @@ impl StandaloneRoot {
 impl gpui::Render for StandaloneRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         use droidkraft_mirror::RecordStatus;
-        if let Some(m) = self.shot.lock().unwrap().take() {
+        if let Some(m) = self
+            .shot
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
+        {
             self.note = Some(m);
         }
         let status = self.recorder.status();

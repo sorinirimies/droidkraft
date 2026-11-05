@@ -3,6 +3,7 @@
 use ratatui::style::{Color, Modifier, Style};
 use tui_nuances::{Status, Theme, ThemeSwitcher};
 
+#[derive(Debug)]
 pub struct Themes {
     sw: ThemeSwitcher,
 }

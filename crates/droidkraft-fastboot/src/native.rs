@@ -9,7 +9,7 @@ use crate::types::{FastbootCommand, FastbootError, FastbootResult};
 use crate::usb::Usb;
 
 /// Why the native backend did not (fully) handle a command.
-pub enum Outcome {
+pub(crate) enum Outcome {
     /// Nothing was sent to the device; safe to retry with another backend.
     Fallback(FastbootError),
     /// The command ran (or was attempted); report this result as final.
@@ -43,7 +43,7 @@ fn read_reply(usb: &mut dyn Transport, info: &mut Vec<String>) -> Result<Reply, 
                 return Err(format!(
                     "unknown response {:?}",
                     String::from_utf8_lossy(&pkt)
-                ))
+                ));
             }
         }
     }
@@ -154,7 +154,7 @@ pub(crate) fn run_reboot(usb: &mut dyn Transport, cmd: &str) -> FastbootResult<S
 }
 
 /// Execute `command` natively (USB or TCP).
-pub fn execute(command: &FastbootCommand, serial: Option<&str>) -> Outcome {
+pub(crate) fn execute(command: &FastbootCommand, serial: Option<&str>) -> Outcome {
     match open(serial) {
         Ok(mut t) => execute_on(&mut *t, command),
         Err(e) => Outcome::Fallback(e),
@@ -162,7 +162,7 @@ pub fn execute(command: &FastbootCommand, serial: Option<&str>) -> Outcome {
 }
 
 /// Execute `command` over any transport (USB, TCP, or a test double).
-pub fn execute_on(usb: &mut dyn Transport, command: &FastbootCommand) -> Outcome {
+pub(crate) fn execute_on(usb: &mut dyn Transport, command: &FastbootCommand) -> Outcome {
     let result = match command {
         FastbootCommand::OemUnlock => run(usb, "flashing unlock"),
         FastbootCommand::OemLock => run(usb, "flashing lock"),

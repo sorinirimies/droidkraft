@@ -2,6 +2,7 @@
 name = "droidkraft-fastboot"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -15,3 +16,6 @@ readme = "README.md"
 nusb = "0.1"
 pollster = "0.4"
 zip = { workspace = true }
+
+[lints]
+workspace = true

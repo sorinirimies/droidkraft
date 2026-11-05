@@ -1,9 +1,9 @@
 //! Shared UI helpers: hit-testing, modals, file-explorer overlay, scrolling.
 
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap};
-use ratatui::Frame;
 use tui_file_explorer::{FileExplorer, SelectionMode};
 use tui_spinner::FluxSpinner;
 

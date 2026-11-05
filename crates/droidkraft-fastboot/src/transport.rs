@@ -1,6 +1,6 @@
 //! Byte-level fastboot transport (USB, TCP, or a test double).
 
-pub trait Transport {
+pub(crate) trait Transport {
     /// Send raw bytes (a command or a download chunk).
     fn send(&mut self, data: &[u8]) -> Result<(), String>;
     /// Receive one response packet.

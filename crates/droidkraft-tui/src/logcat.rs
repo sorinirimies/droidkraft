@@ -13,8 +13,8 @@ use std::io::Write;
 // Re-export the shared domain types so existing `crate::logcat::…` paths keep
 // working across the TUI.
 pub use droidkraft_core::features::logcat::{
-    try_format_json, wrap_entry_message, ChannelWriter, FilterField, LogEntry, LogLevel, LogStats,
-    LogcatFilter, SaveFormat,
+    ChannelWriter, FilterField, LogEntry, LogLevel, LogStats, LogcatFilter, SaveFormat,
+    try_format_json, wrap_entry_message,
 };
 use droidkraft_core::features::logcat::{DrainStatus, LogcatStream};
 use droidkraft_core::utils::copy_to_clipboard;
@@ -493,10 +493,10 @@ impl LogcatState {
 
     /// Toggle a bookmark on the currently selected line.
     pub fn toggle_bookmark(&mut self) {
-        if let Some(&entry_idx) = self.filtered_indices.get(self.selected_line) {
-            if !self.bookmarks.remove(&entry_idx) {
-                self.bookmarks.insert(entry_idx);
-            }
+        if let Some(&entry_idx) = self.filtered_indices.get(self.selected_line)
+            && !self.bookmarks.remove(&entry_idx)
+        {
+            self.bookmarks.insert(entry_idx);
         }
     }
 
@@ -541,16 +541,15 @@ impl LogcatState {
                 .or_else(|| self.bookmarks.iter().next_back().copied())
         };
 
-        if let Some(entry_idx) = target {
-            if let Some(pos) = self.filtered_indices.iter().position(|&i| i == entry_idx) {
-                self.selected_line = pos;
-                self.auto_scroll = false;
-                if self.selected_line < self.scroll_position
-                    || self.selected_line >= self.scroll_position + self.viewport_height
-                {
-                    self.scroll_position =
-                        self.selected_line.saturating_sub(self.viewport_height / 2);
-                }
+        if let Some(entry_idx) = target
+            && let Some(pos) = self.filtered_indices.iter().position(|&i| i == entry_idx)
+        {
+            self.selected_line = pos;
+            self.auto_scroll = false;
+            if self.selected_line < self.scroll_position
+                || self.selected_line >= self.scroll_position + self.viewport_height
+            {
+                self.scroll_position = self.selected_line.saturating_sub(self.viewport_height / 2);
             }
         }
     }

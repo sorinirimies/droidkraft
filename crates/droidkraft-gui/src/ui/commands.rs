@@ -1,9 +1,9 @@
 //! Commands tab: one-click catalogue + this device's last output.
 
-use gpui::{div, prelude::*, rgb, AnyElement, Context};
+use gpui::{AnyElement, Context, div, prelude::*, rgb};
 
 use crate::app::DroidGui;
-use crate::commands::{by_category, CommandCategory};
+use crate::commands::{CommandCategory, by_category};
 use crate::fmt::truncate;
 use crate::state::DeviceState;
 use crate::theme;
@@ -43,7 +43,7 @@ impl DroidGui {
 }
 
 /// This device's last command / fastboot output.
-pub fn render_output(d: &DeviceState) -> AnyElement {
+pub(super) fn render_output(d: &DeviceState) -> AnyElement {
     let content: AnyElement = match (&d.busy_label, &d.last_output) {
         (Some(label), _) => div()
             .text_sm()

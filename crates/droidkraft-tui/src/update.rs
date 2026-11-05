@@ -57,12 +57,13 @@ fn on_key(m: &mut Model, k: KeyEvent) -> Vec<Cmd> {
         return vec![];
     }
     // Alt+o/l/c/f/s always switches tab (plain letters belong to the panels).
-    if k.modifiers.contains(KeyModifiers::ALT) && m.active.is_some() && !m.screen.capture {
-        if let KeyCode::Char(c) = k.code {
-            if let Some(p) = Panel::from_key(c) {
-                return m.set_tab(p);
-            }
-        }
+    if k.modifiers.contains(KeyModifiers::ALT)
+        && m.active.is_some()
+        && !m.screen.capture
+        && let KeyCode::Char(c) = k.code
+        && let Some(p) = Panel::from_key(c)
+    {
+        return m.set_tab(p);
     }
     // Panels get first refusal so text inputs can consume plain characters.
     if m.active.is_some() {

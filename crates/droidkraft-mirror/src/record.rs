@@ -4,7 +4,7 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use adb_client::ADBDeviceExt;
@@ -45,6 +45,7 @@ pub enum RecordStatus {
     Failed(String),
 }
 
+#[derive(Debug)]
 struct Inner {
     status: Mutex<RecordStatus>,
     stop: AtomicBool,
@@ -53,7 +54,7 @@ struct Inner {
 }
 
 /// Cheap-to-share recorder handle.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ScreenRecorder {
     inner: Arc<Inner>,
 }
@@ -76,7 +77,11 @@ impl ScreenRecorder {
     }
 
     pub fn status(&self) -> RecordStatus {
-        self.inner.status.lock().unwrap().clone()
+        self.inner
+            .status
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     pub fn is_recording(&self) -> bool {
@@ -101,7 +106,11 @@ impl ScreenRecorder {
         opts: RecordOptions,
     ) -> Result<(), String> {
         {
-            let mut st = self.inner.status.lock().unwrap();
+            let mut st = self
+                .inner
+                .status
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if matches!(
                 *st,
                 RecordStatus::Recording { .. } | RecordStatus::Finishing
@@ -125,8 +134,8 @@ impl ScreenRecorder {
         );
         std::thread::spawn(move || {
             let res = run(&inner, &serial, &out_dir, &base, &opts);
-            *inner.tag.lock().unwrap() = None;
-            *inner.status.lock().unwrap() = match res {
+            *inner.tag.lock().unwrap_or_else(PoisonError::into_inner) = None;
+            *inner.status.lock().unwrap_or_else(PoisonError::into_inner) = match res {
                 Ok(files) => RecordStatus::Done { files },
                 Err(e) => RecordStatus::Failed(e),
             };
@@ -138,14 +147,24 @@ impl ScreenRecorder {
     /// moves to `Done`.
     pub fn stop(&self) {
         self.inner.stop.store(true, Ordering::SeqCst);
-        let mut st = self.inner.status.lock().unwrap();
+        let mut st = self
+            .inner
+            .status
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         if matches!(*st, RecordStatus::Recording { .. }) {
             *st = RecordStatus::Finishing;
         }
         drop(st);
         // Interrupt in the background; the tag may not be set yet (worker
         // checks the stop flag right after launching, see `run`).
-        if let Some((serial, tag)) = self.inner.tag.lock().unwrap().clone() {
+        if let Some((serial, tag)) = self
+            .inner
+            .tag
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+        {
             std::thread::spawn(move || {
                 let _ = shell_bytes(&serial, &kill_cmd(&tag));
             });
@@ -170,13 +189,12 @@ fn run(
         .unwrap_or(0);
     let tag = format!("{ts}");
     let mut size_arg = String::new();
-    if let Some(h) = opts.max_height {
-        if let Some((w0, h0)) = device_size(serial) {
-            if h0 > h {
-                let w = (u64::from(w0) * u64::from(h) / u64::from(h0)) as u32 & !1;
-                size_arg = format!(" --size {w}x{}", h & !1);
-            }
-        }
+    if let Some(h) = opts.max_height
+        && let Some((w0, h0)) = device_size(serial)
+        && h0 > h
+    {
+        let w = (u64::from(w0) * u64::from(h) / u64::from(h0)) as u32 & !1;
+        size_arg = format!(" --size {w}x{}", h & !1);
     }
     let prev_touches = if opts.show_touches {
         let prev = shell_bytes(serial, "settings get system show_touches")
@@ -218,7 +236,8 @@ fn segments(
         n += 1;
         let seg_tag = format!("{tag}_{n}");
         let remote = format!("/sdcard/.dk_rec_{seg_tag}.mp4");
-        *inner.tag.lock().unwrap() = Some((serial.to_string(), seg_tag.clone()));
+        *inner.tag.lock().unwrap_or_else(PoisonError::into_inner) =
+            Some((serial.to_string(), seg_tag.clone()));
         let cmd = format!(
             "screenrecord --bit-rate {}{size_arg} --time-limit {seg_secs} {remote}",
             u64::from(opts.bit_rate_mbps.max(1)) * 1_000_000
@@ -273,7 +292,7 @@ fn segments(
             }
         }
         {
-            let mut st = inner.status.lock().unwrap();
+            let mut st = inner.status.lock().unwrap_or_else(PoisonError::into_inner);
             if let RecordStatus::Recording {
                 segments_done,
                 bytes_pulled,
@@ -284,10 +303,10 @@ fn segments(
                 *bytes_pulled = bytes_total;
             }
         }
-        if let Err(e) = r {
-            if !inner.stop.load(Ordering::SeqCst) {
-                return Err(format!("screenrecord failed: {e}"));
-            }
+        if let Err(e) = r
+            && !inner.stop.load(Ordering::SeqCst)
+        {
+            return Err(format!("screenrecord failed: {e}"));
         }
     }
     if files.len() == 1 {
@@ -332,11 +351,7 @@ pub fn default_output_dir() -> PathBuf {
                 "Videos"
             };
             let d = h.join(sub);
-            if d.is_dir() {
-                d
-            } else {
-                h
-            }
+            if d.is_dir() { d } else { h }
         }
         None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
     }

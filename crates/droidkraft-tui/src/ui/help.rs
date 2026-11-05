@@ -1,8 +1,8 @@
 //! `?` overlay.
 
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Flex, Layout, Rect};
 use ratatui::widgets::{Clear, Paragraph};
-use ratatui::Frame;
 
 use crate::model::Model;
 

@@ -1,14 +1,15 @@
 //! Bottom status bar: key hints (wrapped / trimmed to fit) + last message.
 
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use ratatui::Frame;
 
 use super::layout::{footer_lines, footer_max_lines, split_hints, truncate_to};
 use crate::model::Model;
 
 /// What the footer will show for a terminal of `width`x`height`.
+#[derive(Debug)]
 pub struct Plan {
     pub hints: Vec<String>,
     pub message: Option<String>,

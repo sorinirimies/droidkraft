@@ -7,10 +7,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent,
 use droidkraft_core::features::flash::RootStatus;
 use droidkraft_core::features::rom::StepStatus;
 use droidkraft_fastboot::FastbootCommand;
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Gauge, Paragraph};
-use ratatui::Frame;
 use tui_file_explorer::{ExplorerOutcome, FileExplorer, SelectionMode};
 
 use super::common::{draw_explorer, draw_modal, hit, new_explorer, scroll_by, spinner};
@@ -85,6 +85,7 @@ pub enum Pending {
     RomStep,
 }
 
+#[derive(Debug)]
 pub struct Confirm {
     pub pending: Pending,
     pub text: String,
@@ -104,7 +105,7 @@ enum Hit {
     Build(usize),
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct FlashUi {
     pub tab: Tab,
     pub sel: usize,
@@ -657,7 +658,7 @@ pub fn on_key(m: &mut Model, k: KeyEvent) -> (Vec<Cmd>, bool) {
         match k.code {
             KeyCode::Char('Y') if c.typed.is_empty() => return confirm_accept(m),
             KeyCode::Enter if c.typed.trim().eq_ignore_ascii_case("yes") => {
-                return confirm_accept(m)
+                return confirm_accept(m);
             }
             KeyCode::Char('n') | KeyCode::Char('N') if c.typed.is_empty() => m.flash.confirm = None,
             KeyCode::Esc => m.flash.confirm = None,
@@ -728,7 +729,7 @@ fn fb_key(m: &mut Model, k: KeyEvent) -> (Vec<Cmd>, bool) {
             return (
                 vec![Cmd::Worker(Req::FastbootDevices { serial: m.serial() })],
                 true,
-            )
+            );
         }
         KeyCode::PageUp => {
             let n = i32::from(m.flash.log_rect.height.max(2)) - 1;
@@ -802,11 +803,7 @@ pub fn on_mouse(m: &mut Model, e: MouseEvent) -> Vec<Cmd> {
                 scroll_by(&mut m.flash.log_scroll, if up { 3 } else { -3 }, usize::MAX);
             } else if m.flash.tab == Tab::Rom {
                 if let Some(r) = m.flash.rom.as_mut() {
-                    if up {
-                        r.select_up()
-                    } else {
-                        r.select_down()
-                    }
+                    if up { r.select_up() } else { r.select_down() }
                 }
             } else {
                 let n = ACTIONS.len();

@@ -1845,13 +1845,10 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 name = "droidkraft"
 version = "2.2.2"
 dependencies = [
- "adb_client",
  "droidkraft-core",
  "droidkraft-mirror",
  "gpui",
  "image",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -1895,12 +1892,9 @@ dependencies = [
  "droidkraft-core",
  "droidkraft-fastboot",
  "droidkraft-mirror",
- "futures",
  "image",
  "ratatui",
  "ratatui-image",
- "regex",
- "serde",
  "serde_json",
  "tokio",
  "tui-chart",
@@ -1908,7 +1902,6 @@ dependencies = [
  "tui-file-explorer",
  "tui-nuances",
  "tui-piechart",
- "tui-slider",
  "tui-spinner",
  "unicode-width",
 ]
@@ -7232,17 +7225,6 @@ checksum = "a3b3d9dfaa69b001a51f98e35af00ad98ebe1a5d8ac4e2e98631704f61ac0536"
 dependencies = [
  "ratatui",
  "tui-nuances",
-]
-
-[[package]]
-name = "tui-slider"
-version = "0.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c774d1c55e55b681c778b20e52c1ec4c4832d61f51c87e26b851132669cc255f"
-dependencies = [
- "ratatui",
- "tui-nuances",
- "unicode-width",
 ]
 
 [[package]]

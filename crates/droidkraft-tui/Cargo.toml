@@ -2,6 +2,7 @@
 name = "droidkraft-tui"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -31,16 +32,12 @@ ratatui           = { workspace = true }
 ratatui-image     = { workspace = true }
 tokio             = { workspace = true }
 color-eyre        = { workspace = true }
-futures           = { workspace = true }
 tui-file-explorer = { workspace = true }
 tui-nuances       = { workspace = true }
 tui-chart         = { workspace = true }
 tui-piechart      = { workspace = true }
 tui-spinner       = { workspace = true }
-tui-slider        = { workspace = true }
 tui-checkbox      = { workspace = true }
-regex             = { workspace = true }
-serde             = { workspace = true }
 serde_json        = { workspace = true }
 adb_client        = { workspace = true }
 image             = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
@@ -78,3 +75,6 @@ assets = [
     { source = "packaging/linux/droidkraft-tui.desktop", dest = "/usr/share/applications/droidkraft-tui.desktop", mode = "644" },
     { source = "assets/icons/droidkraft.png", dest = "/usr/share/icons/hicolor/256x256/apps/droidkraft.png", mode = "644" },
 ]
+
+[lints]
+workspace = true

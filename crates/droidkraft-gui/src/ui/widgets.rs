@@ -1,7 +1,7 @@
 //! Small reusable gpui building blocks: buttons, cards, gauges, sparklines.
 
 use gpui::{
-    div, prelude::*, px, relative, rgb, AnyElement, ClickEvent, Context, Div, ElementId, Hsla,
+    AnyElement, ClickEvent, Context, Div, ElementId, Hsla, div, prelude::*, px, relative, rgb,
 };
 
 use crate::fmt::{spark_heights, tail};

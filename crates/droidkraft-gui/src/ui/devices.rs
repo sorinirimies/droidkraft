@@ -1,6 +1,6 @@
 //! Devices home: fleet summary + one rich card per device.
 
-use gpui::{div, prelude::*, px, rgb, AnyElement, ClickEvent, Context};
+use gpui::{AnyElement, ClickEvent, Context, div, prelude::*, px, rgb};
 
 use crate::app::DroidGui;
 use crate::fmt::{

@@ -14,8 +14,8 @@ pub mod types;
 pub use catalog::{catalog, roms_for_device, supported_roms};
 pub use download::{download_and_verify, download_to, sha256_file, sha256_hex, verify_sha256};
 pub use flash::{
-    build_plan, preflight, run_flash_step, FlashOptions, FlashPlan, FlashSession, FlashStep,
-    StepStatus,
+    FlashOptions, FlashPlan, FlashSession, FlashStep, StepStatus, build_plan, preflight,
+    run_flash_step,
 };
 pub use resolve::{resolve_all, resolve_builds};
 pub use types::{

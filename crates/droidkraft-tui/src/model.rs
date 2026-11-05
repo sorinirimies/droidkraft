@@ -116,7 +116,7 @@ impl CardBtn {
 }
 
 /// UI state of the four device-scoped panels.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct PanelState {
     pub logs: crate::ui::logs::LogsUi,
     pub cmds: crate::ui::commands::CmdUi,
@@ -125,6 +125,7 @@ pub struct PanelState {
 }
 
 /// Everything the TUI knows about one device.
+#[derive(Debug)]
 pub struct DeviceWorkspace {
     pub serial: String,
     /// adb state (`device`, `unauthorized`, `offline`, …) or `disconnected`.
@@ -169,11 +170,7 @@ impl DeviceWorkspace {
         self.serial.contains(':') || self.serial.contains("._adb-tls-connect")
     }
     pub fn connection(&self) -> &'static str {
-        if self.is_wifi() {
-            "Wi-Fi"
-        } else {
-            "USB"
-        }
+        if self.is_wifi() { "Wi-Fi" } else { "USB" }
     }
 }
 
@@ -189,6 +186,7 @@ pub fn state_hint(state: &str) -> &'static str {
     }
 }
 
+#[derive(Debug)]
 pub struct Model {
     /// Open tab inside a workspace.
     pub panel: Panel,

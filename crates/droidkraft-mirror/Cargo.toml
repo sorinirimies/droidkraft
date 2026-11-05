@@ -2,6 +2,7 @@
 name = "droidkraft-mirror"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -11,3 +12,6 @@ description = "Frontend-neutral low-latency Android screen mirroring + input (sc
 [dependencies]
 adb_client = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+
+[lints]
+workspace = true

@@ -104,12 +104,12 @@ pub fn paint(buf: &mut Buffer, at: Rect, s: &Scaled) {
         for cx in 0..w {
             let top = s.px.get((cy as usize * 2) * s.w as usize + cx as usize);
             let bot = s.px.get((cy as usize * 2 + 1) * s.w as usize + cx as usize);
-            if let (Some(t), Some(b)) = (top, bot) {
-                if let Some(cell) = buf.cell_mut((at.x + cx, at.y + cy)) {
-                    cell.set_char('▀')
-                        .set_fg(Color::Rgb(t[0], t[1], t[2]))
-                        .set_bg(Color::Rgb(b[0], b[1], b[2]));
-                }
+            if let (Some(t), Some(b)) = (top, bot)
+                && let Some(cell) = buf.cell_mut((at.x + cx, at.y + cy))
+            {
+                cell.set_char('▀')
+                    .set_fg(Color::Rgb(t[0], t[1], t[2]))
+                    .set_bg(Color::Rgb(b[0], b[1], b[2]));
             }
         }
     }

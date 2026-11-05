@@ -2,6 +2,7 @@
 name = "droidkraft-core"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -20,3 +21,6 @@ serde_json = { workspace = true }
 ureq       = { workspace = true }
 sha2       = { workspace = true }
 zip        = { workspace = true }
+
+[lints]
+workspace = true

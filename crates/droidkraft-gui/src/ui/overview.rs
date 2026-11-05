@@ -1,6 +1,6 @@
 //! Per-device statistics dashboard (workspace Overview tab).
 
-use gpui::{div, prelude::*, rgb, AnyElement};
+use gpui::{AnyElement, div, prelude::*, rgb};
 
 use droidkraft_core::{BatteryStatus, PlugType};
 
@@ -15,7 +15,7 @@ fn opt<T: std::fmt::Display>(v: Option<T>, suffix: &str) -> String {
         .unwrap_or_else(|| "—".into())
 }
 
-pub fn overview(d: &DeviceState, lay: &Layout) -> AnyElement {
+pub(super) fn overview(d: &DeviceState, lay: &Layout) -> AnyElement {
     let Some(det) = d.details.as_ref().filter(|x| x.online) else {
         let msg = if d.connected {
             "Collecting device details…"

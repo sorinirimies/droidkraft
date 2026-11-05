@@ -44,17 +44,17 @@ pub mod features;
 pub mod utils;
 
 // ── Convenience re-exports ─────────────────────────────────────────────────
-pub use client::{AdbManager, ADB_PORT};
-pub use color::{hash_tag, level_text_color, tag_color, Rgb, TAG_PALETTE};
+pub use client::{ADB_PORT, AdbManager};
+pub use color::{Rgb, TAG_PALETTE, hash_tag, level_text_color, tag_color};
 pub use error::{AdbError, AdbResult};
 pub use utils::connection_kind;
 
-pub use features::device::{
-    collect_device_details, collect_device_details_with, list_all_details, BatteryInfo,
-    BatteryStatus, CpuInfo, CpuSample, DetailsCollector, DeviceDetails, DeviceHistory, DisplayInfo,
-    MemoryInfo, NetworkInfo, PlugType, RefreshRate, Ring, StorageInfo, SystemInfo, ThermalInfo,
-};
 pub use features::device::{AdbDeviceEntry, DeviceInfo, DeviceStatus};
+pub use features::device::{
+    BatteryInfo, BatteryStatus, CpuInfo, CpuSample, DetailsCollector, DeviceDetails, DeviceHistory,
+    DisplayInfo, MemoryInfo, NetworkInfo, PlugType, RefreshRate, Ring, StorageInfo, SystemInfo,
+    ThermalInfo, collect_device_details, collect_device_details_with, list_all_details,
+};
 pub use features::fastboot::{FastbootCommand, FastbootError, FastbootManager, FastbootResult};
 pub use features::flash::{RebootTarget, RootMethod, RootStatus};
 pub use features::logcat::{

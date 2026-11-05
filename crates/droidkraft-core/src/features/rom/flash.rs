@@ -575,10 +575,11 @@ mod tests {
         assert_eq!(plan.steps[0], FlashStep::RebootToBootloader);
         assert_eq!(plan.steps[1], FlashStep::UnlockBootloader);
         assert!(plan.steps.contains(&FlashStep::WipeData));
-        assert!(plan
-            .steps
-            .iter()
-            .any(|s| matches!(s, FlashStep::FlashRecovery { .. })));
+        assert!(
+            plan.steps
+                .iter()
+                .any(|s| matches!(s, FlashStep::FlashRecovery { .. }))
+        );
         assert_eq!(*plan.steps.last().unwrap(), FlashStep::RebootToSystem);
     }
 
@@ -586,10 +587,12 @@ mod tests {
     fn destructive_steps_require_confirmation() {
         assert!(FlashStep::UnlockBootloader.requires_confirmation());
         assert!(FlashStep::WipeData.requires_confirmation());
-        assert!(FlashStep::Sideload {
-            zip: PathBuf::from("x")
-        }
-        .requires_confirmation());
+        assert!(
+            FlashStep::Sideload {
+                zip: PathBuf::from("x")
+            }
+            .requires_confirmation()
+        );
         assert!(!FlashStep::RebootToSystem.requires_confirmation());
     }
 
@@ -616,16 +619,19 @@ mod tests {
         let plan = build_plan(&o);
         assert_eq!(plan.steps[0], FlashStep::RebootToBootloader);
         assert_eq!(plan.steps[1], FlashStep::UnlockBootloader);
-        assert!(plan
-            .steps
-            .iter()
-            .any(|s| matches!(s, FlashStep::FactoryFlash { .. })));
+        assert!(
+            plan.steps
+                .iter()
+                .any(|s| matches!(s, FlashStep::FactoryFlash { .. }))
+        );
         assert_eq!(*plan.steps.last().unwrap(), FlashStep::LockBootloader);
         // No sideload/recovery steps in the factory flow.
-        assert!(!plan
-            .steps
-            .iter()
-            .any(|s| matches!(s, FlashStep::Sideload { .. })));
+        assert!(
+            !plan
+                .steps
+                .iter()
+                .any(|s| matches!(s, FlashStep::Sideload { .. }))
+        );
     }
 
     #[test]

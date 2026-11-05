@@ -15,7 +15,7 @@ fn fastboot_interface(info: &DeviceInfo) -> Option<u8> {
 }
 
 /// Serial numbers of all attached fastboot devices.
-pub fn list() -> Result<Vec<String>, String> {
+pub(crate) fn list() -> Result<Vec<String>, String> {
     let devs = nusb::list_devices().map_err(|e| e.to_string())?;
     Ok(devs
         .filter(|d| fastboot_interface(d).is_some())
@@ -23,7 +23,7 @@ pub fn list() -> Result<Vec<String>, String> {
         .collect())
 }
 
-pub struct Usb {
+pub(crate) struct Usb {
     iface: Interface,
     out_ep: u8,
     max_out: usize,
@@ -33,7 +33,7 @@ pub struct Usb {
 
 impl Usb {
     /// Open the first fastboot device (or the one matching `serial`).
-    pub fn open(serial: Option<&str>) -> Result<Self, String> {
+    pub(crate) fn open(serial: Option<&str>) -> Result<Self, String> {
         let mut devs = nusb::list_devices().map_err(|e| e.to_string())?;
         let info = devs
             .find(|d| {

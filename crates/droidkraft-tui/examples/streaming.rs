@@ -6,16 +6,16 @@
 //! Run with: cargo run --example streaming
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
+    event::{self, Event, KeyCode, KeyEventKind},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
-    Frame, Terminal,
 };
 use std::io::{self, stdout};
 
@@ -153,28 +153,28 @@ fn main() -> io::Result<()> {
     loop {
         terminal.draw(|frame| ui(frame, &app))?;
 
-        if let Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press {
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => {
-                        app.should_quit = true;
-                    }
-                    KeyCode::Char('h') | KeyCode::Char('?') => {
-                        app.toggle_help();
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        app.next();
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        app.previous();
-                    }
-                    KeyCode::Enter | KeyCode::Char(' ') => {
-                        let command = app.get_selected_option().command.clone();
-                        app.is_streaming = !app.is_streaming;
-                        eprintln!("Would execute: {}", command);
-                    }
-                    _ => {}
+        if let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            match key.code {
+                KeyCode::Char('q') | KeyCode::Esc => {
+                    app.should_quit = true;
                 }
+                KeyCode::Char('h') | KeyCode::Char('?') => {
+                    app.toggle_help();
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    app.next();
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    app.previous();
+                }
+                KeyCode::Enter | KeyCode::Char(' ') => {
+                    let command = app.get_selected_option().command.clone();
+                    app.is_streaming = !app.is_streaming;
+                    eprintln!("Would execute: {}", command);
+                }
+                _ => {}
             }
         }
 

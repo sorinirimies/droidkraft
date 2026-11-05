@@ -1,3 +1,4 @@
+// Tests set one filter field after `default()`, to show which field each case is about.
 #![allow(clippy::field_reassign_with_default)]
 //! Integration tests exercising the public `droidkraft_core` API surface.
 //!

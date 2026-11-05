@@ -1,7 +1,7 @@
 //! Generates `assets/icons/droidkraft.{png,ico,icns}`.
 //! Run from the repo root: `cargo run -p droidkraft-tui --example gen_icons`
 
-use image::{imageops::FilterType, ImageEncoder, Rgba, RgbaImage};
+use image::{ImageEncoder, Rgba, RgbaImage, imageops::FilterType};
 
 const BG: Rgba<u8> = Rgba([17, 20, 28, 255]);
 const GREEN: Rgba<u8> = Rgba([61, 220, 132, 255]);

@@ -1,10 +1,10 @@
 //! Devices home: fleet summary + one card per device with quick actions.
 
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Sparkline, Wrap};
-use ratatui::Frame;
 use tui_nuances::Status;
 use tui_spinner::FluxSpinner;
 
@@ -12,7 +12,7 @@ use super::common::hit;
 use super::overview::mini_gauge;
 use crate::format::{fmt_mib, truncate};
 use crate::message::Cmd;
-use crate::model::{state_hint, CardBtn, DeviceWorkspace, Model};
+use crate::model::{CardBtn, Model, state_hint};
 
 pub const CARD_H: u16 = 11;
 
@@ -194,7 +194,9 @@ fn card(f: &mut Frame, area: Rect, m: &mut Model, serial: &str, selected: bool) 
     if inner.height == 0 {
         return;
     }
-    let ws: &DeviceWorkspace = m.ws(serial).unwrap();
+    let Some(ws) = m.ws(serial) else {
+        return;
+    };
     let t = &m.themes;
     let st = super::nav::state_status(online, &ws.state);
     let head = Line::from(vec![

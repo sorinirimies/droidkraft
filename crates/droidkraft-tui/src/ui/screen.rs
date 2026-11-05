@@ -4,25 +4,24 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent,
 use std::path::PathBuf;
 
 use droidkraft_mirror::{
-    default_output_dir, oriented_device, timestamped_name, RecordOptions, RecordStatus,
-    ScreenRecorder, ScreenState, ScreenStream,
+    RecordOptions, RecordStatus, ScreenRecorder, ScreenState, ScreenStream, default_output_dir,
+    oriented_device, timestamped_name,
 };
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
-use ratatui::Frame;
 use tui_nuances::Status;
 
 use crate::format::{file_name, fmt_timer, truncate};
 use crate::gfx::{self, Gfx};
-use crate::halfblock::{self, cell_to_device_aspect, cell_to_device_clamped_aspect, ScaleCache};
+use crate::halfblock::{self, ScaleCache, cell_to_device_aspect, cell_to_device_clamped_aspect};
 use crate::message::Cmd;
 use crate::model::{Model, Panel};
 use crate::worker::Req;
 
-pub const HINTS: &str =
-    "R rec · S shot · s mirror · b/h/r keys · p power · +/- vol · B/H/T rec opts · O folder · ^G capture ·";
+pub const HINTS: &str = "R rec · S shot · s mirror · b/h/r keys · p power · +/- vol · B/H/T rec opts · O folder · ^G capture ·";
 
 pub const BITRATES: [u32; 4] = [4, 8, 12, 20];
 pub const HEIGHTS: [Option<u32>; 4] = [None, Some(1080), Some(720), Some(480)];
@@ -40,6 +39,7 @@ pub enum RecAction {
     Open(usize),
 }
 
+#[derive(Debug)]
 pub struct ScreenUi {
     pub stream: ScreenStream,
     /// Ctrl-G: forward typed keys to the device.

@@ -7,7 +7,7 @@
 //! every ~3 s, the focused one every ~1.5 s).
 
 use std::collections::HashMap;
-use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -21,6 +21,7 @@ use crate::commands::CmdAction;
 pub const LIST_INTERVAL: Duration = Duration::from_secs(2);
 
 /// Request from the UI to the worker. `serial` is the target workspace.
+#[derive(Debug)]
 pub enum Req {
     Run {
         serial: String,
@@ -71,6 +72,7 @@ pub struct ListedDevice {
 }
 
 /// Response from the worker to the UI.
+#[derive(Debug)]
 pub enum Res {
     Devices(Vec<ListedDevice>),
     Details(Box<DeviceDetails>),
@@ -108,6 +110,7 @@ pub enum Res {
 }
 
 /// Handle to the worker thread.
+#[derive(Debug)]
 pub struct Worker {
     tx: Sender<Req>,
     rx: Receiver<Res>,

@@ -16,14 +16,14 @@
 
 pub mod record;
 pub use record::{
-    default_output_dir, timestamped_name, RecordOptions, RecordStatus, ScreenRecorder,
+    RecordOptions, RecordStatus, ScreenRecorder, default_output_dir, timestamped_name,
 };
 
 use std::io::{self, Read, Write};
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::mpsc::{SyncSender, sync_channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -49,8 +49,19 @@ pub struct VideoFrame {
     pub seq: u64,
 }
 
+// By hand: the pixel buffer is megabytes of noise in a debug print.
+impl std::fmt::Debug for VideoFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VideoFrame")
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("seq", &self.seq)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Shared, cheaply-cloneable snapshot of the stream state read by the UI.
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ScreenState {
     pub frame: Option<VideoFrame>,
     pub frame_count: u64,
@@ -69,6 +80,7 @@ pub struct ScreenState {
 }
 
 /// A controllable background screen stream with input injection.
+#[derive(Debug)]
 pub struct ScreenStream {
     running: Arc<AtomicBool>,
     generation: Arc<AtomicU64>,
@@ -112,11 +124,11 @@ impl ScreenStream {
         if let Ok(mut s) = self.state.lock() {
             *s = ScreenState::default();
         }
-        let gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let run_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
         let ctx = Ctx {
             running: self.running.clone(),
             generation: self.generation.clone(),
-            gen,
+            run_gen,
             state: self.state.clone(),
             epoch: Instant::now(),
             last_video_ms: Arc::new(AtomicU64::new(0)),
@@ -143,10 +155,10 @@ impl ScreenStream {
     // ── Input ────────────────────────────────────────────────────────────
 
     fn send(&self, line: String) {
-        if let Ok(i) = self.input.lock() {
-            if let Some(tx) = i.as_ref() {
-                let _ = tx.try_send(line);
-            }
+        if let Ok(i) = self.input.lock()
+            && let Some(tx) = i.as_ref()
+        {
+            let _ = tx.try_send(line);
         }
     }
 
@@ -180,7 +192,7 @@ impl ScreenStream {
 struct Ctx {
     running: Arc<AtomicBool>,
     generation: Arc<AtomicU64>,
-    gen: u64,
+    run_gen: u64,
     state: Arc<Mutex<ScreenState>>,
     epoch: Instant,
     /// Millis since `epoch` of the last *video* frame.
@@ -191,7 +203,8 @@ struct Ctx {
 
 impl Ctx {
     fn alive(&self) -> bool {
-        self.running.load(Ordering::Relaxed) && self.generation.load(Ordering::Relaxed) == self.gen
+        self.running.load(Ordering::Relaxed)
+            && self.generation.load(Ordering::Relaxed) == self.run_gen
     }
 
     fn set_error(&self, msg: impl Into<String>) {
@@ -254,12 +267,11 @@ fn wm_size(serial: &str) -> Option<(u32, u32)> {
 pub fn parse_wm_size(s: &str) -> Option<(u32, u32)> {
     let mut found = None;
     for line in s.lines() {
-        if let Some((_, dims)) = line.split_once(':') {
-            if let Some((w, h)) = dims.trim().split_once('x') {
-                if let (Ok(w), Ok(h)) = (w.trim().parse(), h.trim().parse()) {
-                    found = Some((w, h));
-                }
-            }
+        if let Some((_, dims)) = line.split_once(':')
+            && let Some((w, h)) = dims.trim().split_once('x')
+            && let (Ok(w), Ok(h)) = (w.trim().parse(), h.trim().parse())
+        {
+            found = Some((w, h));
         }
     }
     found
@@ -360,19 +372,19 @@ fn still_loop(serial: &str, ctx: &Ctx) {
             done_seq = u64::MAX;
             continue;
         }
-        if let Some((img, w, h)) = decode_image(&out, ImageFormat::Png) {
-            if let Ok(mut s) = ctx.state.lock() {
-                s.frame_count += 1;
-                s.error = None;
-                s.is_still = true;
-                s.fps = 0.0;
-                s.frame = Some(VideoFrame {
-                    image: img,
-                    width: w,
-                    height: h,
-                    seq: s.frame_count,
-                });
-            }
+        if let Some((img, w, h)) = decode_image(&out, ImageFormat::Png)
+            && let Ok(mut s) = ctx.state.lock()
+        {
+            s.frame_count += 1;
+            s.error = None;
+            s.is_still = true;
+            s.fps = 0.0;
+            s.frame = Some(VideoFrame {
+                image: img,
+                width: w,
+                height: h,
+                seq: s.frame_count,
+            });
         }
     }
 }

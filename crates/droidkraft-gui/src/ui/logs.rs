@@ -1,6 +1,6 @@
 //! Logs tab: per-device logcat buffer + filters.
 
-use gpui::{div, prelude::*, px, rgb, AnyElement, ClickEvent, Context, KeyDownEvent};
+use gpui::{AnyElement, ClickEvent, Context, KeyDownEvent, div, prelude::*, px, rgb};
 
 use droidkraft_core::features::logcat::FilterField;
 use droidkraft_core::{LogEntry, LogcatFilter};

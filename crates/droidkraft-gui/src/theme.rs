@@ -1,7 +1,7 @@
 //! Colour palette for the GUI, expressed as gpui `Rgba` values.
 
 use droidkraft_core::LogLevel;
-use gpui::{rgb, Rgba};
+use gpui::{Rgba, rgb};
 
 pub const BG: u32 = 0x0f1117;
 pub const BG_PANEL: u32 = 0x161923;

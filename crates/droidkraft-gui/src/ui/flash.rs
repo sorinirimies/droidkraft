@@ -1,6 +1,6 @@
 //! Flash & Root tab: root tools, reboot targets, fastboot, custom-ROM flow.
 
-use gpui::{div, prelude::*, rgb, AnyElement, Context};
+use gpui::{AnyElement, Context, div, prelude::*, rgb};
 
 use droidkraft_core::features::fastboot::FastbootCommand;
 use droidkraft_core::features::flash::RebootTarget;

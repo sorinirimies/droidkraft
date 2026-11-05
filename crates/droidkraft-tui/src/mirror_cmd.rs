@@ -4,8 +4,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-pub const BUILD_HINT: &str =
-    "droidkraft GUI not found: build it with `cargo build -p droidkraft --release` or `cargo install --path crates/droidkraft-gui`";
+pub const BUILD_HINT: &str = "droidkraft GUI not found: build it with `cargo build -p droidkraft --release` or `cargo install --path crates/droidkraft-gui`";
 
 /// File name of the GUI binary for the current platform.
 pub fn gui_binary_name() -> &'static str {

@@ -1,6 +1,6 @@
 //! Device workspace: header strip, tab bar, and the active tab's body.
 
-use gpui::{div, prelude::*, rgb, AnyElement, ClickEvent, Context};
+use gpui::{AnyElement, ClickEvent, Context, div, prelude::*, rgb};
 
 use crate::app::DroidGui;
 use crate::fmt::{battery_color, connection_kind, nonempty, state_hint};

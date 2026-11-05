@@ -2,6 +2,7 @@
 name = "droidkraft"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -23,10 +24,7 @@ path = "src/lib.rs"
 [dependencies]
 droidkraft-core = { workspace = true }
 droidkraft-mirror = { workspace = true }
-adb_client = { workspace = true }
 gpui = "0.2.2"
-serde      = { workspace = true }
-serde_json = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 
 # ── Packaging metadata ────────────────────────────────────────────────────────
@@ -57,3 +55,6 @@ assets = [
 pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-{ target }{ archive-suffix }"
 bin-dir = "{ bin }{ binary-ext }"
 pkg-fmt = "tgz"
+
+[lints]
+workspace = true

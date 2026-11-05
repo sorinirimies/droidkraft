@@ -4,6 +4,7 @@ use crossterm::event::{KeyEvent, MouseEvent};
 
 use crate::worker::{Req, Res};
 
+#[derive(Debug)]
 pub enum Message {
     Key(KeyEvent),
     Mouse(MouseEvent),
@@ -12,6 +13,7 @@ pub enum Message {
 }
 
 /// Side effects the app loop executes after `update`.
+#[derive(Debug)]
 pub enum Cmd {
     Worker(Req),
     Quit,

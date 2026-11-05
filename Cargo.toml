@@ -19,11 +19,23 @@ resolver = "2"
 
 [workspace.package]
 version      = "2.2.2"
-edition    = "2021"
+edition    = "2024"
+rust-version = "1.91"
 authors    = ["Sorin Albu-Irimies <mihaiirimies@gmail.com>"]
 license    = "MIT"
 repository = "https://github.com/sorinirimies/droidkraft"
 homepage   = "https://github.com/sorinirimies/droidkraft"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+# `pub` only for what another crate uses; then dead_code finds the rest.
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
 
 # ── Shared dependency versions ─────────────────────────────────────────────────
 # Pin versions here once; each crate references them with `{ workspace = true }`
@@ -40,7 +52,6 @@ zip         = { version = "9", default-features = false, features = ["deflate"] 
 
 # Async / runtime
 tokio    = { version = "1.40.0", features = ["full"] }
-futures  = "0.3.32"
 
 # Errors
 color-eyre = "0.6.3"
@@ -53,7 +64,6 @@ tui-nuances       = "0.1.10"
 tui-chart         = { version = "0.1.1", features = ["theme"] }
 tui-piechart      = { version = "1.1", features = ["theme"] }
 tui-spinner       = { version = "0.5", features = ["theme"] }
-tui-slider        = { version = "0.4", features = ["theme"] }
 tui-checkbox      = { version = "0.5", features = ["theme"] }
 ratatui-image     = { version = "12.0.0-rc.2", default-features = false, features = ["crossterm"] }
 

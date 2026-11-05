@@ -253,10 +253,12 @@ mod tests {
             FastbootCommand::RebootFastbootd.args(),
             vec!["reboot", "fastboot"]
         );
-        assert!(FastbootCommand::Erase {
-            partition: "x".into()
-        }
-        .is_destructive());
+        assert!(
+            FastbootCommand::Erase {
+                partition: "x".into()
+            }
+            .is_destructive()
+        );
         assert!(!FastbootCommand::GetVar { name: "x".into() }.is_destructive());
     }
 

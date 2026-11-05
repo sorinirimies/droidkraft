@@ -5,12 +5,12 @@ use std::process::Command;
 use crate::types::{FastbootCommand, FastbootError, FastbootResult};
 
 /// Returns `true` when `fastboot` is available in `PATH`.
-pub fn available() -> bool {
+pub(crate) fn available() -> bool {
     Command::new("fastboot").arg("--version").output().is_ok()
 }
 
 /// Execute a command through the `fastboot` binary.
-pub fn execute(command: &FastbootCommand) -> FastbootResult<String> {
+pub(crate) fn execute(command: &FastbootCommand) -> FastbootResult<String> {
     if !available() {
         return Err(FastbootError::NotInstalled);
     }

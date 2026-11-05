@@ -17,10 +17,10 @@ pub mod screen;
 pub mod statusbar;
 
 use crossterm::event::{KeyEvent, MouseEvent};
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::Span;
 use ratatui::widgets::{Block, Borders, Paragraph};
-use ratatui::Frame;
 use tui_nuances::Status;
 
 use crate::message::Cmd;
@@ -188,7 +188,7 @@ pub fn route_mouse(m: &mut Model, e: MouseEvent) -> Vec<Cmd> {
 #[cfg(test)]
 pub mod test_util {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-    use ratatui::{backend::TestBackend, Terminal};
+    use ratatui::{Terminal, backend::TestBackend};
 
     use crate::model::Model;
 

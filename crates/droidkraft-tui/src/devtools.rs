@@ -246,23 +246,22 @@ impl DevToolsState {
     /// current `project_dir`, update the project root and re-discover modules.
     pub fn sync_project_from_browser(&mut self, browser_dir: &std::path::Path) {
         let (gradle_root, _) = find_gradle_root(browser_dir);
-        if let Some(root) = gradle_root {
-            if root != self.project_dir {
-                self.project_dir = root;
-                self.has_gradle = true;
-                self.discover_app_modules();
-                self.rebuild_variants();
-                let module_count = self.app_modules.len();
-                if module_count > 0 {
-                    let names: Vec<&str> =
-                        self.app_modules.iter().map(|m| m.name.as_str()).collect();
-                    self.status_message = Some(format!(
-                        "📱 Found {} app module{}: {}",
-                        module_count,
-                        if module_count == 1 { "" } else { "s" },
-                        names.join(", ")
-                    ));
-                }
+        if let Some(root) = gradle_root
+            && root != self.project_dir
+        {
+            self.project_dir = root;
+            self.has_gradle = true;
+            self.discover_app_modules();
+            self.rebuild_variants();
+            let module_count = self.app_modules.len();
+            if module_count > 0 {
+                let names: Vec<&str> = self.app_modules.iter().map(|m| m.name.as_str()).collect();
+                self.status_message = Some(format!(
+                    "📱 Found {} app module{}: {}",
+                    module_count,
+                    if module_count == 1 { "" } else { "s" },
+                    names.join(", ")
+                ));
             }
         }
     }
@@ -754,21 +753,21 @@ fn discover_app_modules_recursive(
         for build_file in &["build.gradle.kts", "build.gradle"] {
             let path = dir.join(build_file);
             if path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if content.contains("com.android.application") {
-                        let rel = dir.strip_prefix(root).unwrap_or(dir);
-                        let gradle_path = format!(":{}", rel.to_string_lossy().replace('/', ":"));
-                        let name = dir
-                            .file_name()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .to_string();
-                        modules.push(AppModule {
-                            gradle_path,
-                            name,
-                            fs_path: rel.to_string_lossy().to_string(),
-                        });
-                    }
+                if let Ok(content) = std::fs::read_to_string(&path)
+                    && content.contains("com.android.application")
+                {
+                    let rel = dir.strip_prefix(root).unwrap_or(dir);
+                    let gradle_path = format!(":{}", rel.to_string_lossy().replace('/', ":"));
+                    let name = dir
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    modules.push(AppModule {
+                        gradle_path,
+                        name,
+                        fs_path: rel.to_string_lossy().to_string(),
+                    });
                 }
                 break; // found a build file, don't check both
             }
@@ -955,14 +954,18 @@ mod tests {
         }];
         state.rebuild_variants();
         assert!(state.variants[0].task.contains(":app:"));
-        assert!(state
-            .variants
-            .iter()
-            .any(|v| v.task.contains("assembleDebug")));
-        assert!(state
-            .variants
-            .iter()
-            .any(|v| v.task.contains("installDebug")));
+        assert!(
+            state
+                .variants
+                .iter()
+                .any(|v| v.task.contains("assembleDebug"))
+        );
+        assert!(
+            state
+                .variants
+                .iter()
+                .any(|v| v.task.contains("installDebug"))
+        );
     }
 
     #[test]

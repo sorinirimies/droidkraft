@@ -6,17 +6,17 @@
 //! Run with: cargo run --example main_menu
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
+    event::{self, Event, KeyCode, KeyEventKind},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use droidkraft_tui::adb::{AdbCommand, PackageFilter};
 use ratatui::{
+    Frame, Terminal,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
-    Frame, Terminal,
 };
 use std::io::{self, stdout};
 
@@ -167,29 +167,29 @@ fn main() -> io::Result<()> {
     loop {
         terminal.draw(|frame| ui(frame, &app))?;
 
-        if let Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press {
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => {
-                        app.should_quit = true;
-                    }
-                    KeyCode::Char('h') | KeyCode::Char('?') => {
-                        app.toggle_help();
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        app.next();
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        app.previous();
-                    }
-                    KeyCode::Enter => {
-                        // In a real implementation, this would execute the command
-                        // For this example, we just show which command would be executed
-                        let item = app.get_selected_item();
-                        eprintln!("Would execute: {:?}", item.command);
-                    }
-                    _ => {}
+        if let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            match key.code {
+                KeyCode::Char('q') | KeyCode::Esc => {
+                    app.should_quit = true;
                 }
+                KeyCode::Char('h') | KeyCode::Char('?') => {
+                    app.toggle_help();
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    app.next();
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    app.previous();
+                }
+                KeyCode::Enter => {
+                    // In a real implementation, this would execute the command
+                    // For this example, we just show which command would be executed
+                    let item = app.get_selected_item();
+                    eprintln!("Would execute: {:?}", item.command);
+                }
+                _ => {}
             }
         }
 

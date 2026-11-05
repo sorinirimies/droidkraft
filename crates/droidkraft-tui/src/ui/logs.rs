@@ -1,11 +1,11 @@
 //! Logs panel: live logcat with level/tag/text filters, pause, save.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use ratatui::Frame;
 use tui_checkbox::Checkbox;
 use tui_file_explorer::{ExplorerOutcome, FileExplorer, SelectionMode};
 
@@ -18,6 +18,7 @@ pub const HINTS: &str =
     "/ search  z fuzzy  f tag  l level  space pause  c clear  s save  m fmt  j/k PgUp/PgDn G";
 
 /// Logs panel state.
+#[derive(Debug)]
 pub struct LogsUi {
     pub state: LogcatState,
     pub fmt: SaveFormat,

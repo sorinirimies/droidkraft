@@ -6,15 +6,15 @@
 //! on each tick.
 
 use std::path::PathBuf;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 
+use droidkraft_core::AdbManager;
 use droidkraft_core::features::fastboot::FastbootManager;
 use droidkraft_core::features::rom::{
-    self, build_plan, DeviceProfile, DownloadProgress, FlashOptions, FlashSession, FlashStep,
-    InstallMethod, RomBuild, StepStatus,
+    self, DeviceProfile, DownloadProgress, FlashOptions, FlashSession, FlashStep, InstallMethod,
+    RomBuild, StepStatus, build_plan,
 };
-use droidkraft_core::AdbManager;
 
 /// Request sent to the ROM worker thread.
 enum RomReq {
@@ -142,16 +142,16 @@ impl RomFlashState {
             .as_ref()
             .map(|p| p.serial.clone())
             .unwrap_or_default();
-        if let Some(session) = &self.session {
-            if let Some((idx, step)) = session.next_step() {
-                self.busy = true;
-                self.status = format!("Running: {}", step.label());
-                let _ = self.req_tx.send(RomReq::RunStep {
-                    idx,
-                    step: step.clone(),
-                    serial,
-                });
-            }
+        if let Some(session) = &self.session
+            && let Some((idx, step)) = session.next_step()
+        {
+            self.busy = true;
+            self.status = format!("Running: {}", step.label());
+            let _ = self.req_tx.send(RomReq::RunStep {
+                idx,
+                step: step.clone(),
+                serial,
+            });
         }
     }
 

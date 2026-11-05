@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use gpui::{div, prelude::*, rgb, AnyElement, Context};
+use gpui::{AnyElement, Context, div, prelude::*, rgb};
 
 use droidkraft_mirror::RecordStatus;
 
@@ -12,13 +12,13 @@ use crate::fmt::{ellipsize, fmt_elapsed};
 use crate::layout::Layout;
 use crate::mirror_view::empty_state;
 use crate::state::{
-    next_bitrate, next_dir, next_max_height, output_dir_choices, CaptureKind, DeviceState,
+    CaptureKind, DeviceState, next_bitrate, next_dir, next_max_height, output_dir_choices,
 };
 use crate::theme;
 use crate::ui::widgets::{button, card, kv, section_title, small_button};
 
 /// Program + args that reveal `path` in the platform file manager.
-pub fn reveal_command(path: &Path) -> (String, Vec<String>) {
+pub(super) fn reveal_command(path: &Path) -> (String, Vec<String>) {
     let p = path.to_string_lossy().to_string();
     if cfg!(target_os = "macos") {
         ("open".into(), vec!["-R".into(), p])
@@ -34,7 +34,7 @@ pub fn reveal_command(path: &Path) -> (String, Vec<String>) {
 }
 
 /// Program + args that open `path` with its default application.
-pub fn open_command(path: &Path) -> (String, Vec<String>) {
+pub(super) fn open_command(path: &Path) -> (String, Vec<String>) {
     let p = path.to_string_lossy().to_string();
     if cfg!(target_os = "macos") {
         ("open".into(), vec![p])

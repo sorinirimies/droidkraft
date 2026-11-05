@@ -1,9 +1,9 @@
 //! Header strip: Devices summary on home, device identity inside a workspace.
 
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use ratatui::Frame;
 use tui_nuances::Status;
 
 use crate::model::Model;

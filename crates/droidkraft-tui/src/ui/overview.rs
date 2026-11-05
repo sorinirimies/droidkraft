@@ -3,11 +3,11 @@
 
 use crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind};
 use droidkraft_core::{BatteryStatus, DeviceDetails, DeviceHistory, PlugType};
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Paragraph, Sparkline};
-use ratatui::Frame;
 use tui_chart::{Axis, LineChart, Series};
 use tui_nuances::Status;
 use tui_piechart::{PieChart, PieSlice, Resolution};
@@ -15,7 +15,7 @@ use tui_spinner::FluxSpinner;
 
 use crate::format::{fmt_mib, fmt_uptime, opt, truncate};
 use crate::message::Cmd;
-use crate::model::{state_hint, Model};
+use crate::model::{Model, state_hint};
 
 pub const HINTS: &str = "j/k PgUp/PgDn scroll ·";
 
@@ -62,11 +62,7 @@ impl Card {
         }
     }
     fn height(self) -> u16 {
-        if self == Card::System {
-            SYS_H
-        } else {
-            CARD_H
-        }
+        if self == Card::System { SYS_H } else { CARD_H }
     }
 }
 
@@ -259,6 +255,7 @@ fn kv_lines(rows: &[(&str, String)], w: u16, m: &Model) -> Vec<Line<'static>> {
 }
 
 /// Gauge on row 0, key/values below, sparkline on the last row.
+// Each argument is one value the card shows; a struct would only rename them.
 #[allow(clippy::too_many_arguments)]
 fn gauge_card(
     f: &mut Frame,

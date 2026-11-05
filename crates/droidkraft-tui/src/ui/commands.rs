@@ -2,16 +2,16 @@
 //! shell prompt with history, APK install via file explorer.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
-use ratatui::Frame;
 use tui_file_explorer::{ExplorerOutcome, FileExplorer, SelectionMode};
 
 use super::common::{
     centered, draw_explorer, draw_modal, hit, new_explorer, scroll_by, spinner, wrapped_lines,
 };
-use crate::commands::{catalog, CmdAction, Command};
+use crate::commands::{CmdAction, Command, catalog};
 use crate::message::Cmd;
 use crate::model::Model;
 use crate::worker::Req;
@@ -33,6 +33,7 @@ pub enum InputKind {
     Uninstall,
 }
 
+#[derive(Debug)]
 pub struct CmdUi {
     pub items: Vec<Command>,
     pub entries: Vec<Entry>,

@@ -8,10 +8,10 @@ use std::net::TcpStream;
 
 use crate::transport::Transport;
 
-pub struct Tcp(TcpStream);
+pub(crate) struct Tcp(TcpStream);
 
 impl Tcp {
-    pub fn connect(addr: &str) -> Result<Self, String> {
+    pub(crate) fn connect(addr: &str) -> Result<Self, String> {
         let mut s = TcpStream::connect(addr).map_err(|e| format!("connect {addr}: {e}"))?;
         s.write_all(b"FB01").map_err(|e| e.to_string())?;
         let mut hello = [0u8; 4];
