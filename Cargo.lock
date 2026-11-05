@@ -1843,7 +1843,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
 name = "droidkraft"
-version = "2.2.2"
+version = "2.2.3"
 dependencies = [
  "droidkraft-core",
  "droidkraft-mirror",
@@ -1854,7 +1854,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-core"
-version = "2.2.2"
+version = "2.2.3"
 dependencies = [
  "adb_client",
  "droidkraft-fastboot",
@@ -1868,7 +1868,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-fastboot"
-version = "2.2.2"
+version = "2.2.3"
 dependencies = [
  "nusb",
  "pollster 0.4.0",
@@ -1877,7 +1877,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-mirror"
-version = "2.2.2"
+version = "2.2.3"
 dependencies = [
  "adb_client",
  "image",
@@ -1885,7 +1885,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-tui"
-version = "2.2.2"
+version = "2.2.3"
 dependencies = [
  "adb_client",
  "color-eyre",
