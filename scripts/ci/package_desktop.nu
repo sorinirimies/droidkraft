@@ -40,6 +40,12 @@ export def plain-version [version: string]: nothing -> string { $version | str r
 export def deb-arch [target: string]: nothing -> string { if ($target | str starts-with "aarch64") { "arm64" } else { "amd64" } }
 export def rpm-arch [target: string]: nothing -> string { if ($target | str starts-with "aarch64") { "aarch64" } else { "x86_64" } }
 
+# Arguments for alien. The .deb path is made absolute here, before alien runs in its own
+# scratch directory, where a relative `dist/…` path no longer resolves.
+export def alien-args [deb: string]: nothing -> list<string> {
+    ["--to-rpm" "--scripts" ($deb | path expand)]
+}
+
 # Binaries that open a window or a terminal app, i.e. get a .desktop entry.
 export def launchable [bins: list<record>]: nothing -> list<record> { $bins | where kind in [gui tui] }
 
@@ -367,7 +373,8 @@ def "main linux" [version: string, target: string, --appimage] {
         let scratch = $"dist/rpm-($b.bin)"
         rm -rf $scratch
         mkdir $scratch
-        do { cd $scratch; ^fakeroot alien --to-rpm --scripts ($deb | path expand) }
+        let args = alien-args $deb
+        do { cd $scratch; ^fakeroot alien ...$args }
         let rpm = glob $"($scratch)/*.rpm" | first
         mv $rpm $"dist/($b.bin)-($v)-(rpm-arch $target).rpm"
         rm -rf $root $scratch

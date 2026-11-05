@@ -181,4 +181,10 @@ def "test package_desktop: the generated pkgbuild builds and installs every bina
     assert not ($cli_only | str contains "<<'EOF'")
 }
 
+# alien runs inside dist/rpm-<bin>; a relative .deb path broke the .rpm build.
+def "test desktop: alien gets an absolute deb path" [] {
+    let args = alien-args "dist/app_1.0.0_arm64.deb"
+    assert equal ($args | last) ($env.PWD | path join dist app_1.0.0_arm64.deb)
+}
+
 def main [] { run-tests }
