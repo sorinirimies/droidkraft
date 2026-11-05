@@ -767,7 +767,7 @@ pub fn collect_device_details(
 }
 
 /// Like [`collect_device_details`], but when `fast_base` is a previous good
-/// full collection, runs the much cheaper [`FAST_SCRIPT`] and reuses its
+/// full collection, runs the much cheaper `FAST_SCRIPT` and reuses its
 /// static fields. Pass `None` for a full refresh.
 pub fn collect_device_details_with(
     serial: &str,

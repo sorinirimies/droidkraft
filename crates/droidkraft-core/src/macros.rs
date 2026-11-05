@@ -15,7 +15,7 @@
 /// ```
 ///
 /// Expands to one `pub fn <name>(&mut self) -> AdbResult<String>` per entry,
-/// each delegating to [`AdbManager::shell_command`].
+/// each delegating to [`AdbManager::shell_command`](crate::AdbManager::shell_command).
 #[macro_export]
 macro_rules! shell_getters {
     ($(

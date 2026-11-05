@@ -34,7 +34,7 @@ pub fn parse_size(s: &str) -> Option<(u32, u32)> {
     (w > 0 && h > 0).then_some((w, h))
 }
 
-/// Parse args (without argv[0]).
+/// Parse args (without `argv[0]`).
 pub fn parse(args: &[String]) -> Result<Cli, String> {
     let mut theme = None;
     let mut graphics = None;

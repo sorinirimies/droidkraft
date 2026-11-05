@@ -4,7 +4,7 @@ use crate::features::packages::PackageFilter;
 
 /// A declarative description of an ADB operation.
 ///
-/// Dispatched to a concrete `AdbManager` method by [`AdbManager::execute`].
+/// Dispatched to a concrete `AdbManager` method by [`AdbManager::execute`](crate::AdbManager::execute).
 #[derive(Debug, Clone)]
 pub enum AdbCommand {
     // Device
