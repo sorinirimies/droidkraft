@@ -9,7 +9,7 @@ use ../ci/publish_crate.nu [already_published package_args]
 use ../ci/apt.nu [commands]
 use ../ci/check_static.nu [is_static]
 use ../ci/wayland_smoke.nu [gui_bins app_command as_user compositor_command verdict SOCKET]
-use ../ci/prune_releases.nu [from_gh from_gitea doomed]
+use ../ci/prune_releases.nu [from_gh from_gitea doomed newest]
 use ../ci/gitea_release.nu [release_payload]
 use ../ci/actions_update.nu [uses major_of bump PINNED]
 
@@ -103,6 +103,14 @@ def "test prune_releases: refuses an unknown kept tag" [] {
 
 def "test prune_releases: refuses when the kept release has no assets" [] {
     assert error { doomed (from_gitea $GITEA_RELEASES) "v1.0.0" }
+}
+
+# A manual re-run of an older tag must not delete the newest release's binaries.
+def "test prune_releases: newest compares versions not text" [] {
+    let rels = [{ tag: "v0.4.1" } { tag: "v0.10.0" } { tag: "v0.10.0-rc1" } { tag: "nightly" }]
+    assert equal (newest $rels) "v0.10.0"
+    assert equal (newest ($rels | where tag != "v0.10.0")) "v0.10.0-rc1"
+    assert equal (newest [{ tag: "nightly" }]) null
 }
 
 def "test gitea_release: payload carries tag, title and notes" [] {
