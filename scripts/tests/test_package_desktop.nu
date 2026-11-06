@@ -187,4 +187,11 @@ def "test desktop: alien gets an absolute deb path" [] {
     assert equal ($args | last) ($env.PWD | path join dist app_1.0.0_arm64.deb)
 }
 
+# `which` lists this script's own `appimagetool` command; returning its name made
+# run-external fail with "Command `appimagetool` not found" on every Linux release.
+def "test desktop: a custom command is not an installed program" [] {
+    assert equal (on-path on-path) null
+    assert ((on-path nu) | path exists)
+}
+
 def main [] { run-tests }

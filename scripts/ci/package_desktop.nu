@@ -383,8 +383,15 @@ def "main linux" [version: string, target: string, --appimage] {
     if $appimage { appimages $version $target $existing }
 }
 
+# The path of an installed program, or null. `which` also lists custom commands (this
+# script defines `appimagetool` itself), so only external programs count.
+export def on-path [name: string]: nothing -> any {
+    which $name | where type == external | get -o 0.path
+}
+
 def appimagetool []: nothing -> string {
-    if (which appimagetool | is-not-empty) { return "appimagetool" }
+    let installed = on-path appimagetool
+    if $installed != null { return $installed }
     let arch = uname | get machine
     let tool = $"target/tools/appimagetool-($arch).AppImage"
     if not ($tool | path exists) {
