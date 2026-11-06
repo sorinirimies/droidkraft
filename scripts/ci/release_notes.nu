@@ -10,11 +10,22 @@
 #   nu scripts/ci/release_notes.nu v0.2.0
 # ──────────────────────────────────────────────────────────────────────────────
 
-use ../project.nu [PUBLISH bin_crates]
+use ../project.nu [BINS PUBLISH bin_crates]
+
+# `cargo install` lines for the published `crates`, each under a comment with its
+# binary's summary from `bins` (so a reader sees which one is the GUI, the TUI or
+# the web UI), separated by blank lines.
+export def install_block [crates: list<string>, bins: table, publish: list<string>]: nothing -> list<string> {
+    $crates | where {|c| $c in $publish } | each {|c|
+        let summary = $bins | where crate == $c | get -o 0.summary
+        let label = if ($summary | is-empty) { [] } else { [$"# ($summary)"] }
+        [...$label $"cargo install ($c)"]
+    } | each {|lines| [...$lines ""] } | flatten | drop
+}
 
 # `cargo install` lines for the published crates that ship a binary.
 export def install_lines []: nothing -> list<string> {
-    bin_crates | where {|c| $c in $PUBLISH } | each {|c| $"cargo install ($c)" }
+    install_block (bin_crates) $BINS $PUBLISH
 }
 
 # The notes text for `version` with the changelog section `changes`.
