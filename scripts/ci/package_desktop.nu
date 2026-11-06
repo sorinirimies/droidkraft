@@ -59,12 +59,18 @@ export def deb-deps [kind: string]: nothing -> record<depends: string, recommend
     }
 }
 
+# A binary's package name. Debian allows only lowercase letters, digits and `+-.`, so a
+# binary like `app_cli` ships as the package `app-cli` (the command keeps its name).
+export def deb-name [bin: string]: nothing -> string {
+    $bin | str downcase | str replace --all '_' '-'
+}
+
 # DEBIAN/control of one binary's package.
 export def deb-control [app: record, bin: record, version: string, arch: string]: nothing -> string {
     let deps = deb-deps $bin.kind
     let dep = if ($deps.depends | is-empty) { "" } else { $"Depends: ($deps.depends)\n" }
     let rec = if ($deps.recommends | is-empty) { "" } else { $"Recommends: ($deps.recommends)\n" }
-    $"Package: ($bin.bin)
+    $"Package: (deb-name $bin.bin)
 Version: (plain-version $version)
 Architecture: ($arch)
 Maintainer: ($app.maintainer)
@@ -364,10 +370,11 @@ def "main linux" [version: string, target: string, --appimage] {
         mkdir $"($root)/DEBIAN"
         stage $root (package-files $APP $b $target $existing)
         ^chmod 755 $"($root)/usr/bin/($b.bin)"
-        mkdir $"($root)/usr/share/doc/($b.bin)"
-        cp LICENSE $"($root)/usr/share/doc/($b.bin)/copyright"
+        let pkg = deb-name $b.bin
+        mkdir $"($root)/usr/share/doc/($pkg)"
+        cp LICENSE $"($root)/usr/share/doc/($pkg)/copyright"
         deb-control $APP $b $version (deb-arch $target) | save --force $"($root)/DEBIAN/control"
-        let deb = $"dist/($b.bin)_($v)_(deb-arch $target).deb"
+        let deb = $"dist/($pkg)_($v)_(deb-arch $target).deb"
         ^dpkg-deb --root-owner-group --build $root $deb
         # alien writes into the working directory: give each conversion its own.
         let scratch = $"dist/rpm-($b.bin)"
@@ -376,7 +383,7 @@ def "main linux" [version: string, target: string, --appimage] {
         let args = alien-args $deb
         do { cd $scratch; ^fakeroot alien ...$args }
         let rpm = glob $"($scratch)/*.rpm" | first
-        mv $rpm $"dist/($b.bin)-($v)-(rpm-arch $target).rpm"
+        mv $rpm $"dist/($pkg)-($v)-(rpm-arch $target).rpm"
         rm -rf $root $scratch
         print -e $"✅ ($deb) + .rpm"
     }

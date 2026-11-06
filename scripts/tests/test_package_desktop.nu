@@ -194,4 +194,13 @@ def "test desktop: a custom command is not an installed program" [] {
     assert ((on-path nu) | path exists)
 }
 
+# dpkg-deb rejected netrunner's `netrunner_cli`: package names can't hold `_`.
+def "test desktop: package names are valid debian names" [] {
+    assert equal (deb-name netrunner_cli) netrunner-cli
+    assert equal (deb-name App_GUI) app-gui
+    let ctl = deb-control (app) {crate: x, bin: demo_cli, kind: cli, summary: s} 1.0.0 amd64
+    assert ($ctl | str starts-with "Package: demo-cli\n")
+    for b in $BINS { assert ((deb-name $b.bin) =~ '^[a-z0-9][a-z0-9+.-]+$') $"($b.bin)" }
+}
+
 def main [] { run-tests }
