@@ -307,9 +307,9 @@ demo:
 soak name="droidkraft" secs="60":
     nu scripts/soak.nu {{name}} {{secs}}
 
-# Regenerate the app icons in assets/icons, packaging/macos and packaging/windows
+# Regenerate every app icon (PNGs, .icns, .ico) from assets/icons/droidkraft.svg (needs resvg, magick; iconutil for the .icns)
 icons:
-    cargo run -p droidkraft-tui --example gen_icons
+    nu scripts/icons.nu
 
 # Re-record one preview GIF, e.g. `just vhs tui-overview` (needs vhs and a device)
 vhs name:

@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- DroidKraft app icon: a device whose signal leaves its frame: monitored, mirrored, reached.
+       Master artwork. `just icons` derives every platform icon from this file:
+       the small sizes drop the construction and detail blocks, macOS adds its margin and shadow. -->
+  <defs>
+    <clipPath id="dk-tile"><rect width="1024" height="1024" rx="228"/></clipPath>
+    <radialGradient id="dk-bg" cx="0.35" cy="0.25" r="1">
+      <stop offset="0" stop-color="#22252d"/>
+      <stop offset="1" stop-color="#0a0b0e"/>
+    </radialGradient>
+    <linearGradient id="dk-rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.03"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="dk-ivory" gradientUnits="userSpaceOnUse" x1="0" y1="180" x2="0" y2="850">
+      <stop offset="0" stop-color="#fbf6ec"/>
+      <stop offset="1" stop-color="#d6cab4"/>
+    </linearGradient>
+    <linearGradient id="dk-accent" gradientUnits="userSpaceOnUse" x1="300" y1="250" x2="740" y2="800">
+      <stop offset="0" stop-color="#cdf28e"/>
+      <stop offset="0.5" stop-color="#8cc94a"/>
+      <stop offset="1" stop-color="#5a9128"/>
+    </linearGradient>
+    <filter id="dk-lift" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+    <!-- fine grain: dithers the dark gradient so large sizes show no banding -->
+    <filter id="dk-grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7"/>
+      <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 -0.4"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="228" fill="url(#dk-bg)"/>
+  <rect width="1024" height="1024" filter="url(#dk-grain)" clip-path="url(#dk-tile)" opacity="0.06"/>
+
+  <!-- construction:start -->
+  <g clip-path="url(#dk-tile)" fill="none" stroke="#c3dc9a" stroke-width="2.5">
+    <circle cx="512" cy="512" r="400" stroke-opacity="0.22"/>
+    <rect x="252" y="200" width="380" height="624" rx="76" stroke-opacity="0.12" transform="translate(150 0)" stroke-dasharray="6 10"/>
+    <path d="M252 40 V 984 M632 40 V 984" stroke-opacity="0.13"/>
+    <path d="M40 200 H 984 M40 824 H 984 M40 540 H 984" stroke-opacity="0.13"/>
+    <g stroke-opacity="0.45">
+      <path d="M252 140 H 632 M252 128 V 152 M632 128 V 152"/>
+      <path d="M690 200 V 824 M678 200 H 702 M678 824 H 702"/>
+    </g>
+  <g fill="#c3dc9a" fill-opacity="0.5"><circle cx="512" cy="512" r="5"/><circle cx="442" cy="200" r="5"/><circle cx="442" cy="824" r="5"/><circle cx="800" cy="540" r="5"/></g>
+  </g>
+  <!-- construction:end -->
+
+  <!-- mark:start -->
+  <g filter="url(#dk-lift)">
+    <rect x="280" y="228" width="324" height="568" rx="56" fill="none" stroke="url(#dk-ivory)" stroke-width="56"/>
+    <path d="M392 290 H 492" fill="none" stroke="url(#dk-ivory)" stroke-width="28" stroke-linecap="round"/>
+    <path d="M210 540 H 350 L 400 440 L 470 660 L 520 540 H 740" fill="none" stroke="url(#dk-accent)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="790" cy="540" r="62" fill="url(#dk-accent)"/>
+  </g>
+  <g fill="#121419">
+    <circle cx="790" cy="540" r="24"/>
+  </g>
+  <!-- mark:end -->
+
+  <!-- rim:start -->
+  <rect x="5" y="5" width="1014" height="1014" rx="223" fill="none" stroke="url(#dk-rim)" stroke-width="10"/>
+  <!-- rim:end -->
+</svg>

@@ -40,7 +40,8 @@ fn ico_has_directory_and_valid_offsets() {
         let len = u32::from_le_bytes(e[8..12].try_into().unwrap()) as usize;
         let off = u32::from_le_bytes(e[12..16].try_into().unwrap()) as usize;
         assert!(off + len <= b.len(), "entry {i} out of bounds");
-        assert_eq!(&b[off..off + 4], b"\x89PNG");
+        // Classic BMP entries (a BITMAPINFOHEADER), which NSIS and every Windows read.
+        assert_eq!(&b[off..off + 4], [0x28, 0, 0, 0], "entry {i} is a BMP");
     }
 }
 
