@@ -365,7 +365,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-core"
-version = "2.2.3"
+version = "2.3.0"
 dependencies = [
  "adb_client",
  "droidkraft-fastboot",
@@ -379,7 +379,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-fastboot"
-version = "2.2.3"
+version = "2.3.0"
 dependencies = [
  "nusb",
  "pollster",
@@ -398,7 +398,7 @@ dependencies = [
 
 [[package]]
 name = "droidkraft-mirror"
-version = "2.2.3"
+version = "2.3.0"
 dependencies = [
  "adb_client",
  "image",

@@ -4,6 +4,26 @@ All notable changes to this project are documented here. It is generated from
 [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — do not edit it by hand.
 
+## [2.3.0](https://github.com/sorinirimies/droidkraft/compare/v2.2.3...v2.3.0) — 2026-11-07
+
+### ✨ Features
+
+- New app icon for macOS, Windows and Linux ([`86c53fd`](https://github.com/sorinirimies/droidkraft/commit/86c53fdbd710ef2408fc4aa19741e8f57eba8721))
+
+### 📦 Dependencies
+
+- Nightly cargo update 2026-11-07 ([`6599be7`](https://github.com/sorinirimies/droidkraft/commit/6599be7fdcf2cc875f76cd46282f70cda5ef68af))
+- Nightly cargo update 2026-11-06 ([`acc9418`](https://github.com/sorinirimies/droidkraft/commit/acc9418d20e1f39fe281c9265d444a560afe0980))
+
+### 🔄 CI and release
+
+- **gitea:** Check the MSRV on Gitea too, with the same command as GitHub ([`fcbe2a5`](https://github.com/sorinirimies/droidkraft/commit/fcbe2a5220a513226dd58533145f1466abb97ade))
+- **release:** Each install line in the release notes says which binary it is (GUI, TUI, web) ([`6b64879`](https://github.com/sorinirimies/droidkraft/commit/6b64879cb45b8b513e80583f4828b81bfcda2cf4))
+- **packages:** .deb and .rpm package names are valid Debian names (no underscores) ([`2f702be`](https://github.com/sorinirimies/droidkraft/commit/2f702be0203485021307c5624e285f5b0cca68bd))
+- **packages:** AppImages use the downloaded appimagetool; which also matched the script's own command ([`1090bf3`](https://github.com/sorinirimies/droidkraft/commit/1090bf36959d6025cb0518def83cc51e761f74bc))
+- **release:** Pruning skips a re-run of an older release ([`ce49e53`](https://github.com/sorinirimies/droidkraft/commit/ce49e5377378ac7d60fb0fbb5c21d98ea3b101d1))
+- **packages:** Alien gets an absolute .deb path, so the .rpm build finds it ([`ef03258`](https://github.com/sorinirimies/droidkraft/commit/ef03258f59216ef5cc966d49e8a7cc7275de7a33))
+
 ## [2.2.3](https://github.com/sorinirimies/droidkraft/compare/v2.2.2...v2.2.3) — 2026-11-05
 
 ### 🐛 Bug fixes
