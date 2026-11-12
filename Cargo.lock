@@ -121,9 +121,9 @@ dependencies = [
 
 [[package]]
 name = "ar_archive_writer"
-version = "0.5.3"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73cd58deff2140a0a8eae87e417bd01db68a33e148aa93d1e8cd837e55e312b6"
+checksum = "523e5e187fff36fcb8d1d19ccf0ca4ca43ec3d158316057f66dc6f72716bc5ec"
 dependencies = [
  "object 0.39.1",
 ]
@@ -7238,9 +7238,9 @@ dependencies = [
 
 [[package]]
 name = "tui-spinner"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "937930e920bac1061afa9b23835cd2b30160438c7fc8afc2f06b5605b56746d6"
+checksum = "6e63e09be3aa0d8ef868b44f764829949c5873884f42e2fce714a3439ae586a3"
 dependencies = [
  "ratatui",
  "tui-nuances",
