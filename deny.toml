@@ -7,6 +7,7 @@ yanked = "deny"
 ignore = [
     "RUSTSEC-2023-0071", # rsa: Marvin attack
     "RUSTSEC-2025-0141", # bincode unmaintained
+    "RUSTSEC-2026-0543", # chrono unmaintained notice only, no vulnerability; a move to jiff/time is a separate migration
     # Unmaintained crates reached only through gpui 0.2.2, the latest release; droidkraft
     # cannot replace them. Drop each entry once a gpui release moves off it.
     # gpui_http_client (zed-async-tar, zed-reqwest, futures-lite 1).
