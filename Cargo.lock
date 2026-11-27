@@ -991,9 +991,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.11.3"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02f0e023adb368345ce0ca6cdfc0f24a06554468d0e8503e14a0841de79bfa69"
+checksum = "95e45cf2980b2d467be49a9ed942c9179b701063a7ca3d037de7ee9bd67f8d66"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -2190,9 +2190,9 @@ dependencies = [
 
 [[package]]
 name = "find-msvc-tools"
-version = "0.1.15"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c66915cc5391097de7a2b0b972e8505aa33c0df401fd3a6811dbdb32881ba48"
+checksum = "3e44f110d1777dc6559a51e7d45083945ded4f1bf3305494350f693b6d20b9c8"
 
 [[package]]
 name = "finl_unicode"
@@ -7207,9 +7207,9 @@ dependencies = [
 
 [[package]]
 name = "tui-file-explorer"
-version = "4.0.9"
+version = "4.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c88f7ba797f0325a95d591e2476bebbe207bdc69e2c380b110fc62cdd35d53f6"
+checksum = "54022a51672b249356d9af27d496d51edecc6d45be2a6f297e531b92a029a5e5"
 dependencies = [
  "crossterm",
  "libc",
@@ -7229,9 +7229,9 @@ dependencies = [
 
 [[package]]
 name = "tui-piechart"
-version = "1.4.4"
+version = "1.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d65272d25bb3799d827de6d07f7c4885eb40761693ea0db6eafe051fa63457ac"
+checksum = "50a2da79cd55ed43e4c022ddf97c76d8948e312c7327e06c5789448960428d74"
 dependencies = [
  "ratatui",
  "tui-nuances",
@@ -7239,9 +7239,9 @@ dependencies = [
 
 [[package]]
 name = "tui-spinner"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e63e09be3aa0d8ef868b44f764829949c5873884f42e2fce714a3439ae586a3"
+checksum = "6b41697655668846f0d6ecd86e93a3aa952d689c747fb6504513054a84e3fd7c"
 dependencies = [
  "ratatui",
  "tui-nuances",
@@ -8685,9 +8685,9 @@ checksum = "ac366ea532fa8ee6a992cec9dea525b1dc284e69702f36c2ab5fbebadc81ec86"
 
 [[package]]
 name = "yeslogic-fontconfig-sys"
-version = "6.0.1"
+version = "6.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d8b8abf912b9a29ff112e1671c97c33636903d13a69712037190e6805af4f76"
+checksum = "b2232035104db97d8ded0e24a20d6ba61a0f904e5830d437f411d9a499336224"
 dependencies = [
  "dlib",
  "once_cell",
